@@ -5556,14 +5556,32 @@ const PDL_FINE_GIORNO = [
 ];
 
 // Come viene numerata una scena nella colonna di sinistra.
-// Il suffisso di lettera ("12A") deve stare attaccato al numero: con uno
-// spazio in mezzo il regex si prenderebbe la "I" di "Sc: 12 INT/EXT" e
-// nessun numero corrisponderebbe piu' a quelli estratti dal modello.
+// I numeri di scena non sono solo numeri: "35APT", "71Pt1", "71End1",
+// "70End" sono tutti nomi legittimi. Ammettere una sola lettera leggeva
+// "35A" da "35APT", che non corrisponde a nulla di quanto estratto dal
+// modello, e la scena restava fuori dal riordino.
+// Il suffisso deve pero' stare attaccato al numero: con uno spazio in mezzo
+// il regex si prenderebbe la "I" di "Sc: 12 INT/EXT".
+const PDL_NUM = '(\\d{1,4}[A-Za-z]{0,6}\\d{0,3})(?![\\d/])';
 const PDL_SCENE = [
-  { nome: 'Sc: N',     re: /\bsc\s*[:.]\s*(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
-  { nome: 'SCENA N',   re: /\bscena\s*[:.]?\s*(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
-  { nome: 'Sc N',      re: /\bsc\s+(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
+  { nome: 'Sc: N',     re: new RegExp('\\bsc\\s*[:.]\\s*' + PDL_NUM, 'gi') },
+  { nome: 'SCENA N',   re: new RegExp('\\bscena\\s*[:.]?\\s*' + PDL_NUM, 'gi') },
+  { nome: 'Sc N',      re: new RegExp('\\bsc\\s+' + PDL_NUM, 'gi') },
 ];
+
+// La data della giornata, scritta sulla riga del marcatore:
+//   "End of Day 1 -- sabato 17 ottobre 2026 -- 2 2/8 Pag --"
+// E' l'unica fonte attendibile: il modello sbagliava di un giorno, mettendo
+// il Day 2 di domenica invece che di lunedi' e lasciando un buco nel
+// calendario.
+const PDL_MESI = {
+  gennaio:1, febbraio:2, marzo:3, aprile:4, maggio:5, giugno:6, luglio:7,
+  agosto:8, settembre:9, ottobre:10, novembre:11, dicembre:12,
+  january:1, february:2, march:3, april:4, may:5, june:6, july:7,
+  august:8, september:9, october:10, november:11, december:12
+};
+const PDL_DATA_RE = new RegExp(
+  '(\\d{1,2})\\s+(' + Object.keys(PDL_MESI).join('|') + ')\\s+(\\d{4})', 'i');
 
 // Come viene scritto l'orario della giornata.
 const PDL_ORA  = '(\\d{1,2})(?:\\s*[.:]\\s*(\\d{2}))?';
@@ -5607,8 +5625,14 @@ function pdlSegmentiPerGiorno(text) {
   const segmenti = [];
   let prevEnd = 0;
   for (const marker of markers) {
-    segmenti.push({ dayNum: marker.dayNum, chunk: text.slice(prevEnd, marker.index) });
-    prevEnd = marker.index + marker.len;
+    const fine = marker.index + marker.len;
+    segmenti.push({
+      dayNum: marker.dayNum,
+      chunk: text.slice(prevEnd, marker.index),
+      // La coda del marcatore contiene la data: "-- sabato 17 ottobre 2026 --"
+      coda: text.slice(fine, fine + 80)
+    });
+    prevEnd = fine;
   }
   return { segmenti, dicitura };
 }
@@ -5793,6 +5817,56 @@ function applyTrasferimenti(transferMap) {
 }
 
 /*
+ * Legge la data di ogni giornata dalla riga del marcatore.
+ *
+ * "End of Day 1 -- sabato 17 ottobre 2026 -- 2 2/8 Pag --"
+ *
+ * E' scritta nel PDF, quindi non ha senso dedurla: il modello la sbagliava
+ * di un giorno, piazzando il Day 2 di domenica invece che di lunedi' e
+ * lasciando un buco nel calendario dove non c'era.
+ */
+function parseDateFromText(text) {
+  const result = {};
+  const { segmenti } = pdlSegmentiPerGiorno(text);
+  for (const { dayNum, coda } of segmenti) {
+    const m = PDL_DATA_RE.exec(coda || '');
+    if (!m) continue;
+    const mese = PDL_MESI[m[2].toLowerCase()];
+    if (!mese) continue;
+    result[dayNum] = m[3] + '-' + String(mese).padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  const n = Object.keys(result).length;
+  if (n) console.log('[DataParser] ' + n + ' date lette dal PDF');
+  return result;
+}
+
+/*
+ * Scrive le date lette dal PDF sulle giornate.
+ */
+function applyDate(dateMap) {
+  if (!pdlData?.settimane || !Object.keys(dateMap).length) return false;
+  const GIORNI = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let cambiate = 0;
+  pdlData.settimane.forEach(s => (s.giorni || []).forEach(g => {
+    const d = dateMap[g.numero_giorno];
+    if (!d || g.data === d) return;
+    g.data = d;
+    const [y, mo, dd] = d.split('-').map(Number);
+    g.giorno_settimana = GIORNI[new Date(Date.UTC(y, mo - 1, dd)).getUTCDay()];
+    cambiate++;
+  }));
+  if (cambiate) {
+    console.log('[applyDate] ' + cambiate + ' date corrette rispetto a quelle del modello');
+    // data_inizio e data_fine devono seguire, altrimenti il calendario
+    // si apre sul mese sbagliato.
+    const tutte = Object.values(dateMap).sort();
+    pdlData.data_inizio = tutte[0];
+    pdlData.data_fine = tutte[tutte.length - 1];
+  }
+  return cambiate > 0;
+}
+
+/*
  * Rimette ogni scena nella giornata giusta.
  *
  * Il modello slitta il raggruppamento: le scene del giorno 1 finiscono sul
@@ -5889,7 +5963,10 @@ async function extractAndApplyTrasferimenti(b64) {
     const sceneMap = parseSceneFromText(fullText);
     const sceneChanged = applyScene(sceneMap);
 
-    if (Object.keys(transferMap).length || orariChanged || sceneChanged) {
+    // Anche le date stanno scritte nel PDF, sulla riga di fine giornata.
+    const dateChanged = applyDate(parseDateFromText(fullText));
+
+    if (Object.keys(transferMap).length || orariChanged || sceneChanged || dateChanged) {
       renderPdlCalendar();
       savePdlToSupabase();
     }
