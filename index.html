@@ -2818,7 +2818,7 @@ async function startAnalysis() {
     let resp;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const apiData = await callApi('api/analyze', { model:'claude-sonnet-4-6', max_tokens:20000, system:SYSPROMPT, messages:[{ role:'user', content:blocks }] });
+        const apiData = await callApi('api/analyze', { model:'claude-sonnet-5-5', max_tokens:20000, system:SYSPROMPT, messages:[{ role:'user', content:blocks }] });
         resp = { ok: true, _data: apiData };
         break;
       } catch(e) {
@@ -3326,7 +3326,7 @@ async function startSerieAnalysis() {
       const sysPromptSerie = SYSPROMPT + `\n\nCONTESTO SERIE TV: ${serieCtx}`;
 
       const apiData = await callApi('api/analyze', {
-        model: 'claude-sonnet-4-6', max_tokens: 16000,
+        model: 'claude-sonnet-5-5', max_tokens: 16000,
         system: sysPromptSerie,
         messages: [{ role: 'user', content: [{ type: 'text', text: text.slice(0, 120000) }] }]
       });
@@ -3748,7 +3748,7 @@ Rispondi SOLO con JSON valido:
 
   try {
     const resp = await callApi('api/analyze', {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5-5',
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -3826,7 +3826,7 @@ async function runNewAnalysisBackground(b64, newText) {
     console.log('[NewAnalysis] SYSPROMPT length:', sysprompt.length);
     if (!sysprompt) { console.log('[NewAnalysis] SYSPROMPT vuoto!'); return; }
     const resp = await callApi('api/analyze', {
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5-5',
       max_tokens: 16000,
       system: sysprompt,
       messages: [{ role: 'user', content: [{ type: 'text', text: newText.slice(0, 120000) }] }]
@@ -4274,7 +4274,7 @@ async function classifyMessageIntent(text) {
   const recent = chatHistory.slice(-4).map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`).join('\n');
   try {
     const data = await callApi('api/chat', {
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-5-5',
       max_tokens: 60,
       system: 'Sei un classificatore di intento. Rispondi SOLO con JSON valido, nessun testo aggiuntivo.',
       messages: [{ role: 'user', content: `Contesto recente:\n${recent}\n\nNuovo messaggio: "${text}"\n\nRispondi SOLO con JSON: {"tipo":"scena|pdl|generico","numeri":[numeri scena se tipo=scena]}` }]
@@ -4455,7 +4455,7 @@ async function sendChat() {
   let reply = '';
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const data = await callApi('api/chat', { model:'claude-sonnet-4-6', max_tokens:1024, system:SYS, messages:chatHistory });
+      const data = await callApi('api/chat', { model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:chatHistory });
       reply = data.content.map(b=>b.text||'').join('').trim();
       break;
     } catch(err) {
@@ -5427,7 +5427,7 @@ async function handleCastUpload(input) {
       // Image (JPEG/PNG) — use Claude Vision
       const mediaType = file.type || 'image/jpeg';
       const data = await callApi('api/chat', {
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-5-5',
         max_tokens: 4000,
         system: 'Sei un estrattore di dati. Rispondi ESCLUSIVAMENTE con un array JSON. Zero testo extra. Zero markdown. Zero backtick. Solo il JSON grezzo che inizia con [ e finisce con ].',
         messages: [{ role: 'user', content: [
@@ -6444,7 +6444,7 @@ async function sendGennaroDrawer() {
     const ragText = await buildRagContext(text);
     const SYS = buildGennaroSys(ragText);
 
-    const data = await callApi('api/chat', { model:'claude-sonnet-4-6', max_tokens:1024, system:SYS, messages:gennaroDrawerHistory });
+    const data = await callApi('api/chat', { model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:gennaroDrawerHistory });
     const reply = data.content.map(b=>b.text||'').join('').trim();
     gennaroDrawerHistory.push({ role: 'assistant', content: reply });
     document.getElementById('gennaroDrawerTyping')?.remove();
@@ -7096,11 +7096,42 @@ function ttBuildPdfPage(doc, tab, produzione, film, reparto, settimana, dal, al,
 // ══════════════════════════════════════════════
 </script>
 <script>
-// Unregister any old service workers
+// Service worker: serve l'app offline (sul set senza campo).
+//
+// sw.js usa network-first per l'HTML, quindi una versione nuova arriva
+// sempre quando c'e' rete e la cache entra in gioco solo come riserva:
+// non si resta bloccati su una build vecchia.
+//
+// Interruttori d'emergenza, da aggiungere in fondo all'indirizzo:
+//   ?nosw  spegne l'offline — disiscrive, svuota le cache e NON si riaccende
+//   ?sw    lo riaccende
+// Lo stato sta in localStorage, non nell'indirizzo: senza quello il ricarico
+// dopo ?nosw ripartirebbe senza il parametro e si re-iscriverebbe subito.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
-  });
+  const q = new URLSearchParams(location.search);
+  const SW_OFF = 'sw_disabled';
+
+  if (q.has('sw')) {
+    localStorage.removeItem(SW_OFF);
+  }
+
+  if (q.has('nosw')) {
+    localStorage.setItem(SW_OFF, '1');
+    const done = () => location.replace(location.pathname);
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => Promise.all(regs.map(r => r.unregister())))
+      .then(() => caches.keys())
+      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(done, done);
+  } else if (localStorage.getItem(SW_OFF)) {
+    console.info('[SW] offline disattivato — riattiva con ?sw');
+  } else {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(e => {
+        console.warn('[SW] registrazione fallita', e);
+      });
+    });
+  }
 }
 </script>
 </body>

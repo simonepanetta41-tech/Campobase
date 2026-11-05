@@ -1,18 +1,36 @@
-const CACHE = 'soundanalyst-v2';
+const CACHE = 'soundanalyst-v3';
+
+// Dipendenze che devono esserci offline.
+// pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
+// l'app si apre ma le due funzioni principali non vanno.
 const STATIC = [
   '/',
   '/index.html',
+  '/manifest.json',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700;800&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
 ];
 
+// ── INSTALL ──────────────────────────────────────────────────────────────────
+// Scarica tutto STATIC una risorsa per volta invece di addAll: con addAll un
+// singolo 404 fa fallire l'installazione intera e l'app resta senza offline.
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['/index.html'])).then(() => self.skipWaiting())
+    caches.open(CACHE).then(cache =>
+      Promise.all(
+        STATIC.map(url =>
+          cache.add(new Request(url, { cache: 'reload' }))
+            .catch(err => console.warn('[SW] precache saltato:', url, err))
+        )
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
+// ── ACTIVATE ─────────────────────────────────────────────────────────────────
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -21,33 +39,49 @@ self.addEventListener('activate', e => {
   );
 });
 
+// ── FETCH ────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', e => {
+  // Solo GET: le POST verso Supabase o /api/ devono passare intatte.
+  if (e.request.method !== 'GET') return;
+
   const url = new URL(e.request.url);
 
-  // Never cache API calls or Supabase
+  // Mai in cache: devono sempre passare dalla rete.
   if (url.pathname.startsWith('/api/') ||
       url.hostname.includes('supabase') ||
       url.hostname.includes('anthropic') ||
-      e.request.method !== 'GET') {
+      url.hostname.includes('googleapis.com')) {
     return;
   }
 
-  // Network first for HTML (always fresh)
-  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+  // HTML: network-first, cache solo come riserva.
+  // Cosi' una build nuova arriva sempre quando c'e' rete e non si resta
+  // bloccati su una versione vecchia.
+  if (e.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     e.respondWith(
       fetch(e.request)
-        .then(r => { const c = r.clone(); caches.open(CACHE).then(cache => cache.put(e.request, c)); return r; })
+        .then(r => {
+          const copy = r.clone();
+          caches.open(CACHE).then(cache => cache.put('/index.html', copy));
+          return r;
+        })
         .catch(() => caches.match('/index.html'))
     );
     return;
   }
 
-  // Cache first for static assets (fonts, scripts)
+  // Tutto il resto: cache-first.
+  // Le risposte opache (status 0) dai CDN si accettano: i <script src> senza
+  // attributo crossorigin arrivano in no-cors e con il controllo r.ok non
+  // finirebbero mai in cache, lasciando pdf.js e jsPDF fuori dall'offline.
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(r => {
-        if (r.ok) { const c = r.clone(); caches.open(CACHE).then(cache => cache.put(e.request, c)); }
+        if (r.ok || r.type === 'opaque') {
+          const copy = r.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, copy));
+        }
         return r;
       });
     })
