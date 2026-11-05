@@ -2443,7 +2443,15 @@ async function callApi(endpoint, body) {
   });
   let data;
   try { data = await resp.json(); } catch(_) { throw new Error('Errore API ' + resp.status); }
-  if (!resp.ok) throw new Error(data?.error || 'Errore API ' + resp.status);
+  if (!resp.ok) {
+    // Difesa contro "[object Object]": se l'errore non e' una stringa,
+    // si cerca il messaggio dentro e solo in ultima istanza si serializza.
+    const e = data?.error;
+    const msg = typeof e === 'string' ? e
+              : e?.message || (e ? JSON.stringify(e) : null)
+              || 'Errore API ' + resp.status;
+    throw new Error(msg);
+  }
   return data;
 }
 

@@ -150,6 +150,24 @@ export async function callAnthropic(env, payload, ctx) {
     body: JSON.stringify(payload)
   });
 
+  // Gli errori si leggono e si riducono a una stringa, invece di girarli
+  // grezzi. Anthropic li manda come { type, error: { type, message } }, e il
+  // client fa new Error(data.error): con un oggetto dentro, a schermo
+  // comparirebbe "[object Object]" e il motivo vero resterebbe nascosto.
+  // Sono risposte corte, quindi leggerle non costa nulla.
+  if (!r.ok) {
+    const grezzo = await r.text().catch(() => '');
+    console.error('anthropic', r.status, grezzo.slice(0, 500));
+    let messaggio;
+    try {
+      const d = JSON.parse(grezzo);
+      messaggio = d?.error?.message || d?.message || grezzo;
+    } catch {
+      messaggio = grezzo || `errore ${r.status}`;
+    }
+    return json({ error: `Anthropic (HTTP ${r.status}): ${messaggio}` }, r.status);
+  }
+
   if (!r.body) {
     return new Response(null, { status: r.status, headers: CORS });
   }
