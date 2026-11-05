@@ -14,6 +14,34 @@ import { handleWrap } from './wrap.js';
 
 const FREE_LIMIT = 3;
 
+/*
+ * Spegne il ragionamento per le due rotte che producono JSON strutturato.
+ *
+ * Su questo PDL Haiku 5.5 aveva consumato 16.000 token su 16.000 in
+ * ragionamento, senza scrivere una riga di risposta — e abbassare l'effort
+ * a "low" non aveva cambiato nulla, come la documentazione stessa avverte.
+ * L'interruttore vero e' il parametro thinking, ma i due modelli vogliono
+ * valori diversi:
+ *
+ *   Haiku 5.5   -> { type: 'disabled' }       ('between_tools' da' 400)
+ *   Sonnet 5.5  -> { type: 'between_tools' }  ('disabled' da' 400)
+ *
+ * In entrambi i casi serve un effort di 'high' o inferiore, altrimenti la
+ * richiesta viene rifiutata: da qui il limite imposto sotto.
+ */
+function spegniRagionamento(model) {
+  return String(model).startsWith('claude-sonnet-5-5')
+    ? { type: 'between_tools' }
+    : { type: 'disabled' };
+}
+
+// 'xhigh' e 'max' sono incompatibili con il ragionamento spento: si
+// riportano a 'high' invece di far fallire la richiesta.
+function effortCompatibile(richiesto) {
+  const e = richiesto || 'low';
+  return (e === 'xhigh' || e === 'max') ? 'high' : e;
+}
+
 // ── /api/analyze ─────────────────────────────────────────────────────────────
 async function handleAnalyze(request, env, ctx) {
   const { user, error: authError } = await requireUser(request, env);
@@ -25,13 +53,13 @@ async function handleAnalyze(request, env, ctx) {
   const { body, error } = await readJson(request);
   if (error) return error;
 
+  const modello = body.model || 'claude-sonnet-5-5';
+
   return callAnthropic(env, {
-    model: body.model || 'claude-sonnet-5-5',
+    model: modello,
     max_tokens: body.max_tokens || 16000,
-    // Come per il PDL: l'uscita e' un JSON lungo, e il budget deve bastare
-    // a scriverlo. Se l'analisi dovesse perdere di qualita', si alza a
-    // 'medium' da qui o passando effort dal client.
-    output_config: { effort: body.effort || 'low' },
+    thinking: spegniRagionamento(modello),
+    output_config: { effort: effortCompatibile(body.effort) },
     system: body.system,
     messages: body.messages
   }, ctx);
@@ -70,12 +98,8 @@ async function handlePdl(request, env, ctx) {
   return callAnthropic(env, {
     model: 'claude-haiku-5-5',
     max_tokens: body.max_tokens || 16000,
-    // Sui modelli 5.5 il ragionamento e' adattivo e non si spegne: si
-    // abbassa con effort. Su Haiku 5.5 il default e' "medium", e con un PDL
-    // in ingresso ha consumato tutti i 16.000 token di budget in
-    // ragionamento, senza arrivare a scrivere una riga di JSON. Qui il
-    // lavoro e' trascrivere una tabella, non deliberare.
-    output_config: { effort: body.effort || 'low' },
+    thinking: spegniRagionamento('claude-haiku-5-5'),
+    output_config: { effort: effortCompatibile(body.effort) },
     system: body.system,
     messages: body.messages
   }, ctx);

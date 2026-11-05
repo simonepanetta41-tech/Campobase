@@ -191,6 +191,7 @@ export async function callAnthropic(env, payload, ctx) {
         console.log('anthropic', JSON.stringify({
           model: payload.model,
           effort: payload.output_config?.effort || '(default)',
+          thinking: payload.thinking?.type || '(default)',
           max_tokens_richiesti: payload.max_tokens,
           stop_reason: d.stop_reason,     // max_tokens = risposta tagliata
           token_uscita: u.output_tokens,
