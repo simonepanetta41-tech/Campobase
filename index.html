@@ -5954,7 +5954,11 @@ async function loadPdlFile(input) {
     const b64 = btoa(bin);
     const data = await callApi('api/pdl', {
       system: PDL_SYSPROMPT,
-      max_tokens: 16000,
+      // Margine ampio: il ragionamento dei modelli 5.5 attinge allo stesso
+      // budget della risposta, quindi 16000 rischiavano di finire prima che
+      // il JSON cominciasse. Con effort basso ne servono molti meno, questo
+      // e' solo spazio di sicurezza: non vengono fatturati se non usati.
+      max_tokens: 32000,
       messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analizza questo PDL.'}]}]
     });
     const raw = data.content.map(b=>b.text||'').join('');
@@ -6004,7 +6008,7 @@ async function loadUpdatedPdlFile(input) {
     for(let i=0;i<bytes.byteLength;i+=chunk) bin+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     const b64=btoa(bin);
     const data = await callApi('api/pdl', {
-      system: PDL_SYSPROMPT, max_tokens: 16000,
+      system: PDL_SYSPROMPT, max_tokens: 32000,
       messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analizza.'}]}]
     });
     const raw=data.content.map(b=>b.text||'').join('');
