@@ -1,21 +1,22 @@
-export const config = { maxDuration: 30 };
+import { json } from './_shared.js';
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+export { onRequestOptions } from './_shared.js';
 
-  const key = process.env.GOOGLE_PLACES_KEY;
-  if (!key) return res.status(500).json({ error: 'GOOGLE_PLACES_KEY not configured' });
+export async function onRequestPost({ request, env }) {
+  const key = env.GOOGLE_PLACES_KEY;
+  if (!key) return json({ error: 'GOOGLE_PLACES_KEY non configurata' }, 500);
 
-  const body = req.body;
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Corpo della richiesta non valido' }, 400);
+  }
 
-  // ── Reviews request ──
+  // ── Recensioni di un singolo posto ──
   if (body.action === 'reviews') {
     const { placeId } = body;
-    if (!placeId) return res.status(400).json({ error: 'placeId required' });
+    if (!placeId) return json({ error: 'placeId required' }, 400);
 
     const r = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
       headers: {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
       }
     });
     const data = await r.json();
-    if (data.error) return res.status(500).json({ error: data.error.message });
+    if (data.error) return json({ error: data.error.message }, 500);
 
     const reviews = (data.reviews || []).map(rv => ({
       authorName: rv.authorAttribution?.displayName || 'Anonimo',
@@ -38,22 +39,24 @@ export default async function handler(req, res) {
       `https://places.googleapis.com/v1/${p.name}/media?maxHeightPx=200&maxWidthPx=300&key=${key}`
     );
 
-    const hours = data.currentOpeningHours?.weekdayDescriptions || [];
-    const website = data.websiteUri || null;
-
-    return res.status(200).json({ reviews, photos, hours, website });
+    return json({
+      reviews,
+      photos,
+      hours: data.currentOpeningHours?.weekdayDescriptions || [],
+      website: data.websiteUri || null
+    });
   }
 
-  // ── Nearby search ──
+  // ── Ricerca nei dintorni ──
   const { lat, lng, filters, radius = 5000 } = body;
-  if (!lat || !lng) return res.status(400).json({ error: 'lat/lng required' });
+  if (!lat || !lng) return json({ error: 'lat/lng required' }, 400);
 
   const typeMap = {
     pranzo:    ['restaurant'],
     cena:      ['restaurant'],
     birra:     ['bar'],
     vino:      ['wine_bar'],
-    aperitivo: ['bar'],
+    aperitivo: ['bar']
   };
 
   const activeTypes = [...new Set(
@@ -63,17 +66,6 @@ export default async function handler(req, res) {
   const results = [];
 
   for (const type of activeTypes) {
-    const reqBody = {
-      includedTypes: [type],
-      maxResultCount: 15,
-      locationRestriction: {
-        circle: {
-          center: { latitude: parseFloat(lat), longitude: parseFloat(lng) },
-          radius: parseInt(radius)
-        }
-      }
-    };
-
     try {
       const r = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
         method: 'POST',
@@ -83,12 +75,21 @@ export default async function handler(req, res) {
           'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.currentOpeningHours,places.internationalPhoneNumber,places.websiteUri,places.location,places.types,places.reservable',
           'Accept-Language': 'it'
         },
-        body: JSON.stringify(reqBody)
+        body: JSON.stringify({
+          includedTypes: [type],
+          maxResultCount: 15,
+          locationRestriction: {
+            circle: {
+              center: { latitude: parseFloat(lat), longitude: parseFloat(lng) },
+              radius: parseInt(radius)
+            }
+          }
+        })
       });
       const data = await r.json();
-      if (data.error) return res.status(500).json({ error: data.error.message });
+      if (data.error) return json({ error: data.error.message }, 500);
       if (data.places) results.push(...data.places);
-    } catch(e) {
+    } catch (e) {
       console.error('Fetch error:', e.message);
     }
   }
@@ -96,20 +97,24 @@ export default async function handler(req, res) {
   const seen = new Set();
   const unique = results.filter(p => {
     if (seen.has(p.id)) return false;
-    seen.add(p.id); return true;
+    seen.add(p.id);
+    return true;
   });
 
   unique.sort((a, b) => {
     const aName = a.displayName?.text?.toLowerCase() || '';
     const bName = b.displayName?.text?.toLowerCase() || '';
-    const aSlowFood = /osteria|trattoria|locanda/.test(aName) ? 1 : 0;
-    const bSlowFood = /osteria|trattoria|locanda/.test(bName) ? 1 : 0;
-    if (aSlowFood !== bSlowFood) return bSlowFood - aSlowFood;
+    const aSlow = /osteria|trattoria|locanda/.test(aName) ? 1 : 0;
+    const bSlow = /osteria|trattoria|locanda/.test(bName) ? 1 : 0;
+    if (aSlow !== bSlow) return bSlow - aSlow;
     return (b.rating || 0) - (a.rating || 0);
   });
 
-  return res.status(200).json({
+  // gmapsKey serve al client per caricare Maps JS, che la chiave la vuole
+  // per forza nel browser. Vedi DEPLOY_CLOUDFLARE.md: conviene usare qui una
+  // seconda chiave limitata per referrer, non questa.
+  return json({
     places: unique.slice(0, 15),
-    gmapsKey: key
+    gmapsKey: env.GOOGLE_MAPS_BROWSER_KEY || key
   });
 }

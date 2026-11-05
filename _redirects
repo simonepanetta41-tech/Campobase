@@ -1,2 +1,7 @@
+# Unico percorso gestito dal client: /share/<token>.
+#
+# La regola generica /* e' stata tolta di proposito: su Cloudflare Pages i
+# redirect valgono anche quando esiste un file con quello stesso percorso,
+# quindi /* avrebbe servito index.html al posto di sw.js, manifest.json e
+# delle icone, mandando in pezzi la PWA. La radice serve index.html da se'.
 /share/*  /index.html  200
-/*        /index.html  200
