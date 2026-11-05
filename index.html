@@ -4186,7 +4186,33 @@ function initChat(d) {
   rotateChatPlaceholder();
   document.getElementById('chatMessages').innerHTML = '';
   document.getElementById('chatSection').classList.add('on');
-  addMsg('assistant', `Ciao! Sono Gennaro. Ho analizzato <em>${d.titolo||'la sceneggiatura'}</em>. Sono pronto per qualsiasi domanda sul reparto suono — criticità, attrezzatura, scene specifiche. Come posso aiutarti?`);
+  addMsg('assistant', `Ciao! Sono Gennaro. Ho analizzato <em>${escapeHtml(d.titolo||'la sceneggiatura')}</em>. Sono pronto per qualsiasi domanda sul reparto suono — criticità, attrezzatura, scene specifiche. Come posso aiutarti?`);
+}
+
+// Converte il testo del modello in HTML da mostrare.
+//
+// L'ordine conta: prima si neutralizzano & < >, poi si applicano grassetto,
+// corsivo e a capo. Senza il primo passaggio basta un "<" nella risposta —
+// un "24 < 47", un confronto — perche' il browser lo legga come inizio di
+// tag e si mangi tutto quello che segue fino a un ">". Era questo a far
+// sparire la coda delle risposte di Gennaro, a meta' parola e solo a volte.
+function mdToHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*(?!\s)([^*]+?)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/\n/g, '<br>');
+}
+
+// Per il testo che scriviamo noi e che contiene gia' tag voluti: mette in
+// sicurezza solo le parti variabili.
+function escapeHtml(text) {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 function addMsg(role, text) {
@@ -4467,7 +4493,7 @@ async function sendChat() {
 
   chatHistory.push({ role:'assistant', content:reply });
   removeTyping();
-  addMsg('assistant', reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n/g,'<br>'));
+  addMsg('assistant', mdToHtml(reply));
   chatTyping = false;
   document.getElementById('sendBtn').disabled = false;
   document.getElementById('chatInput').focus();
@@ -6403,7 +6429,7 @@ function gennaroDrawerAddMsg(role, text) {
     background:${isUser?'var(--yellow)':'var(--surface2)'};
     color:${isUser?'#000':'var(--white)'};
     border:1px solid ${isUser?'transparent':'var(--border)'};`;
-  bubble.innerHTML = text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  bubble.innerHTML = mdToHtml(text);
   div.appendChild(bubble);
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
