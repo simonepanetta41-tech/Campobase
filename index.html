@@ -4223,6 +4223,32 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
+// Spiega perche' il JSON del PDL non si e' potuto leggere.
+// "Unexpected end of JSON input" da solo non dice se il modello ha risposto
+// a vuoto, se si e' fermato a meta' o se ha scritto altro: questi tre casi
+// si correggono in modi diversi, quindi vanno distinti.
+function pdlDiagnosi(data, raw) {
+  const motivo = data?.stop_reason || 'sconosciuto';
+  const tipi = (data?.content || []).map(b => b.type).join(', ') || 'nessuno';
+  const u = data?.usage || {};
+  const pensiero = u.output_tokens_details?.thinking_tokens;
+  const dettaglio = [
+    `stop_reason: ${motivo}`,
+    `blocchi: ${tipi}`,
+    u.output_tokens != null ? `token in uscita: ${u.output_tokens}` : null,
+    pensiero != null ? `di cui di ragionamento: ${pensiero}` : null,
+    `caratteri di testo ricevuti: ${(raw || '').length}`
+  ].filter(Boolean).join(' · ');
+
+  if (motivo === 'max_tokens') {
+    return `Il modello si e' fermato per esaurimento del budget di token, quindi il PDL e' arrivato incompleto. ${dettaglio}`;
+  }
+  if (!raw || !raw.trim()) {
+    return `Il modello non ha restituito testo. ${dettaglio}`;
+  }
+  return `La risposta del modello non e' JSON valido. ${dettaglio}`;
+}
+
 function addMsg(role, text) {
   const box = document.getElementById('chatMessages');
   const div = document.createElement('div');
@@ -5935,10 +5961,12 @@ async function loadPdlFile(input) {
     let newPdl;
     try { newPdl = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
     catch(e) {
+      if (!raw.trim()) throw new Error(pdlDiagnosi(data));
       const lb=raw.lastIndexOf('}'); let attempt=raw.substring(0,lb+1);
       let o=0,s=0; for(const c of attempt){if(c==='{')o++;else if(c==='}')o--;else if(c==='[')s++;else if(c===']')s--;} 
       attempt+=']'.repeat(Math.max(0,s))+'}' .repeat(Math.max(0,o));
-      newPdl = JSON.parse(attempt);
+      try { newPdl = JSON.parse(attempt); }
+      catch(_) { throw new Error(pdlDiagnosi(data, raw)); }
     }
     pdlData = newPdl;
     window.pdlData = pdlData; // accessibile da altri script block
@@ -5980,7 +6008,9 @@ async function loadUpdatedPdlFile(input) {
       messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analizza.'}]}]
     });
     const raw=data.content.map(b=>b.text||'').join('');
-    const newPdl=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    let newPdl;
+    try { newPdl=JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(_) { throw new Error(pdlDiagnosi(data, raw)); }
     const oldGiorni=getPdlAllGiorni();
     const newPdlMinDay=Math.min(...newPdl.settimane.flatMap(s=>s.giorni||[]).map(g=>g.numero_giorno));
     const oldDays=oldGiorni.filter(g=>g.numero_giorno<newPdlMinDay);
