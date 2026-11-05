@@ -15,7 +15,7 @@ import { handleWrap } from './wrap.js';
 const FREE_LIMIT = 3;
 
 // ── /api/analyze ─────────────────────────────────────────────────────────────
-async function handleAnalyze(request, env) {
+async function handleAnalyze(request, env, ctx) {
   const { user, error: authError } = await requireUser(request, env);
   if (authError) return authError;
 
@@ -31,12 +31,12 @@ async function handleAnalyze(request, env) {
     temperature: 0,
     system: body.system,
     messages: body.messages
-  });
+  }, ctx);
 }
 
 // ── /api/chat ────────────────────────────────────────────────────────────────
 // Niente quota: la chat e' leggera e nell'originale non la consumava.
-async function handleChat(request, env) {
+async function handleChat(request, env, ctx) {
   const { error: authError } = await requireUser(request, env);
   if (authError) return authError;
 
@@ -48,13 +48,13 @@ async function handleChat(request, env) {
     max_tokens: body.max_tokens || 1024,
     system: body.system,
     messages: body.messages
-  });
+  }, ctx);
 }
 
 // ── /api/pdl ─────────────────────────────────────────────────────────────────
 // Modello fisso come nell'originale: il PDL e' estrazione strutturata,
 // non serve lasciarlo scegliere al client.
-async function handlePdl(request, env) {
+async function handlePdl(request, env, ctx) {
   const { user, error: authError } = await requireUser(request, env);
   if (authError) return authError;
 
@@ -70,7 +70,7 @@ async function handlePdl(request, env) {
     temperature: 0,
     system: body.system,
     messages: body.messages
-  });
+  }, ctx);
 }
 
 const ROUTES = {
@@ -81,7 +81,7 @@ const ROUTES = {
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     const route = ROUTES[pathname];
 
@@ -96,7 +96,7 @@ export default {
     }
 
     try {
-      return await route(request, env);
+      return await route(request, env, ctx);
     } catch (e) {
       console.error(pathname, e);
       return json({ error: 'Errore interno: ' + e.message }, 500);

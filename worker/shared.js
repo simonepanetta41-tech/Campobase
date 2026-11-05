@@ -132,8 +132,15 @@ export async function consumeQuota(env, userId, limit) {
  * Deserializzare e riserializzare 20.000 token sarebbe l'unico punto del
  * flusso a consumare CPU davvero, quindi il corpo si gira cosi' com'e'.
  */
-export function callAnthropic(env, payload) {
-  return fetch('https://api.anthropic.com/v1/messages', {
+export async function callAnthropic(env, payload, ctx) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return json({
+      error: 'Configurazione incompleta: manca ANTHROPIC_API_KEY. ' +
+             'Controlla i nomi in Settings > Variables and Secrets.'
+    }, 500);
+  }
+
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -141,8 +148,38 @@ export function callAnthropic(env, payload) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify(payload)
-  }).then(r => new Response(r.body, {
+  });
+
+  if (!r.body) {
+    return new Response(null, { status: r.status, headers: CORS });
+  }
+
+  // Il corpo si sdoppia: una copia parte subito verso il client, l'altra
+  // viene letta dopo la risposta dentro waitUntil, solo per registrare
+  // perche' il modello si e' fermato. Il client non aspetta nulla.
+  const [toClient, toLog] = r.body.tee();
+
+  if (ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        const d = JSON.parse(await new Response(toLog).text());
+        console.log('anthropic', JSON.stringify({
+          model: payload.model,
+          max_tokens_richiesti: payload.max_tokens,
+          stop_reason: d.stop_reason,     // max_tokens = risposta tagliata
+          usage: d.usage,
+          tipi_blocco: (d.content || []).map(b => b.type)
+        }));
+      } catch (e) {
+        console.error('log anthropic fallito:', e.message);
+      }
+    })());
+  } else {
+    toLog.cancel().catch(() => {});
+  }
+
+  return new Response(toClient, {
     status: r.status,
     headers: { ...CORS, 'Content-Type': 'application/json' }
-  }));
+  });
 }
