@@ -38,14 +38,51 @@ export async function requireUser(request, env) {
     return { error: json({ error: 'Non autorizzato' }, 401) };
   }
 
-  const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      apikey: env.SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${auth.slice(7)}`
-    }
-  });
+  // Variabili mancanti: e' l'errore piu' comune dopo un trasloco, e senza
+  // questo controllo si presenta come un generico "Token non valido" che
+  // manda a cercare il problema dalla parte sbagliata.
+  const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].filter(k => !env[k]);
+  if (missing.length) {
+    return {
+      error: json({
+        error: `Configurazione incompleta: manca ${missing.join(' e ')}. ` +
+               `Controlla i nomi in Settings > Variables and Secrets.`
+      }, 500)
+    };
+  }
 
-  if (!r.ok) return { error: json({ error: 'Token non valido' }, 401) };
+  const base = env.SUPABASE_URL.replace(/\/+$/, '');   // tollera la barra finale
+  let r;
+  try {
+    r = await fetch(`${base}/auth/v1/user`, {
+      headers: {
+        apikey: env.SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${auth.slice(7)}`
+      }
+    });
+  } catch (e) {
+    return {
+      error: json({
+        error: `Supabase irraggiungibile all'indirizzo configurato: ${e.message}. ` +
+               `Verifica SUPABASE_URL.`
+      }, 502)
+    };
+  }
+
+  if (!r.ok) {
+    // Il corpo di Supabase dice se a non andare e' la chiave di servizio
+    // o il token dell'utente. Nessuno dei due viene mai stampato.
+    const detail = await r.text().catch(() => '');
+    console.error('auth/v1/user ->', r.status, detail);
+    return {
+      error: json({
+        error: `Supabase ha rifiutato la verifica (HTTP ${r.status}). ` +
+               (r.status === 401
+                 ? 'Di solito e\' SUPABASE_SERVICE_KEY sbagliata: serve la chiave service_role, non la anon.'
+                 : detail.slice(0, 200))
+      }, 401)
+    };
+  }
 
   const user = await r.json();
   if (!user?.id) return { error: json({ error: 'Token non valido' }, 401) };
