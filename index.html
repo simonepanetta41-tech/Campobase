@@ -5546,7 +5546,12 @@ Regole: momento D=Day N=Night M=Morning E=Evening. cast solo numeri. JSON minifi
 // Questo approccio è immune al bug del modello AI che slittava gli orari di un giorno.
 function parseOrariFromText(text) {
   const result = {};
-  const markerRe = /Fine del [Gg]iorno\s*#\s*(\d+)/g;
+
+  // Marcatore di fine giornata. I PDL non hanno un formato standard: lo
+  // stesso concetto compare come "Fine del giorno #3", "FINE GIORNO 3" o,
+  // sui piani bilingue, "End of Day 3". Senza la variante inglese il parser
+  // non agganciava nulla e restavano gli orari del modello, che slittano.
+  const markerRe = /(?:fine\s+del\s+giorno|fine\s+giorno|end\s+of\s+day)\s*#?\s*(\d+)/gi;
   const markers = [];
   let m;
   while ((m = markerRe.exec(text)) !== null) {
@@ -5554,24 +5559,33 @@ function parseOrariFromText(text) {
   }
   if (markers.length === 0) return result;
 
-  // Segmento per giorno N = testo tra il marker del giorno N-1 e il marker del giorno N
+  // Un orario, con i minuti facoltativi: "09", "09:00", "9.00".
+  const ORA = '(\\d{1,2})(?:\\s*[.:]\\s*(\\d{2}))?';
+  const SEP = '\\s*[-\u2013\u2014/]\\s*';
+
+  // Con l'etichetta davanti ("orario 09 / 16", "H: 15/01", "ORARIO 9.00-17.00")
+  // i minuti possono mancare: l'etichetta garantisce che sia un orario.
+  const CON_ETICHETTA = new RegExp('(?:orario|orari|h)\\s*:?\\s*' + ORA + SEP + ORA, 'i');
+  // Senza etichetta si pretendono i minuti da entrambi i lati, altrimenti
+  // un "2 2/8 Pag" o una frazione di pagina verrebbe letta come un orario.
+  const NUDO = new RegExp('(\\d{1,2})\\s*[.:]\\s*(\\d{2})' + SEP + '(\\d{1,2})\\s*[.:]\\s*(\\d{2})');
+
+  const oreValide = (h1, h2) => h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23;
+
+  // Il segmento del giorno N e' il testo fra il marcatore precedente e il suo.
   let prevEnd = 0;
   for (const marker of markers) {
     const chunk = text.slice(prevEnd, marker.index);
-    // Regex per orari italiani: 09.00 - 17.00 / 18:00 - 02:00 / ORARIO 9.00 – 17.00 TBC
-    // Prima si cerca il match con prefisso ORARIO (quello autorevole), poi si ripiega
-    // sul primo range del segmento: senza questa priorita' un orario qualsiasi che
-    // compare prima nel chunk (note, appuntamenti) vinceva su quello vero.
-    const RANGE = '(\\d{1,2})\\s*[.:]\\s*(\\d{2})\\s*[-\u2013\u2014/]\\s*(\\d{1,2})\\s*[.:]\\s*(\\d{2})';
-    const match = new RegExp('ORARIO\\s*:?\\s*' + RANGE, 'i').exec(chunk)
-               || new RegExp(RANGE).exec(chunk);
+    const match = CON_ETICHETTA.exec(chunk) || NUDO.exec(chunk);
     if (match) {
-      result[marker.dayNum] = {
-        ora_inizio: match[1].padStart(2,'0') + ':' + match[2],
-        ora_fine:   match[3].padStart(2,'0') + ':' + match[4]
-      };
+      const h1 = parseInt(match[1]), h2 = parseInt(match[3]);
+      if (oreValide(h1, h2)) {
+        result[marker.dayNum] = {
+          ora_inizio: String(h1).padStart(2, '0') + ':' + (match[2] || '00'),
+          ora_fine:   String(h2).padStart(2, '0') + ':' + (match[4] || '00')
+        };
+      }
     }
-    // Avanza oltre il marker (usa la lunghezza reale del match)
     prevEnd = marker.index + marker.len;
   }
   return result;
@@ -5585,9 +5599,10 @@ function applyOrari(orariMap) {
   const totGiorni = pdlData.settimane.reduce((a,s) => a + (s.giorni?.length || 0), 0);
   const copertura = totGiorni ? Object.keys(orariMap).length / totGiorni : 0;
   if (copertura < 0.5) {
-    console.log('[applyOrari] copertura marker troppo bassa (' + Math.round(copertura*100) + '%), orari AI mantenuti');
+    console.log('[applyOrari] copertura marker troppo bassa (' + Math.round(copertura*100) + '%), orari AI mantenuti — il PDL usa probabilmente una dicitura di fine giornata non riconosciuta');
     return false;
   }
+  console.log('[applyOrari] copertura ' + Math.round(copertura*100) + '% — orari del PDF applicati su ' + totGiorni + ' giorni');
   let changed = false;
   pdlData.settimane.forEach(s => {
     (s.giorni || []).forEach(g => {
