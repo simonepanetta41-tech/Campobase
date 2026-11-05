@@ -28,7 +28,6 @@ async function handleAnalyze(request, env, ctx) {
   return callAnthropic(env, {
     model: body.model || 'claude-sonnet-5-5',
     max_tokens: body.max_tokens || 16000,
-    temperature: 0,
     system: body.system,
     messages: body.messages
   }, ctx);
@@ -67,7 +66,6 @@ async function handlePdl(request, env, ctx) {
   return callAnthropic(env, {
     model: 'claude-haiku-5-5',
     max_tokens: body.max_tokens || 16000,
-    temperature: 0,
     system: body.system,
     messages: body.messages
   }, ctx);

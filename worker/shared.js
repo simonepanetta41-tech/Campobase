@@ -140,6 +140,11 @@ export async function callAnthropic(env, payload, ctx) {
     }, 500);
   }
 
+  // I modelli 5.5 rifiutano temperature con un 400 ("deprecated for this
+  // model"). Si toglie qui una volta sola, cosi' nessuna rotta puo'
+  // reintrodurlo e un client che lo mandasse non fa fallire la richiesta.
+  const { temperature, ...corpo } = payload;
+
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -147,7 +152,7 @@ export async function callAnthropic(env, payload, ctx) {
       'x-api-key': env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(corpo)
   });
 
   // Gli errori si leggono e si riducono a una stringa, invece di girarli
