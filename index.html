@@ -5540,14 +5540,13 @@ Struttura:
 
 Regole: momento D=Day N=Night M=Morning E=Evening. cast solo numeri. JSON minificato. ORARI CRITICI: la struttura standard di un PDL è: [ORARIO] → [scene del giorno N] → [Fine del Giorno #N]. L'orario precede SEMPRE le scene del giorno a cui appartiene. L'orario che appare DOPO "Fine del Giorno #N" appartiene al giorno N+1, non al giorno N. CASO SPECIALE — GIORNO SENZA ORARIO: alcuni giorni (tipicamente il primo, spesso un giorno di trasferimento troupe o prelight) NON hanno nessun orario prima delle loro scene — il PDL passa direttamente dal titolo del giorno alle scene, e poi a "Fine del Giorno #1". In questo caso il giorno 1 ha ora_inizio="TBD" e ora_fine="TBD". L'orario che segue "Fine del Giorno #1" appartiene al giorno 2. NON spostare l'orario del giorno 2 sul giorno 1 solo perché il giorno 1 non ne ha uno. Se un giorno ha più orari (es. unità principale + 2° UNITÀ), usa SOLO il primo orario trovato per quel giorno. Formati orario riconosciuti: "H: 08:00/18:00" (ora_inizio=08:00, ora_fine=18:00), "07:30/17:30", "ORARIO 08-18", "09.00-17.00", "H: 15/01 o 17/03" (formato compatto italiano — 15/01 significa ora_inizio=15:00 ora_fine=01:00, 17/03 significa ora_inizio=17:00 ora_fine=03:00 — se ci sono due orari alternativi separati da "o", prendi il primo E imposta ora_incerta=true). IMPORTANTE: se per un giorno non trovi NESSUN orario esplicito nel testo del PDL, usa OBBLIGATORIAMENTE "TBD" per ora_inizio e ora_fine — NON inventare orari, NON usare valori di default. Rispondi SOLO con il JSON.`;
 
-// ── ORARI: riconoscimento dei formati PDL ────────────────────────────────────
+// ── PDL: riconoscimento dei formati ──────────────────────────────────────────
 // I PDL non hanno un formato standard: ogni produzione scrive a modo suo.
-// Invece di inseguire un piano alla volta, i formati stanno in due tabelle.
+// Invece di inseguire un piano alla volta, i formati stanno in tabelle.
 // Per aggiungerne uno basta una riga, e la console dice sempre quale ha
 // agganciato — o cosa non ha riconosciuto.
 
 // Come viene segnata la fine di una giornata di riprese.
-// L'ordine non conta: si prendono tutti i marcatori trovati.
 const PDL_FINE_GIORNO = [
   { nome: 'Fine del giorno #N',  re: /fine\s+del\s+giorno\s*#?\s*(\d+)/gi },
   { nome: 'Fine giorno N',       re: /fine\s+giorn(?:o|ata)\s*#?\s*(\d+)/gi },
@@ -5556,10 +5555,17 @@ const PDL_FINE_GIORNO = [
   { nome: 'End Day N',           re: /end\s+day\s*#?\s*(\d+)/gi },
 ];
 
+// Come viene numerata una scena nella colonna di sinistra.
+// Il suffisso di lettera ("12A") deve stare attaccato al numero: con uno
+// spazio in mezzo il regex si prenderebbe la "I" di "Sc: 12 INT/EXT" e
+// nessun numero corrisponderebbe piu' a quelli estratti dal modello.
+const PDL_SCENE = [
+  { nome: 'Sc: N',     re: /\bsc\s*[:.]\s*(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
+  { nome: 'SCENA N',   re: /\bscena\s*[:.]?\s*(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
+  { nome: 'Sc N',      re: /\bsc\s+(\d{1,4}[A-Za-z]?)(?![\d/])/gi },
+];
+
 // Come viene scritto l'orario della giornata.
-// Con un'etichetta davanti i minuti possono mancare ("orario 09 / 16"):
-// e' l'etichetta a garantire che sia un orario. Senza etichetta i minuti
-// sono obbligatori, altrimenti "pag: 2 2/8" verrebbe letto come le 2:28.
 const PDL_ORA  = '(\\d{1,2})(?:\\s*[.:]\\s*(\\d{2}))?';
 const PDL_ORA_PIENA = '(\\d{1,2})\\s*[.:]\\s*(\\d{2})';
 const PDL_SEP  = '\\s*(?:[-\u2013\u2014/]|\u2192|->|alle)\\s*';
@@ -5575,12 +5581,17 @@ const PDL_ORARI = [
     re: new RegExp(PDL_ORA_PIENA + PDL_SEP + PDL_ORA_PIENA) },
 ];
 
-function parseOrariFromText(text) {
-  const result = {};
-  const diagnostica = { marcatore: null, giorni: {}, nonRiconosciuti: [] };
-
-  // 1. Trova i marcatori di fine giornata, provando tutte le diciture.
-  let markers = [];
+/*
+ * Divide il testo del PDF in un segmento per giornata.
+ *
+ * La struttura di un PDL e' sempre la stessa, qualunque sia la dicitura:
+ *   [scene del giorno N] [orario del giorno N] [fine del giorno N]
+ * quindi tutto cio' che precede il marcatore del giorno N appartiene al
+ * giorno N. E' su questo che si corregge lo slittamento del modello, che
+ * tende a far scivolare ogni cosa sul giorno successivo.
+ */
+function pdlSegmentiPerGiorno(text) {
+  let markers = [], dicitura = null;
   for (const forma of PDL_FINE_GIORNO) {
     const trovati = [];
     let m;
@@ -5588,27 +5599,32 @@ function parseOrariFromText(text) {
     while ((m = forma.re.exec(text)) !== null) {
       trovati.push({ dayNum: parseInt(m[1]), index: m.index, len: m[0].length });
     }
-    if (trovati.length > markers.length) {
-      markers = trovati;
-      diagnostica.marcatore = forma.nome;
-    }
+    if (trovati.length > markers.length) { markers = trovati; dicitura = forma.nome; }
   }
+  if (!markers.length) return { segmenti: [], dicitura: null };
 
-  if (!markers.length) {
+  markers.sort((a, b) => a.index - b.index);
+  const segmenti = [];
+  let prevEnd = 0;
+  for (const marker of markers) {
+    segmenti.push({ dayNum: marker.dayNum, chunk: text.slice(prevEnd, marker.index) });
+    prevEnd = marker.index + marker.len;
+  }
+  return { segmenti, dicitura };
+}
+
+function parseOrariFromText(text) {
+  const result = {};
+  const { segmenti, dicitura } = pdlSegmentiPerGiorno(text);
+  if (!segmenti.length) {
     console.log('[OrariParser] nessuna dicitura di fine giornata riconosciuta — ' +
       'il PDL ne usa una nuova. Diciture note: ' +
       PDL_FINE_GIORNO.map(f => f.nome).join(' | '));
     return result;
   }
 
-  markers.sort((a, b) => a.index - b.index);
-
-  // 2. Il segmento del giorno N e' il testo fra il marcatore precedente e il suo.
-  let prevEnd = 0;
-  for (const marker of markers) {
-    const chunk = text.slice(prevEnd, marker.index);
-    prevEnd = marker.index + marker.len;
-
+  const senzaOrario = [];
+  for (const { dayNum, chunk } of segmenti) {
     let letto = null;
     for (const forma of PDL_ORARI) {
       const m = forma.re.exec(chunk);
@@ -5620,23 +5636,63 @@ function parseOrariFromText(text) {
         ora_fine:   String(h2).padStart(2, '0') + ':' + (m[4] || '00'),
         // "H: 15/01 o 17/03" — due orari alternativi: si prende il primo
         // e si segnala che non e' ancora deciso.
-        ora_incerta: /\b(?:o|oppure|\/\/|tbc)\b/i.test(chunk.slice(m.index + m[0].length, m.index + m[0].length + 24))
+        ora_incerta: /\b(?:o|oppure|tbc)\b/i.test(chunk.slice(m.index + m[0].length, m.index + m[0].length + 24))
       };
-      diagnostica.giorni[marker.dayNum] = forma.nome;
       break;
     }
-
-    if (letto) result[marker.dayNum] = letto;
-    else diagnostica.nonRiconosciuti.push(marker.dayNum);
+    if (letto) result[dayNum] = letto; else senzaOrario.push(dayNum);
   }
 
-  console.log('[OrariParser] marcatore "' + diagnostica.marcatore + '" — ' +
-    Object.keys(result).length + '/' + markers.length + ' giorni con orario');
-  if (diagnostica.nonRiconosciuti.length) {
-    console.log('[OrariParser] senza orario riconosciuto: giorni ' +
-      diagnostica.nonRiconosciuti.join(', ') + '. Formati noti: ' +
-      PDL_ORARI.map(f => f.nome).join(' | '));
+  console.log('[OrariParser] marcatore "' + dicitura + '" — ' +
+    Object.keys(result).length + '/' + segmenti.length + ' giorni con orario');
+  if (senzaOrario.length) {
+    console.log('[OrariParser] senza orario riconosciuto: giorni ' + senzaOrario.join(', ') +
+      '. Formati noti: ' + PDL_ORARI.map(f => f.nome).join(' | '));
   }
+  return result;
+}
+
+/*
+ * Legge dal PDF quali scene appartengono a quale giornata.
+ *
+ * Il modello estrae bene i dettagli della singola scena (interno/esterno,
+ * momento, cast, pagine) ma sbaglia il raggruppamento, facendo scivolare le
+ * scene sul giorno dopo. Qui si ricava solo l'appartenenza: i dettagli
+ * restano quelli del modello.
+ */
+function parseSceneFromText(text) {
+  const result = {};
+  const { segmenti, dicitura } = pdlSegmentiPerGiorno(text);
+  if (!segmenti.length) return result;
+
+  // Si sceglie la dicitura di scena che ne trova di piu' sull'intero testo,
+  // cosi' un PDL che scrive "SCENA 12" funziona come uno che scrive "Sc: 12".
+  let forma = null, meglio = 0;
+  for (const f of PDL_SCENE) {
+    f.re.lastIndex = 0;
+    const n = (text.match(f.re) || []).length;
+    if (n > meglio) { meglio = n; forma = f; }
+  }
+  if (!forma) {
+    console.log('[SceneParser] nessuna numerazione di scena riconosciuta. Forme note: ' +
+      PDL_SCENE.map(f => f.nome).join(' | '));
+    return result;
+  }
+
+  for (const { dayNum, chunk } of segmenti) {
+    const numeri = [];
+    let m;
+    forma.re.lastIndex = 0;
+    while ((m = forma.re.exec(chunk)) !== null) {
+      const n = m[1].replace(/\s+/g, '').toUpperCase();
+      if (!numeri.includes(n)) numeri.push(n);
+    }
+    if (numeri.length) result[dayNum] = numeri;
+  }
+
+  const tot = Object.values(result).reduce((a, v) => a + v.length, 0);
+  console.log('[SceneParser] marcatore "' + dicitura + '", numerazione "' + forma.nome +
+    '" — ' + tot + ' scene su ' + Object.keys(result).length + ' giorni');
   return result;
 }
 
@@ -5736,6 +5792,78 @@ function applyTrasferimenti(transferMap) {
   });
 }
 
+/*
+ * Rimette ogni scena nella giornata giusta.
+ *
+ * Il modello slitta il raggruppamento: le scene del giorno 1 finiscono sul
+ * 2, quelle del 2 sul 3. I dettagli della singola scena pero' sono corretti,
+ * quindi non si riestrae nulla: si prendono gli oggetti scena gia' estratti
+ * e si ricollocano seguendo l'appartenenza letta dal PDF.
+ */
+function applyScene(sceneMap) {
+  if (!pdlData?.settimane || !Object.keys(sceneMap).length) return false;
+
+  const chiave = n => String(n ?? '').replace(/\s+/g, '').toUpperCase();
+
+  // Tutte le scene estratte dal modello, raggruppate per numero. Lo stesso
+  // numero puo' comparire piu' volte (scena ripresa su due giornate), quindi
+  // ogni numero tiene una coda e se ne consuma una copia alla volta.
+  const pool = new Map();
+  pdlData.settimane.forEach(s => (s.giorni || []).forEach(g => (g.scene || []).forEach(sc => {
+    const k = chiave(sc.numero);
+    if (!pool.has(k)) pool.set(k, []);
+    pool.get(k).push(sc);
+  })));
+
+  // Guardia di copertura: si riordina solo se le scene lette dal PDF
+  // corrispondono davvero a quelle del modello. Su un PDL con numerazione
+  // diversa si svuoterebbero altrimenti tutte le giornate.
+  const numeriPdf = Object.values(sceneMap).flat();
+  const riconosciute = numeriPdf.filter(n => pool.has(n)).length;
+  const copertura = numeriPdf.length ? riconosciute / numeriPdf.length : 0;
+  if (copertura < 0.7) {
+    console.log('[applyScene] copertura ' + Math.round(copertura * 100) +
+      '% — troppo bassa, raggruppamento del modello mantenuto');
+    return false;
+  }
+
+  const disponibili = new Map();
+  pool.forEach((v, k) => disponibili.set(k, v.slice()));
+
+  const perGiorno = {};
+  for (const [day, numeri] of Object.entries(sceneMap)) {
+    perGiorno[day] = numeri
+      .map(n => (disponibili.get(n) || []).shift())
+      .filter(Boolean);
+  }
+
+  // Le scene che il PDF non ha assegnato a nessuna giornata restano dove
+  // erano: meglio una scena nel posto sbagliato che una scena persa.
+  let avanzate = 0;
+  pdlData.settimane.forEach(s => (s.giorni || []).forEach(g => {
+    const rimaste = (g.scene || []).filter(sc => (disponibili.get(chiave(sc.numero)) || []).includes(sc));
+    rimaste.forEach(sc => {
+      const q = disponibili.get(chiave(sc.numero));
+      q.splice(q.indexOf(sc), 1);
+      (perGiorno[g.numero_giorno] = perGiorno[g.numero_giorno] || []).push(sc);
+      avanzate++;
+    });
+  }));
+
+  let spostate = 0;
+  pdlData.settimane.forEach(s => (s.giorni || []).forEach(g => {
+    const nuove = perGiorno[g.numero_giorno] || [];
+    const prima = (g.scene || []).map(sc => chiave(sc.numero)).join(',');
+    const dopo  = nuove.map(sc => chiave(sc.numero)).join(',');
+    if (prima !== dopo) spostate++;
+    g.scene = nuove;
+  }));
+
+  console.log('[applyScene] copertura ' + Math.round(copertura * 100) + '% — ' +
+    spostate + ' giornate ricomposte' + (avanzate ? ', ' + avanzate + ' scene lasciate dov\'erano' : ''));
+  return spostate > 0;
+}
+
 async function extractAndApplyTrasferimenti(b64) {
   try {
     const bin = atob(b64);
@@ -5754,10 +5882,14 @@ async function extractAndApplyTrasferimenti(b64) {
 
     // Orari deterministici — sovrascrive i valori AI con quelli letti dal PDF
     const orariMap = parseOrariFromText(fullText);
-    console.log('[OrariParser] trovati:', orariMap);
     const orariChanged = applyOrari(orariMap);
 
-    if (Object.keys(transferMap).length || orariChanged) {
+    // Stesso principio applicato al raggruppamento delle scene, che il
+    // modello fa slittare esattamente come faceva con gli orari.
+    const sceneMap = parseSceneFromText(fullText);
+    const sceneChanged = applyScene(sceneMap);
+
+    if (Object.keys(transferMap).length || orariChanged || sceneChanged) {
       renderPdlCalendar();
       savePdlToSupabase();
     }
