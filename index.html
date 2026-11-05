@@ -5727,7 +5727,19 @@ function applyOrari(orariMap) {
   // i marker "Fine del giorno #N" coprono almeno meta' dei giorni. Su un PDL con dicitura
   // diversa cancellerebbe altrimenti tutti gli orari validi trovati dal modello.
   const totGiorni = pdlData.settimane.reduce((a,s) => a + (s.giorni?.length || 0), 0);
-  const copertura = totGiorni ? Object.keys(orariMap).length / totGiorni : 0;
+  const lettiDalPdf = Object.keys(orariMap).length;
+  // Se il PDF contiene molte piu' giornate di quelle estratte dal modello,
+  // il JSON e' troncato: correggere gli orari delle poche rimaste nasconde
+  // il problema vero invece di segnalarlo.
+  if (totGiorni && lettiDalPdf > totGiorni * 1.5) {
+    console.warn('[applyOrari] ESTRAZIONE INCOMPLETA: il PDF contiene almeno ' +
+      lettiDalPdf + ' giornate, il PDL caricato ne ha ' + totGiorni +
+      '. La risposta del modello e\' stata troncata — ricarica il PDL.');
+    showToast('PDL incompleto: ' + totGiorni + ' giorni su ' + lettiDalPdf +
+      ' presenti nel file. Riprova il caricamento.', 'red', 7000);
+    return false;
+  }
+  const copertura = totGiorni ? lettiDalPdf / totGiorni : 0;
   if (copertura < 0.5) {
     console.log('[applyOrari] copertura marker troppo bassa (' + Math.round(copertura*100) + '%), orari AI mantenuti — il PDL usa probabilmente una dicitura di fine giornata non riconosciuta');
     return false;
@@ -5951,6 +5963,13 @@ async function extractAndApplyTrasferimenti(b64) {
       const tc = await page.getTextContent();
       fullText += tc.items.map(i => i.str).join(' ') + '\n';
     }
+    // Campione del testo come lo restituisce pdf.js: serve a capire con che
+    // forma compaiono davvero numeri di scena e marcatori, che cambiano da
+    // una produzione all'altra.
+    const iScena = fullText.search(/INT\/EXT|INT\.|EXT\./i);
+    console.log('[PdlTesto] campione attorno alla prima scena:\n' +
+      JSON.stringify(fullText.slice(Math.max(0, iScena - 400), iScena + 600)));
+
     const transferMap = parseTrasferimentiFromText(fullText);
     console.log('[TransferParser] trovati:', transferMap);
     applyTrasferimenti(transferMap);
