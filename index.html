@@ -6801,29 +6801,47 @@ function ttMkTab(workers,orariSrc){
   return{id:Date.now()+Math.random(),workers:[...workers],orari:o};
 }
 
+// Minuti dall'inizio della giornata di calendario, senza interpretazioni.
 function ttToMin(t){
   if(!t||!t.trim())return null;
   const m=t.replace(',','.').match(/^(\d{1,2})[.:](\d{2})$/);
   if(!m)return null;
-  let h=parseInt(m[1]),mn=parseInt(m[2]);
-  if(h<6)h+=24;
+  const h=parseInt(m[1]),mn=parseInt(m[2]);
+  if(h>23||mn>59)return null;
   return h*60+mn;
 }
-// PARTENZA precede sempre INIZIO: se il rollover l'ha portata dopo, torna indietro di 24h.
-// Es. partenza 05:00 -> 1740 con inizio 07:00 -> 420  =>  1740-1440 = 300 (corretto)
-function ttNormPre(t,refM){
-  let m=ttToMin(t);
-  if(m===null||refM===null)return m;
-  if(m>refM)m-=1440;
-  return m;
+
+/*
+ * Ordina gli orari di una giornata lungo un'unica linea del tempo.
+ *
+ * Prima qualsiasi ora prima delle 06:00 veniva spostata al giorno dopo
+ * (+24h). Funzionava per un turno che finisce all'una di notte, ma rompeva
+ * la giornata che COMINCIA all'alba: con inizio 05:30 e fine 14:20, l'inizio
+ * finiva alle 29:30 e il calcolo usciva subito perche' la fine risultava
+ * prima dell'inizio.
+ *
+ * L'ancora giusta e' INIZIO: e' li' che comincia la giornata di lavoro,
+ * qualunque ora segni l'orologio. Tutto cio' che viene dopo scavalca la
+ * mezzanotte solo se risulta precedente all'ancora; PARTENZA, che precede
+ * sempre l'inizio, scavalca all'indietro.
+ */
+function ttOrdinaGiornata(par,ini,pau,fin,rie){
+  const iniM=ttToMin(ini);
+  if(iniM===null)return null;
+
+  const dopo=(t,rif)=>{const m=ttToMin(t);if(m===null||rif===null)return null;return m<rif?m+1440:m;};
+  const prima=(t,rif)=>{const m=ttToMin(t);if(m===null||rif===null)return null;return m>rif?m-1440:m;};
+
+  const finM=dopo(fin,iniM);
+  return {
+    iniM,
+    finM,
+    pauM: dopo(pau,iniM),
+    parM: prima(par,iniM),
+    rieM: finM!==null?dopo(rie,finM):null
+  };
 }
-// RIENTRO segue sempre FINE: se risulta precedente, e' del giorno dopo.
-function ttNormPost(t,refM){
-  let m=ttToMin(t);
-  if(m===null||refM===null)return m;
-  if(m<refM)m+=1440;
-  return m;
-}
+
 function ttToHM(mins){
   if(!mins||mins<=0)return'—';
   const h=Math.floor(mins/60),m=mins%60;
@@ -6836,20 +6854,18 @@ function ttCalcDay(d,orari,isSestoGiorno){
   const isTrasf=!!par&&par.trim()!=='';
   let r={oreLav:null,oreViaggio:null,nottOrd:null,nottStr:null,goldenOrd:null,goldenNott:null,golden6:null,mancataPausa:false,isSesto:isSestoGiorno};
   if(!ini||!fin)return r;
-  const iniM=ttToMin(ini),finM=ttToMin(fin);
-  if(iniM===null||finM===null||finM<=iniM)return r;
+  const T=ttOrdinaGiornata(par,ini,pau,fin,rie);
+  if(!T||T.finM===null||T.finM<=T.iniM)return r;
+  const iniM=T.iniM,finM=T.finM;
   r.oreLav=finM-iniM;
   // Soglia: sesto giorno sempre 7h, altrimenti tipoGiornata
   const soglia=isSestoGiorno?420:ttMeta.tipoGiornata*60;
   const goldenRaw=Math.max(0,r.oreLav-soglia);
   let mancataG=0;
-  if(pau&&pau.trim()){const pM=ttToMin(pau);if(pM!==null&&(pM-iniM)>360){r.mancataPausa=true;mancataG=60;}}
+  if(T.pauM!==null&&(T.pauM-iniM)>360){r.mancataPausa=true;mancataG=60;}
   // Ore viaggio: calcolo grezzo poi sottrai franchigia
   if(isTrasf){
-    // PARTENZA e RIENTRO vanno normalizzati rispetto a INIZIO/FINE:
-    // ttToMin applica il rollover +24h sotto le 06:00, corretto per FINE/RIENTRO
-    // ma sbagliato per una PARTENZA all'alba (es. 05:00 con inizio 07:00).
-    const parM=ttNormPre(par,iniM), rieM=rie&&rie.trim()?ttNormPost(rie,finM):null;
+    const parM=T.parM, rieM=T.rieM;
     let v=0;
     if(parM!==null)v+=Math.max(0,iniM-parM);
     if(rieM!==null)v+=Math.max(0,rieM-finM);
@@ -6858,6 +6874,7 @@ function ttCalcDay(d,orari,isSestoGiorno){
     r.oreViaggio=netto>0?netto:null;
   }
   if(ttMeta.maggiorazioniNott){
+    // 23:00 e 02:30 del giorno dopo, sulla stessa linea del tempo di iniM.
     const N1=23*60,N2=24*60+150;
     const o55=Math.max(0,Math.min(finM,N2)-Math.max(iniM,N1));
     const o80=Math.max(0,finM-Math.max(iniM,N2));
