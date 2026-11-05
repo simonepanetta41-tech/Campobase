@@ -5540,53 +5540,102 @@ Struttura:
 
 Regole: momento D=Day N=Night M=Morning E=Evening. cast solo numeri. JSON minificato. ORARI CRITICI: la struttura standard di un PDL è: [ORARIO] → [scene del giorno N] → [Fine del Giorno #N]. L'orario precede SEMPRE le scene del giorno a cui appartiene. L'orario che appare DOPO "Fine del Giorno #N" appartiene al giorno N+1, non al giorno N. CASO SPECIALE — GIORNO SENZA ORARIO: alcuni giorni (tipicamente il primo, spesso un giorno di trasferimento troupe o prelight) NON hanno nessun orario prima delle loro scene — il PDL passa direttamente dal titolo del giorno alle scene, e poi a "Fine del Giorno #1". In questo caso il giorno 1 ha ora_inizio="TBD" e ora_fine="TBD". L'orario che segue "Fine del Giorno #1" appartiene al giorno 2. NON spostare l'orario del giorno 2 sul giorno 1 solo perché il giorno 1 non ne ha uno. Se un giorno ha più orari (es. unità principale + 2° UNITÀ), usa SOLO il primo orario trovato per quel giorno. Formati orario riconosciuti: "H: 08:00/18:00" (ora_inizio=08:00, ora_fine=18:00), "07:30/17:30", "ORARIO 08-18", "09.00-17.00", "H: 15/01 o 17/03" (formato compatto italiano — 15/01 significa ora_inizio=15:00 ora_fine=01:00, 17/03 significa ora_inizio=17:00 ora_fine=03:00 — se ci sono due orari alternativi separati da "o", prendi il primo E imposta ora_incerta=true). IMPORTANTE: se per un giorno non trovi NESSUN orario esplicito nel testo del PDL, usa OBBLIGATORIAMENTE "TBD" per ora_inizio e ora_fine — NON inventare orari, NON usare valori di default. Rispondi SOLO con il JSON.`;
 
-// ══ ORARI PARSER — deterministico, no API ══
-// Costruisce una mappa { dayNum: {ora_inizio, ora_fine} } leggendo il testo grezzo del PDF.
-// Ogni segmento è il testo che PRECEDE il marker "Fine del giorno #N", quindi appartiene al giorno N.
-// Questo approccio è immune al bug del modello AI che slittava gli orari di un giorno.
+// ── ORARI: riconoscimento dei formati PDL ────────────────────────────────────
+// I PDL non hanno un formato standard: ogni produzione scrive a modo suo.
+// Invece di inseguire un piano alla volta, i formati stanno in due tabelle.
+// Per aggiungerne uno basta una riga, e la console dice sempre quale ha
+// agganciato — o cosa non ha riconosciuto.
+
+// Come viene segnata la fine di una giornata di riprese.
+// L'ordine non conta: si prendono tutti i marcatori trovati.
+const PDL_FINE_GIORNO = [
+  { nome: 'Fine del giorno #N',  re: /fine\s+del\s+giorno\s*#?\s*(\d+)/gi },
+  { nome: 'Fine giorno N',       re: /fine\s+giorn(?:o|ata)\s*#?\s*(\d+)/gi },
+  { nome: 'Fine N° giorno',      re: /fine\s+(?:del\s+)?(\d+)\s*[°ªa]?\s*giorn(?:o|ata)/gi },
+  { nome: 'End of Day N',        re: /end\s+of\s+(?:shooting\s+)?day\s*#?\s*(\d+)/gi },
+  { nome: 'End Day N',           re: /end\s+day\s*#?\s*(\d+)/gi },
+];
+
+// Come viene scritto l'orario della giornata.
+// Con un'etichetta davanti i minuti possono mancare ("orario 09 / 16"):
+// e' l'etichetta a garantire che sia un orario. Senza etichetta i minuti
+// sono obbligatori, altrimenti "pag: 2 2/8" verrebbe letto come le 2:28.
+const PDL_ORA  = '(\\d{1,2})(?:\\s*[.:]\\s*(\\d{2}))?';
+const PDL_ORA_PIENA = '(\\d{1,2})\\s*[.:]\\s*(\\d{2})';
+const PDL_SEP  = '\\s*(?:[-\u2013\u2014/]|\u2192|->|alle)\\s*';
+
+const PDL_ORARI = [
+  { nome: 'etichetta + ore',
+    re: new RegExp('(?:orari[oi]|convocazione|call|h)\\s*:?\\s*' + PDL_ORA + PDL_SEP + PDL_ORA, 'i') },
+  { nome: 'dalle N alle N',
+    re: new RegExp('dalle\\s+' + PDL_ORA + '\\s+alle\\s+' + PDL_ORA, 'i') },
+  { nome: 'call/wrap',
+    re: new RegExp('call\\s*:?\\s*' + PDL_ORA + '[\\s\\S]{0,40}?wrap\\s*:?\\s*' + PDL_ORA, 'i') },
+  { nome: 'orario nudo con minuti',
+    re: new RegExp(PDL_ORA_PIENA + PDL_SEP + PDL_ORA_PIENA) },
+];
+
 function parseOrariFromText(text) {
   const result = {};
+  const diagnostica = { marcatore: null, giorni: {}, nonRiconosciuti: [] };
 
-  // Marcatore di fine giornata. I PDL non hanno un formato standard: lo
-  // stesso concetto compare come "Fine del giorno #3", "FINE GIORNO 3" o,
-  // sui piani bilingue, "End of Day 3". Senza la variante inglese il parser
-  // non agganciava nulla e restavano gli orari del modello, che slittano.
-  const markerRe = /(?:fine\s+del\s+giorno|fine\s+giorno|end\s+of\s+day)\s*#?\s*(\d+)/gi;
-  const markers = [];
-  let m;
-  while ((m = markerRe.exec(text)) !== null) {
-    markers.push({ dayNum: parseInt(m[1]), index: m.index, len: m[0].length });
+  // 1. Trova i marcatori di fine giornata, provando tutte le diciture.
+  let markers = [];
+  for (const forma of PDL_FINE_GIORNO) {
+    const trovati = [];
+    let m;
+    forma.re.lastIndex = 0;
+    while ((m = forma.re.exec(text)) !== null) {
+      trovati.push({ dayNum: parseInt(m[1]), index: m.index, len: m[0].length });
+    }
+    if (trovati.length > markers.length) {
+      markers = trovati;
+      diagnostica.marcatore = forma.nome;
+    }
   }
-  if (markers.length === 0) return result;
 
-  // Un orario, con i minuti facoltativi: "09", "09:00", "9.00".
-  const ORA = '(\\d{1,2})(?:\\s*[.:]\\s*(\\d{2}))?';
-  const SEP = '\\s*[-\u2013\u2014/]\\s*';
+  if (!markers.length) {
+    console.log('[OrariParser] nessuna dicitura di fine giornata riconosciuta — ' +
+      'il PDL ne usa una nuova. Diciture note: ' +
+      PDL_FINE_GIORNO.map(f => f.nome).join(' | '));
+    return result;
+  }
 
-  // Con l'etichetta davanti ("orario 09 / 16", "H: 15/01", "ORARIO 9.00-17.00")
-  // i minuti possono mancare: l'etichetta garantisce che sia un orario.
-  const CON_ETICHETTA = new RegExp('(?:orario|orari|h)\\s*:?\\s*' + ORA + SEP + ORA, 'i');
-  // Senza etichetta si pretendono i minuti da entrambi i lati, altrimenti
-  // un "2 2/8 Pag" o una frazione di pagina verrebbe letta come un orario.
-  const NUDO = new RegExp('(\\d{1,2})\\s*[.:]\\s*(\\d{2})' + SEP + '(\\d{1,2})\\s*[.:]\\s*(\\d{2})');
+  markers.sort((a, b) => a.index - b.index);
 
-  const oreValide = (h1, h2) => h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23;
-
-  // Il segmento del giorno N e' il testo fra il marcatore precedente e il suo.
+  // 2. Il segmento del giorno N e' il testo fra il marcatore precedente e il suo.
   let prevEnd = 0;
   for (const marker of markers) {
     const chunk = text.slice(prevEnd, marker.index);
-    const match = CON_ETICHETTA.exec(chunk) || NUDO.exec(chunk);
-    if (match) {
-      const h1 = parseInt(match[1]), h2 = parseInt(match[3]);
-      if (oreValide(h1, h2)) {
-        result[marker.dayNum] = {
-          ora_inizio: String(h1).padStart(2, '0') + ':' + (match[2] || '00'),
-          ora_fine:   String(h2).padStart(2, '0') + ':' + (match[4] || '00')
-        };
-      }
-    }
     prevEnd = marker.index + marker.len;
+
+    let letto = null;
+    for (const forma of PDL_ORARI) {
+      const m = forma.re.exec(chunk);
+      if (!m) continue;
+      const h1 = parseInt(m[1]), h2 = parseInt(m[3]);
+      if (!(h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23)) continue;
+      letto = {
+        ora_inizio: String(h1).padStart(2, '0') + ':' + (m[2] || '00'),
+        ora_fine:   String(h2).padStart(2, '0') + ':' + (m[4] || '00'),
+        // "H: 15/01 o 17/03" — due orari alternativi: si prende il primo
+        // e si segnala che non e' ancora deciso.
+        ora_incerta: /\b(?:o|oppure|\/\/|tbc)\b/i.test(chunk.slice(m.index + m[0].length, m.index + m[0].length + 24))
+      };
+      diagnostica.giorni[marker.dayNum] = forma.nome;
+      break;
+    }
+
+    if (letto) result[marker.dayNum] = letto;
+    else diagnostica.nonRiconosciuti.push(marker.dayNum);
+  }
+
+  console.log('[OrariParser] marcatore "' + diagnostica.marcatore + '" — ' +
+    Object.keys(result).length + '/' + markers.length + ' giorni con orario');
+  if (diagnostica.nonRiconosciuti.length) {
+    console.log('[OrariParser] senza orario riconosciuto: giorni ' +
+      diagnostica.nonRiconosciuti.join(', ') + '. Formati noti: ' +
+      PDL_ORARI.map(f => f.nome).join(' | '));
   }
   return result;
 }
@@ -5608,10 +5657,12 @@ function applyOrari(orariMap) {
     (s.giorni || []).forEach(g => {
       const o = orariMap[g.numero_giorno];
       if (o) {
-        // Orario trovato deterministicamente → sovrascriviamo sempre
+        // Orario trovato deterministicamente → sovrascriviamo sempre.
+        // ora_incerta la decide il parser: e' vera quando il PDL indica due
+        // orari alternativi ("15/01 o 17/03") o li marca TBC.
         g.ora_inizio = o.ora_inizio;
         g.ora_fine   = o.ora_fine;
-        g.ora_incerta = false;
+        g.ora_incerta = !!o.ora_incerta;
         changed = true;
       } else {
         // Nessun orario nel segmento di questo giorno → forziamo TBD
