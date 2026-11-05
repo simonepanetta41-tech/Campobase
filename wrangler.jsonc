@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "soundanalyst",
+  "compatibility_date": "2026-11-05",
+  "main": "worker/index.js",
+
+  "assets": {
+    // La radice del repo: l'app e' un singolo index.html piu' icone.
+    // Cosa NON viene caricato sta in .assetsignore.
+    "directory": ".",
+
+    // I percorsi che non corrispondono a un file ricadono su index.html.
+    // E' cosi' che si configura un'applicazione a pagina singola su Workers:
+    // _redirects qui non va usato, perche' un rewrite verso /index.html
+    // viene rifiutato in fase di deploy come loop infinito.
+    "not_found_handling": "single-page-application",
+
+    // Il Worker gira solo per queste rotte. Senza questa riga /api/* non lo
+    // raggiungerebbe mai: non esiste un file con quel nome, quindi la
+    // richiesta ricadrebbe su index.html e il client riceverebbe HTML al
+    // posto del JSON.
+    "run_worker_first": ["/api/*"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

@@ -1,8 +1,5 @@
 /*
- * Parti comuni alle funzioni Pages.
- *
- * I file che iniziano con _ non diventano rotte: Cloudflare Pages li tratta
- * come moduli da importare, quindi questo non e' raggiungibile dall'esterno.
+ * Parti comuni alle rotte /api/.
  *
  * Supabase si chiama via REST con fetch invece che con @supabase/supabase-js:
  * niente dipendenze npm da impacchettare, niente nodejs_compat, e una cosa in
@@ -22,8 +19,13 @@ export function json(data, status = 200) {
   });
 }
 
-export function onRequestOptions() {
-  return new Response(null, { status: 204, headers: CORS });
+/** Legge il corpo JSON, o restituisce una risposta d'errore pronta. */
+export async function readJson(request) {
+  try {
+    return { body: await request.json() };
+  } catch {
+    return { error: json({ error: 'Corpo della richiesta non valido' }, 400) };
+  }
 }
 
 /**
@@ -35,12 +37,11 @@ export async function requireUser(request, env) {
   if (!auth?.startsWith('Bearer ')) {
     return { error: json({ error: 'Non autorizzato' }, 401) };
   }
-  const token = auth.slice(7);
 
   const r = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
     headers: {
       apikey: env.SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${auth.slice(7)}`
     }
   });
 
@@ -54,10 +55,10 @@ export async function requireUser(request, env) {
 
 /**
  * Consuma una unita' di quota in modo atomico lato DB.
- * La funzione SQL consume_analysis_quota() salta il limite per permanent_plan
- * = 'founder', quindi per il proprietario passa sempre.
+ * consume_analysis_quota() salta il limite per permanent_plan = 'founder',
+ * quindi per il proprietario passa sempre.
  */
-export async function consumeQuota(env, userId, limit = 3) {
+export async function consumeQuota(env, userId, limit) {
   const today = new Date().toISOString().split('T')[0];
 
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/consume_analysis_quota`, {
@@ -71,8 +72,7 @@ export async function consumeQuota(env, userId, limit = 3) {
   });
 
   if (!r.ok) {
-    const detail = await r.text();
-    return { error: json({ error: 'Errore verifica quota: ' + detail }, 500) };
+    return { error: json({ error: 'Errore verifica quota: ' + await r.text() }, 500) };
   }
 
   const out = await r.json();
@@ -80,9 +80,7 @@ export async function consumeQuota(env, userId, limit = 3) {
 
   if (!q?.allowed) {
     return {
-      error: json({
-        error: `Limite giornaliero raggiunto (${limit} analisi/giorno).`
-      }, 429)
+      error: json({ error: `Limite giornaliero raggiunto (${limit} analisi/giorno).` }, 429)
     };
   }
 
@@ -92,13 +90,13 @@ export async function consumeQuota(env, userId, limit = 3) {
 /**
  * Inoltra una richiesta all'API di Anthropic.
  *
- * La risposta viene restituita in streaming senza passare da JSON.parse:
- * su Worker il limite e' di CPU, non di tempo, e deserializzare e
- * riserializzare 20.000 token di risposta e' l'unico punto del flusso che
- * ne consumerebbe davvero. Cosi' il costo resta vicino allo zero.
+ * La risposta torna in streaming senza passare da JSON.parse: su Worker il
+ * limite e' di CPU (10 ms), non di tempo, e l'attesa di rete non conta.
+ * Deserializzare e riserializzare 20.000 token sarebbe l'unico punto del
+ * flusso a consumare CPU davvero, quindi il corpo si gira cosi' com'e'.
  */
-export async function callAnthropic(env, payload) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+export function callAnthropic(env, payload) {
+  return fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -106,10 +104,8 @@ export async function callAnthropic(env, payload) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify(payload)
-  });
-
-  return new Response(r.body, {
+  }).then(r => new Response(r.body, {
     status: r.status,
     headers: { ...CORS, 'Content-Type': 'application/json' }
-  });
+  }));
 }

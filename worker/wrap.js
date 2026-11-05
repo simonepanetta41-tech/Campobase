@@ -1,17 +1,11 @@
-import { json } from './_shared.js';
+import { json, readJson } from './shared.js';
 
-export { onRequestOptions } from './_shared.js';
-
-export async function onRequestPost({ request, env }) {
+export async function handleWrap(request, env) {
   const key = env.GOOGLE_PLACES_KEY;
   if (!key) return json({ error: 'GOOGLE_PLACES_KEY non configurata' }, 500);
 
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: 'Corpo della richiesta non valido' }, 400);
-  }
+  const { body, error } = await readJson(request);
+  if (error) return error;
 
   // ── Recensioni di un singolo posto ──
   if (body.action === 'reviews') {
