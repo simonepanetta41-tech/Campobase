@@ -1,0 +1,13 @@
+# File che NON devono essere pubblicati come file statici.
+# Senza questo elenco finirebbero scaricabili da chiunque: il codice del
+# Worker, le query SQL e la documentazione.
+worker/
+sql/
+*.md
+wrangler.jsonc
+.assetsignore
+.gitignore
+node_modules/
+.wrangler/
+.dev.vars
+.git/
