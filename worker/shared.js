@@ -186,11 +186,20 @@ export async function callAnthropic(env, payload, ctx) {
     ctx.waitUntil((async () => {
       try {
         const d = JSON.parse(await new Response(toLog).text());
+        const u = d.usage || {};
+        const pensiero = u.output_tokens_details?.thinking_tokens;
         console.log('anthropic', JSON.stringify({
           model: payload.model,
+          effort: payload.output_config?.effort || '(default)',
           max_tokens_richiesti: payload.max_tokens,
           stop_reason: d.stop_reason,     // max_tokens = risposta tagliata
-          usage: d.usage,
+          token_uscita: u.output_tokens,
+          token_ragionamento: pensiero,
+          // Se questa percentuale e' alta, il budget se ne va in
+          // ragionamento invece che nella risposta: e' il guasto che ha
+          // fatto fallire il PDL, con 16000 su 16000.
+          quota_ragionamento: (pensiero != null && u.output_tokens)
+            ? Math.round(100 * pensiero / u.output_tokens) + '%' : null,
           tipi_blocco: (d.content || []).map(b => b.type)
         }));
       } catch (e) {

@@ -28,6 +28,10 @@ async function handleAnalyze(request, env, ctx) {
   return callAnthropic(env, {
     model: body.model || 'claude-sonnet-5-5',
     max_tokens: body.max_tokens || 16000,
+    // Come per il PDL: l'uscita e' un JSON lungo, e il budget deve bastare
+    // a scriverlo. Se l'analisi dovesse perdere di qualita', si alza a
+    // 'medium' da qui o passando effort dal client.
+    output_config: { effort: body.effort || 'low' },
     system: body.system,
     messages: body.messages
   }, ctx);
@@ -66,6 +70,12 @@ async function handlePdl(request, env, ctx) {
   return callAnthropic(env, {
     model: 'claude-haiku-5-5',
     max_tokens: body.max_tokens || 16000,
+    // Sui modelli 5.5 il ragionamento e' adattivo e non si spegne: si
+    // abbassa con effort. Su Haiku 5.5 il default e' "medium", e con un PDL
+    // in ingresso ha consumato tutti i 16.000 token di budget in
+    // ragionamento, senza arrivare a scrivere una riga di JSON. Qui il
+    // lavoro e' trascrivere una tabella, non deliberare.
+    output_config: { effort: body.effort || 'low' },
     system: body.system,
     messages: body.messages
   }, ctx);
