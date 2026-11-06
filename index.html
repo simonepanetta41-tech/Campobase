@@ -5533,6 +5533,11 @@ let pdlModalDayNum  = null;
 let pdlModalSceneStates = {};
 let pdlModalStatus  = 'pending';
 
+// Prompt storico, quando il PDL intero veniva mandato al modello come PDF.
+// Non e' piu' in uso: il piano si legge dal testo, e la riserva a blocchi
+// usa PDL_SYS_BLOCCO. Resta come riferimento delle regole di lettura, in
+// particolare sull'appartenenza degli orari alle giornate.
+// eslint-disable-next-line no-unused-vars
 const PDL_SYSPROMPT = `Sei un esperto analizzatore di piani di lavorazione cinematografici (PDL).
 Analizza il PDL e restituisci SOLO un JSON valido. Nessun testo. Nessun backtick. JSON COMPATTO.
 
@@ -5565,6 +5570,9 @@ const PDL_FINE_GIORNO = [
 // il regex si prenderebbe la "I" di "Sc: 12 INT/EXT".
 const PDL_NUM = '(\\d{1,4}[A-Za-z]{0,6}\\d{0,3})(?![\\d/])';
 const PDL_SCENE = [
+  // Su alcuni PDL pdf.js emette le etichette DOPO i valori, quindi il
+  // numero di scena precede "pag: Sc:" invece di seguirlo.
+  { nome: 'N pag: Sc:', re: /([0-9][0-9A-Za-z]*)\s+pag:\s*Sc:/gi },
   { nome: 'Sc: N',     re: new RegExp('\\bsc\\s*[:.]\\s*' + PDL_NUM, 'gi') },
   { nome: 'SCENA N',   re: new RegExp('\\bscena\\s*[:.]?\\s*' + PDL_NUM, 'gi') },
   { nome: 'Sc N',      re: new RegExp('\\bsc\\s+' + PDL_NUM, 'gi') },
@@ -5830,6 +5838,285 @@ function applyTrasferimenti(transferMap) {
 }
 
 /*
+ * Caricamento di un PDL: prima si prova a leggerlo, poi semmai a chiederlo.
+ *
+ * Il percorso vecchio mandava il PDF intero al modello e gli chiedeva di
+ * trascriverlo in JSON. Su un piano di 37 giorni erano 37.807 token in
+ * ingresso e una risposta troppo lunga, che si troncava: ne arrivavano due
+ * giornate su trentasette. E il modello sbagliava proprio le cose
+ * meccaniche — a quale giornata appartiene una scena, le date, gli orari.
+ *
+ * Ora: si estrae il testo con pdf.js e si tenta una lettura deterministica.
+ * Se riesce, il modello non viene nemmeno chiamato: zero token, immediato,
+ * ed esatto. Se il PDL ha un impianto che non riconosciamo, si ricade sul
+ * modello — ma mandando il TESTO invece del PDF (sei volte meno token) e
+ * spezzato in blocchi di giornate, cosi' la risposta non puo' troncarsi.
+ */
+
+// Estrae il testo del PDF esattamente come serve ai parser.
+async function pdlEstraiTesto(b64) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const doc = await pdfjsLib.getDocument({ data: arr }).promise;
+  let testo = '';
+  for (let p = 1; p <= doc.numPages; p++) {
+    const tc = await (await doc.getPage(p)).getTextContent();
+    testo += tc.items.map(i => i.str).join(' ') + '\n';
+  }
+  return testo;
+}
+
+/*
+ * Parser deterministico del PDL.
+ *
+ * Chiave di lettura: pdf.js restituisce le celle della tabella in un ordine
+ * diverso da quello visivo, e le etichette arrivano DOPO i valori. Una scena
+ * si presenta cosi':
+ *
+ *   INT/EXT  <titolo>  <momento>  <pagine>  <descrizione>  <cast>  <numero>
+ *   pag:  Sc:  DAY <n>  <location>  <effetti>
+ *
+ * L'ancora affidabile e' quindi "pag: Sc:", con il numero di scena subito
+ * prima — non dopo, come verrebbe da pensare guardando il PDF stampato.
+ * Se il piano non ha questa forma la funzione restituisce null.
+ */
+const PDLD = {
+  ANCORA:  /pag:\s*Sc:/g,
+  // Due istanze della stessa espressione: una globale per matchAll, una
+  // semplice per exec. Condividerne una sola non funziona, perche' exec
+  // avanza lastIndex e matchAll riparte da li', saltando le scene
+  // successive — con una sola se ne perdevano 72 su 87.
+  INTEXT:  /\b(INT\/EXT|EXT\/INT|INT-EXT|INT|EXT)\b/g,
+  INTEXT1: /\b(INT\/EXT|EXT\/INT|INT-EXT|INT|EXT)\b/,
+  MOMENTO: /\b(Giorno|Notte|Alba|Tramonto)\b/,
+  PAGINE:  /^\s*(\d+\s+\d+\/\d+|\d+\/\d+|\d+)\s/,
+  CODA:    /(?:([\d,\s]*?)\s+)?([0-9][0-9A-Za-z]*)\s*$/,
+  STORIA:  /^\s*DAY\s+(\d+)/i,
+  // Sigle di reparto che stanno accanto alla location e non ne fanno parte.
+  EFFETTI: /^(?:VFX|SFX|STUNT|STU|ARM|R\/ARM|FX|CGI|V|S|R|[+/&\s])+$/i,
+  MOM: { Giorno: 'D', Notte: 'N', Alba: 'M', Tramonto: 'E' }
+};
+
+function pdlParseDeterministico(text) {
+  const ancore = [...text.matchAll(PDLD.ANCORA)];
+  const marker = [...text.matchAll(/End of Day\s+(\d+)/gi)];
+  if (ancore.length < 2 || marker.length < 2) return null;
+
+  // ── le scene ──
+  const scene = [];
+  let prev = 0;
+  for (let k = 0; k < ancore.length; k++) {
+    const a = ancore[k];
+    const pre = text.slice(prev, a.index);
+    prev = a.index + a[0].length;
+
+    PDLD.INTEXT.lastIndex = 0;
+    const tutti = [...pre.matchAll(PDLD.INTEXT)];
+    if (!tutti.length) continue;
+    const mi = tutti[tutti.length - 1];          // l'ultimo prima dell'ancora
+
+    const corpo = pre.slice(mi.index + mi[0].length);
+    const mm = PDLD.MOMENTO.exec(corpo);
+    if (!mm) continue;
+
+    let resto = corpo.slice(mm.index + mm[0].length);
+    const pm = PDLD.PAGINE.exec(resto);
+    const pagine = pm ? pm[1] : '';
+    if (pm) resto = resto.slice(pm[0].length);
+
+    const cm = PDLD.CODA.exec(resto);
+    if (!cm) continue;
+
+    const finePost = k + 1 < ancore.length ? ancore[k + 1].index : text.length;
+    let post = text.slice(a.index + a[0].length, finePost);
+    const nx = PDLD.INTEXT1.exec(post);
+    if (nx) post = post.slice(0, nx.index);
+    for (const stop of ['orario', 'End of Day', 'FINE']) {
+      const i = post.indexOf(stop);
+      if (i >= 0) post = post.slice(0, i);
+    }
+    const dm = PDLD.STORIA.exec(post);
+    const coda = dm ? post.slice(dm[0].length) : post;
+    const pezzi = coda.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+    const eff = pezzi.filter(p => PDLD.EFFETTI.test(p));
+
+    scene.push({
+      numero: cm[2],
+      int_ext: mi[1].replace('-', '/'),
+      momento: PDLD.MOM[mm[1]] || 'D',
+      location: pezzi.filter(p => !PDLD.EFFETTI.test(p)).join(' '),
+      cast: (cm[1] || '').split(',').map(c => c.trim()).filter(Boolean),
+      pagine,
+      stunt: eff.some(e => /STU/i.test(e)),
+      _pos: a.index
+    });
+  }
+  if (!scene.length) return null;
+
+  // ── le giornate ──
+  const GG = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const reData = new RegExp('(\\d{1,2})\\s+(' + Object.keys(PDL_MESI).join('|') + ')\\s+(\\d{4})', 'i');
+  const giorni = [];
+  prev = 0;
+  for (const m of marker) {
+    const ini = m.index, fin = m.index + m[0].length;
+    const seg = text.slice(prev, ini), coda = text.slice(fin, fin + 90);
+
+    let data = null, gset = null;
+    const dm = reData.exec(coda);
+    if (dm) {
+      const d = new Date(Date.UTC(+dm[3], PDL_MESI[dm[2].toLowerCase()] - 1, +dm[1]));
+      data = d.toISOString().slice(0, 10);
+      gset = GG[(d.getUTCDay() + 6) % 7];
+    }
+    const pm = /--\s*([\d\s/]+?)\s*Pag/.exec(coda);
+    const om = /orario\s+(\d{1,2})(?:[.:](\d{2}))?\s*\/\s*(\d{1,2})(?:[.:](\d{2}))?/i.exec(seg);
+
+    const mie = scene.filter(s => s._pos >= prev && s._pos < ini);
+    const conta = {};
+    mie.forEach(s => { if (s.location) conta[s.location] = (conta[s.location] || 0) + 1; });
+
+    giorni.push({
+      numero_giorno: parseInt(m[1]), data, giorno_settimana: gset,
+      ora_inizio: om ? String(+om[1]).padStart(2, '0') + ':' + (om[2] || '00') : 'TBD',
+      ora_fine:   om ? String(+om[3]).padStart(2, '0') + ':' + (om[4] || '00') : 'TBD',
+      ora_incerta: false,
+      location_principale: Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || '',
+      pagine_giorno: pm ? pm[1].trim() : '',
+      unita_secondarie: [],
+      scene: mie.map(({ _pos, ...s }) => s),
+      _pos: ini
+    });
+    prev = fin;
+  }
+  if (!giorni.length || !giorni.some(g => g.data)) return null;
+
+  // ── le settimane ──
+  const tagli = [...text.matchAll(/FINE\s+(\d+)[aª]?\s+SETTIMANA/gi)].map(m => m.index);
+  tagli.push(text.length);
+  const settimane = [];
+  let idx = 0;
+  for (const taglio of tagli) {
+    const gruppo = giorni.slice(idx).filter(g => g._pos < taglio);
+    if (!gruppo.length) continue;
+    idx += gruppo.length;
+    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1),
+                     giorni: gruppo.map(({ _pos, ...g }) => g) });
+  }
+  if (!settimane.length) return null;
+
+  const tm = /\n([A-Z][A-Z\s']{4,40})\s+bozza/.exec(text);
+  const vm = /bozza\s+(PdL\s+\d+\s+del\s+[\w\s]+?\d{4})/i.exec(text);
+
+  return {
+    titolo: tm ? tm[1].trim() : 'PDL',
+    regista: '', versione: vm ? vm[1].trim() : '',
+    totale_giorni: giorni.length,
+    totale_scene: giorni.reduce((a, g) => a + g.scene.length, 0),
+    data_inizio: giorni[0].data, data_fine: giorni[giorni.length - 1].data,
+    settimane
+  };
+}
+
+/*
+ * Riserva: il modello, ma sul testo e a blocchi.
+ *
+ * Mandare il PDF costava 37.807 token in ingresso contro i circa 5.800 del
+ * testo. E chiedere tutto il piano in una risposta sola la faceva troncare:
+ * spezzandolo in gruppi di giornate, ogni risposta e' corta e completa.
+ */
+const PDL_GIORNI_PER_BLOCCO = 8;
+
+function pdlDividiPerBlocchi(text) {
+  const { segmenti } = pdlSegmentiPerGiorno(text);
+  if (segmenti.length <= PDL_GIORNI_PER_BLOCCO) return [text];
+
+  // Si taglia alla fine del marcatore dell'ultima giornata di ogni gruppo.
+  const fini = [];
+  let scorri = 0;
+  for (const forma of PDL_FINE_GIORNO) {
+    forma.re.lastIndex = 0;
+    const t = [...text.matchAll(forma.re)];
+    if (t.length > fini.length) { fini.length = 0; t.forEach(m => fini.push(m.index + m[0].length)); }
+  }
+  const blocchi = [];
+  let da = 0;
+  for (let i = PDL_GIORNI_PER_BLOCCO - 1; i < fini.length; i += PDL_GIORNI_PER_BLOCCO) {
+    blocchi.push(text.slice(da, fini[i]));
+    da = fini[i];
+  }
+  if (da < text.length - 50) blocchi.push(text.slice(da));
+  return blocchi;
+}
+
+const PDL_SYS_BLOCCO = `Sei un esperto analizzatore di piani di lavorazione cinematografici (PDL).
+Ricevi un ESTRATTO di PDL contenente alcune giornate. Restituisci SOLO un JSON valido, compatto, senza backtick:
+{"giorni":[{"numero_giorno":1,"data":"YYYY-MM-DD","giorno_settimana":"Monday","ora_inizio":"TBD","ora_fine":"TBD","ora_incerta":false,"location_principale":"string","pagine_giorno":"string","unita_secondarie":[],"scene":[{"numero":"string","int_ext":"INT/EXT","momento":"D","location":"string","cast":["1"],"pagine":"string","stunt":false}]}]}
+Includi SOLO le giornate che si chiudono dentro l'estratto. momento D=Day N=Night M=Morning E=Evening. cast solo numeri.
+La struttura e' [scene del giorno N] -> [orario del giorno N] -> [fine del giorno N]: tutto cio' che precede il marcatore di fine giornata appartiene a quella giornata. Se per una giornata non trovi un orario esplicito usa "TBD": non inventarlo.
+Rispondi SOLO con il JSON.`;
+
+async function pdlEstraiConModello(text) {
+  const blocchi = pdlDividiPerBlocchi(text);
+  console.log('[PdlModello] ' + blocchi.length + ' blocchi, ' +
+    Math.round(text.length / 4) + ' token stimati in tutto');
+
+  const risposte = await Promise.all(blocchi.map(b => callApi('api/pdl', {
+    system: PDL_SYS_BLOCCO,
+    max_tokens: 16000,
+    messages: [{ role: 'user', content: [{ type: 'text', text: b }] }]
+  })));
+
+  const giorni = [];
+  risposte.forEach((d, i) => {
+    const raw = d.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+    try {
+      const j = JSON.parse(raw);
+      (j.giorni || []).forEach(g => giorni.push(g));
+    } catch (e) {
+      console.warn('[PdlModello] blocco ' + (i + 1) + ' illeggibile: ' + pdlDiagnosi(d, raw));
+    }
+  });
+  if (!giorni.length) throw new Error('Il modello non ha restituito nessuna giornata leggibile.');
+
+  // Deduplica e ordina: un marcatore a cavallo di due blocchi puo' ripetersi.
+  const visti = new Map();
+  giorni.forEach(g => { if (!visti.has(g.numero_giorno)) visti.set(g.numero_giorno, g); });
+  const ordinati = [...visti.values()].sort((a, b) => a.numero_giorno - b.numero_giorno);
+
+  const settimane = [];
+  ordinati.forEach((g, i) => {
+    if (i % 6 === 0) settimane.push({ numero: settimane.length + 1,
+                                      label: 'Settimana ' + (settimane.length + 1), giorni: [] });
+    settimane[settimane.length - 1].giorni.push(g);
+  });
+
+  const tm = /\n([A-Z][A-Z\s']{4,40})\s+bozza/.exec(text);
+  return {
+    titolo: tm ? tm[1].trim() : 'PDL', regista: '', versione: '',
+    totale_giorni: ordinati.length,
+    totale_scene: ordinati.reduce((a, g) => a + (g.scene?.length || 0), 0),
+    data_inizio: ordinati[0]?.data || null,
+    data_fine: ordinati[ordinati.length - 1]?.data || null,
+    settimane
+  };
+}
+
+// Sceglie la strada e restituisce il PDL.
+async function pdlAnalizza(b64) {
+  const testo = await pdlEstraiTesto(b64);
+  const det = pdlParseDeterministico(testo);
+  if (det && det.totale_giorni > 0 && det.totale_scene > 0) {
+    console.log('[Pdl] lettura diretta dal PDF: ' + det.totale_giorni + ' giornate, ' +
+      det.totale_scene + ' scene, ' + det.settimane.length + ' settimane — nessuna chiamata al modello');
+    return { pdl: det, testo, metodo: 'deterministico' };
+  }
+  console.log('[Pdl] impianto non riconosciuto, passo al modello sul testo a blocchi');
+  return { pdl: await pdlEstraiConModello(testo), testo, metodo: 'modello' };
+}
+
+/*
  * Legge la data di ogni giornata dalla riga del marcatore.
  *
  * "End of Day 1 -- sabato 17 ottobre 2026 -- 2 2/8 Pag --"
@@ -5953,16 +6240,9 @@ function applyScene(sceneMap) {
 
 async function extractAndApplyTrasferimenti(b64) {
   try {
-    const bin = atob(b64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    const doc = await pdfjsLib.getDocument({ data: arr }).promise;
-    let fullText = '';
-    for (let p = 1; p <= doc.numPages; p++) {
-      const page = await doc.getPage(p);
-      const tc = await page.getTextContent();
-      fullText += tc.items.map(i => i.str).join(' ') + '\n';
-    }
+    // Il testo e' gia' stato estratto al caricamento: riusarlo evita di
+    // rileggere il PDF una seconda volta.
+    const fullText = window._pdlTesto || await pdlEstraiTesto(b64);
     // Campione del testo come lo restituisce pdf.js: serve a capire con che
     // forma compaiono davvero numeri di scena e marcatori, che cambiano da
     // una produzione all'altra.
@@ -5975,6 +6255,14 @@ async function extractAndApplyTrasferimenti(b64) {
     applyTrasferimenti(transferMap);
 
     // Orari deterministici — sovrascrive i valori AI con quelli letti dal PDF
+    // Quando il piano e' stato letto direttamente dal PDF, giorni, date,
+    // orari e scene vengono di li': correggerli con gli stessi dati non
+    // aggiunge nulla e riempirebbe la console di rumore.
+    if (window._pdlMetodo === 'deterministico') {
+      if (Object.keys(transferMap).length) { applyTrasferimenti(transferMap); renderPdlCalendar(); savePdlToSupabase(); }
+      return;
+    }
+
     const orariMap = parseOrariFromText(fullText);
     const orariChanged = applyOrari(orariMap);
 
@@ -6247,27 +6535,10 @@ async function loadPdlFile(input) {
     let bin=''; const chunk=8192;
     for(let i=0;i<bytes.byteLength;i+=chunk) bin+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     const b64 = btoa(bin);
-    const data = await callApi('api/pdl', {
-      system: PDL_SYSPROMPT,
-      // Margine ampio: il ragionamento dei modelli 5.5 attinge allo stesso
-      // budget della risposta, quindi 16000 rischiavano di finire prima che
-      // il JSON cominciasse. Con effort basso ne servono molti meno, questo
-      // e' solo spazio di sicurezza: non vengono fatturati se non usati.
-      max_tokens: 32000,
-      messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analizza questo PDL.'}]}]
-    });
-    const raw = data.content.map(b=>b.text||'').join('');
-    let newPdl;
-    try { newPdl = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
-    catch(e) {
-      if (!raw.trim()) throw new Error(pdlDiagnosi(data));
-      const lb=raw.lastIndexOf('}'); let attempt=raw.substring(0,lb+1);
-      let o=0,s=0; for(const c of attempt){if(c==='{')o++;else if(c==='}')o--;else if(c==='[')s++;else if(c===']')s--;} 
-      attempt+=']'.repeat(Math.max(0,s))+'}' .repeat(Math.max(0,o));
-      try { newPdl = JSON.parse(attempt); }
-      catch(_) { throw new Error(pdlDiagnosi(data, raw)); }
-    }
+    const { pdl: newPdl, testo: pdlTesto, metodo } = await pdlAnalizza(b64);
     pdlData = newPdl;
+    window._pdlTesto = pdlTesto;   // riusato dalle correzioni, evita di riestrarre
+    window._pdlMetodo = metodo;
     window.pdlData = pdlData; // accessibile da altri script block
     const saved = localStorage.getItem('pdl_sd_'+pdlData.titolo);
     pdlShootingData = saved ? JSON.parse(saved) : {};
@@ -6302,14 +6573,9 @@ async function loadUpdatedPdlFile(input) {
     let bin=''; const chunk=8192;
     for(let i=0;i<bytes.byteLength;i+=chunk) bin+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     const b64=btoa(bin);
-    const data = await callApi('api/pdl', {
-      system: PDL_SYSPROMPT, max_tokens: 32000,
-      messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Analizza.'}]}]
-    });
-    const raw=data.content.map(b=>b.text||'').join('');
-    let newPdl;
-    try { newPdl=JSON.parse(raw.replace(/```json|```/g,'').trim()); }
-    catch(_) { throw new Error(pdlDiagnosi(data, raw)); }
+    const { pdl: newPdl, testo: pdlTesto, metodo } = await pdlAnalizza(b64);
+    window._pdlTesto = pdlTesto;
+    window._pdlMetodo = metodo;
     const oldGiorni=getPdlAllGiorni();
     const newPdlMinDay=Math.min(...newPdl.settimane.flatMap(s=>s.giorni||[]).map(g=>g.numero_giorno));
     const oldDays=oldGiorni.filter(g=>g.numero_giorno<newPdlMinDay);
