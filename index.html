@@ -7634,12 +7634,59 @@ async function ttSave(){
   await ttRenderStorico();showToast('Settimana salvata!');
 }
 
+/*
+ * Ordina lo storico per settimana, non per quando e' stato salvato.
+ *
+ * Capita di compilare la terza settimana, poi la seconda, poi la quarta:
+ * l'ordine di inserimento non dice nulla a chi rilegge. La chiave vera e'
+ * la data di inizio, che e' un campo data e quindi si ordina da sola.
+ *
+ * Le produzioni pero' non si mescolano: ordinare per sola settimana
+ * metterebbe la settimana 2 di un film accanto alla 2 di un altro. Quindi
+ * si raggruppa per produzione, le produzioni piu' recenti in alto — cosi'
+ * quella in corso resta a portata — e dentro ogni produzione le settimane
+ * in ordine crescente.
+ */
+function ttOrdinaStorico(righe){
+  const nomeProd = s => (s.meta?.film || s.meta?.produzione || '—').trim().toLowerCase();
+  // Numero di settimana da un campo libero: "3", "Sett. 3", "3ª" -> 3
+  const numSett = s => {
+    const n = parseInt(String(s.meta?.settimana || '').replace(/\D+/g, ''), 10);
+    return isNaN(n) ? Infinity : n;
+  };
+  const dentro = (a, b) => {
+    const da = a.meta?.dal || '', db = b.meta?.dal || '';
+    if (da && db && da !== db) return da < db ? -1 : 1;   // date ISO: confronto diretto
+    if (da && !db) return -1;
+    if (!da && db) return 1;
+    const na = numSett(a), nb = numSett(b);
+    if (na !== nb) return na - nb;
+    return String(a.salvataIl || '').localeCompare(String(b.salvataIl || ''));
+  };
+
+  const gruppi = new Map();
+  righe.forEach(r => {
+    const k = nomeProd(r);
+    if (!gruppi.has(k)) gruppi.set(k, []);
+    gruppi.get(k).push(r);
+  });
+  // Una produzione vale quanto la sua settimana piu' recente.
+  const recente = g => g.reduce((m, r) => {
+    const v = r.meta?.dal || r.salvataIl || '';
+    return v > m ? v : m;
+  }, '');
+
+  return [...gruppi.values()]
+    .sort((a, b) => recente(b).localeCompare(recente(a)))
+    .flatMap(g => g.sort(dentro));
+}
+
 async function ttRenderStorico(){
   const el=document.getElementById('tt-storico');if(!el)return;
   if(!currentUser){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Accedi per vedere lo storico.</div>';return;}
   const{data:rows,error}=await sb.from('timetable_weeks').select('id,data,updated_at').eq('user_id',currentUser.id).order('updated_at',{ascending:false});
   if(error){console.log('[ttStorico] error:',error.message);el.innerHTML='<div style="font-size:11px;color:var(--danger)">Errore caricamento storico.</div>';return;}
-  ttStoricoCache=(rows||[]).map(r=>({dbId:r.id,...r.data}));
+  ttStoricoCache=ttOrdinaStorico((rows||[]).map(r=>({dbId:r.id,salvataIl:r.updated_at,...r.data})));
   const saved=ttStoricoCache;
   if(saved.length===0){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Nessuna settimana salvata.</div>';return;}
   el.innerHTML=saved.map((s,si)=>{
