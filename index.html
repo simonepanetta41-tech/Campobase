@@ -5838,22 +5838,32 @@ function applyTrasferimenti(transferMap) {
 }
 
 /*
- * Caricamento di un PDL: prima si prova a leggerlo, poi semmai a chiederlo.
+ * Caricamento di un PDL.
  *
- * Il percorso vecchio mandava il PDF intero al modello e gli chiedeva di
- * trascriverlo in JSON. Su un piano di 37 giorni erano 37.807 token in
- * ingresso e una risposta troppo lunga, che si troncava: ne arrivavano due
- * giornate su trentasette. E il modello sbagliava proprio le cose
- * meccaniche — a quale giornata appartiene una scena, le date, gli orari.
+ * Sette PDL di produzioni diverse hanno sette impianti di tabella diversi:
+ * in uno il numero di scena precede "pag: Sc:", in un altro precede
+ * INT/EXT, in un altro ancora segue la parola "Day". Inseguire ogni
+ * impianto non e' sostenibile.
  *
- * Ora: si estrae il testo con pdf.js e si tenta una lettura deterministica.
- * Se riesce, il modello non viene nemmeno chiamato: zero token, immediato,
- * ed esatto. Se il PDL ha un impianto che non riconosciamo, si ricade sul
- * modello — ma mandando il TESTO invece del PDF (sei volte meno token) e
- * spezzato in blocchi di giornate, cosi' la risposta non puo' troncarsi.
+ * Quello che invece NON cambia e' la struttura: un marcatore chiude ogni
+ * giornata, e sulla sua riga c'e' la data. Da li' si ricavano le giornate,
+ * le date, gli orari e — soprattutto — quale pezzo di testo appartiene a
+ * quale giornata. Sono esattamente le cose che il modello sbagliava.
+ *
+ * Quindi: la struttura la leggiamo noi, le scene le chiede al modello UN
+ * SEGMENTO DI GIORNATA ALLA VOLTA. Cosi' l'appartenenza di una scena a un
+ * giorno non e' piu' una sua decisione, e non puo' piu' slittare.
+ * Dove l'impianto e' riconosciuto si leggono anche le scene, e il modello
+ * non viene chiamato affatto.
  */
 
-// Estrae il testo del PDF esattamente come serve ai parser.
+// Due forme di data: "17 ottobre 2026" e "February 27, 2026" — i piani
+// bilingui scrivono il mese prima del giorno.
+const PDL_DATE = [
+  new RegExp('(\\d{1,2})\\s+(' + Object.keys(PDL_MESI).join('|') + ')\\s+(\\d{4})', 'i'),
+  new RegExp('(' + Object.keys(PDL_MESI).join('|') + ')\\s+(\\d{1,2}),?\\s+(\\d{4})', 'i'),
+];
+
 async function pdlEstraiTesto(b64) {
   const bin = atob(b64);
   const arr = new Uint8Array(bin.length);
@@ -5868,64 +5878,108 @@ async function pdlEstraiTesto(b64) {
 }
 
 /*
- * Parser deterministico del PDL.
- *
- * Chiave di lettura: pdf.js restituisce le celle della tabella in un ordine
- * diverso da quello visivo, e le etichette arrivano DOPO i valori. Una scena
- * si presenta cosi':
- *
- *   INT/EXT  <titolo>  <momento>  <pagine>  <descrizione>  <cast>  <numero>
- *   pag:  Sc:  DAY <n>  <location>  <effetti>
- *
- * L'ancora affidabile e' quindi "pag: Sc:", con il numero di scena subito
- * prima — non dopo, come verrebbe da pensare guardando il PDF stampato.
- * Se il piano non ha questa forma la funzione restituisce null.
+ * Lo scheletro del piano: giornate, date, orari e il testo di ciascuna.
+ * Vale su qualunque impianto, perche' guarda solo i marcatori di fine
+ * giornata. Restituisce null se non ne trova abbastanza.
+ */
+function pdlStrutturaDaTesto(text) {
+  let marker = [], dicitura = null;
+  for (const forma of PDL_FINE_GIORNO) {
+    forma.re.lastIndex = 0;
+    const t = [...text.matchAll(forma.re)];
+    if (t.length > marker.length) { marker = t; dicitura = forma.nome; }
+  }
+  if (marker.length < 2) return null;
+  marker.sort((a, b) => a.index - b.index);
+
+  // Numerazione consecutiva: se salta, stiamo leggendo la cosa sbagliata.
+  const numeri = marker.map(m => parseInt(m[1]));
+  if (!numeri.every((n, i) => i === 0 || n === numeri[i - 1] + 1)) {
+    console.log('[Pdl] giornate non consecutive (' + numeri.slice(0, 8).join(',') + '…)');
+    return null;
+  }
+
+  const GG = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const giorni = [];
+  let prev = 0;
+  for (const m of marker) {
+    const ini = m.index, fin = ini + m[0].length;
+    const seg = text.slice(prev, ini);
+    const coda = text.slice(fin, fin + 100);
+
+    let data = null, gset = null;
+    for (const re of PDL_DATE) {
+      const d = re.exec(coda);
+      if (!d) continue;
+      const [gg, mm, aa] = /^\d/.test(d[1])
+        ? [+d[1], PDL_MESI[d[2].toLowerCase()], +d[3]]
+        : [+d[2], PDL_MESI[d[1].toLowerCase()], +d[3]];
+      if (!mm) continue;
+      const dt = new Date(Date.UTC(aa, mm - 1, gg));
+      data = dt.toISOString().slice(0, 10);
+      gset = GG[(dt.getUTCDay() + 6) % 7];
+      break;
+    }
+
+    let oi = 'TBD', of = 'TBD', incerta = false;
+    trovato:
+    for (const forma of PDL_ORARI) {
+      forma.re.lastIndex = 0;
+      let o;
+      while ((o = forma.re.exec(seg)) !== null) {
+        let h1 = +o[1], h2 = +o[3];
+        // I piani scrivono "16 / 24" per dire fino a mezzanotte, e a volte
+        // "25" o "26" per l'una e le due di notte: ore legittime, si
+        // riportano sul quadrante invece di scartarle.
+        if (!(h1 >= 0 && h1 <= 29 && h2 >= 0 && h2 <= 29)) continue;
+        h1 %= 24; h2 %= 24;
+        oi = String(h1).padStart(2, '0') + ':' + (o[2] || '00');
+        of = String(h2).padStart(2, '0') + ':' + (o[4] || '00');
+        incerta = /\b(?:o|oppure|tbc)\b/i.test(seg.slice(o.index + o[0].length, o.index + o[0].length + 24));
+        break trovato;
+      }
+    }
+
+    giorni.push({ numero_giorno: parseInt(m[1]), data, giorno_settimana: gset,
+                  ora_inizio: oi, ora_fine: of, ora_incerta: incerta,
+                  location_principale: '', pagine_giorno: '', unita_secondarie: [],
+                  scene: [], _seg: seg, _ini: prev, _fin: ini });
+    prev = fin;
+  }
+  // Il conteggio pagine segue la data: "-- 2 3/8 Pag --", "- 2/8 pag. ----",
+  // "-- 5 7/8 Pages". I trattini variano, quindi non si pretendono.
+  const pm = /([\d]+(?:\s+\d+\/\d+)?|\d+\/\d+)\s*(?:Pag|pgs)/i;
+  giorni.forEach(g => {
+    const m = pm.exec(text.slice(g._fin, g._fin + 110));
+    if (m) g.pagine_giorno = m[1].trim();
+  });
+  return { giorni, dicitura };
+}
+
+/*
+ * Lettura diretta delle scene, per gli impianti che sappiamo riconoscere.
+ * Oggi ne conosciamo uno: quello in cui pdf.js emette le etichette dopo i
+ * valori, e il numero di scena precede "pag: Sc:".
  */
 const PDLD = {
   ANCORA:  /pag:\s*Sc:/g,
   // Due istanze della stessa espressione: una globale per matchAll, una
   // semplice per exec. Condividerne una sola non funziona, perche' exec
-  // avanza lastIndex e matchAll riparte da li', saltando le scene
-  // successive — con una sola se ne perdevano 72 su 87.
+  // avanza lastIndex e matchAll riparte da li', saltando le scene dopo.
   INTEXT:  /\b(INT\/EXT|EXT\/INT|INT-EXT|INT|EXT)\b/g,
   INTEXT1: /\b(INT\/EXT|EXT\/INT|INT-EXT|INT|EXT)\b/,
   MOMENTO: /\b(Giorno|Notte|Alba|Tramonto)\b/,
   PAGINE:  /^\s*(\d+\s+\d+\/\d+|\d+\/\d+|\d+)\s/,
   CODA:    /(?:([\d,\s]*?)\s+)?([0-9][0-9A-Za-z]*)\s*$/,
   STORIA:  /^\s*DAY\s+(\d+)/i,
-  // Sigle di reparto che stanno accanto alla location e non ne fanno parte.
   EFFETTI: /^(?:VFX|SFX|STUNT|STU|ARM|R\/ARM|FX|CGI|V|S|R|[+/&\s])+$/i,
   MOM: { Giorno: 'D', Notte: 'N', Alba: 'M', Tramonto: 'E' }
 };
 
-function pdlParseDeterministico(text) {
+function pdlSceneDaAncora(text) {
   const ancore = [...text.matchAll(PDLD.ANCORA)];
   if (ancore.length < 2) return null;
 
-  // I marcatori di fine giornata si cercano con la stessa tabella usata
-  // altrove, non con la sola dicitura inglese: un PDL italiano con questo
-  // impianto di tabella merita la lettura diretta quanto uno bilingue.
-  let marker = [];
-  for (const forma of PDL_FINE_GIORNO) {
-    forma.re.lastIndex = 0;
-    const t = [...text.matchAll(forma.re)];
-    if (t.length > marker.length) marker = t;
-  }
-  if (marker.length < 2) return null;
-  marker.sort((a, b) => a.index - b.index);
-
-  // Le giornate devono essere numerate di fila: una numerazione sconnessa
-  // vuol dire che stiamo leggendo la cosa sbagliata, e conviene lasciar
-  // fare al modello invece di produrre un piano plausibile ma falso.
-  const numeri = marker.map(m => parseInt(m[1]));
-  const consecutivi = numeri.every((n, i) => i === 0 || n === numeri[i - 1] + 1);
-  if (!consecutivi) {
-    console.log('[Pdl] numerazione delle giornate non consecutiva (' +
-      numeri.slice(0, 8).join(',') + '…): lascio fare al modello');
-    return null;
-  }
-
-  // ── le scene ──
   const scene = [];
   let prev = 0;
   for (let k = 0; k < ancore.length; k++) {
@@ -5936,17 +5990,15 @@ function pdlParseDeterministico(text) {
     PDLD.INTEXT.lastIndex = 0;
     const tutti = [...pre.matchAll(PDLD.INTEXT)];
     if (!tutti.length) continue;
-    const mi = tutti[tutti.length - 1];          // l'ultimo prima dell'ancora
+    const mi = tutti[tutti.length - 1];
 
     const corpo = pre.slice(mi.index + mi[0].length);
     const mm = PDLD.MOMENTO.exec(corpo);
     if (!mm) continue;
-
     let resto = corpo.slice(mm.index + mm[0].length);
     const pm = PDLD.PAGINE.exec(resto);
     const pagine = pm ? pm[1] : '';
     if (pm) resto = resto.slice(pm[0].length);
-
     const cm = PDLD.CODA.exec(resto);
     if (!cm) continue;
 
@@ -5959,188 +6011,232 @@ function pdlParseDeterministico(text) {
       if (i >= 0) post = post.slice(0, i);
     }
     const dm = PDLD.STORIA.exec(post);
-    const coda = dm ? post.slice(dm[0].length) : post;
-    const pezzi = coda.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+    const pezzi = (dm ? post.slice(dm[0].length) : post)
+      .split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
     const eff = pezzi.filter(p => PDLD.EFFETTI.test(p));
 
     scene.push({
-      numero: cm[2],
-      int_ext: mi[1].replace('-', '/'),
+      numero: cm[2], int_ext: mi[1].replace('-', '/'),
       momento: PDLD.MOM[mm[1]] || 'D',
       location: pezzi.filter(p => !PDLD.EFFETTI.test(p)).join(' '),
       cast: (cm[1] || '').split(',').map(c => c.trim()).filter(Boolean),
-      pagine,
-      stunt: eff.some(e => /STU/i.test(e)),
-      _pos: a.index
+      pagine, stunt: eff.some(e => /STU/i.test(e)), _pos: a.index
     });
   }
-  if (!scene.length) return null;
-
-  // ── le giornate ──
-  const GG = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const reData = new RegExp('(\\d{1,2})\\s+(' + Object.keys(PDL_MESI).join('|') + ')\\s+(\\d{4})', 'i');
-  const giorni = [];
-  prev = 0;
-  for (const m of marker) {
-    const ini = m.index, fin = m.index + m[0].length;
-    const seg = text.slice(prev, ini), coda = text.slice(fin, fin + 90);
-
-    let data = null, gset = null;
-    const dm = reData.exec(coda);
-    if (dm) {
-      const d = new Date(Date.UTC(+dm[3], PDL_MESI[dm[2].toLowerCase()] - 1, +dm[1]));
-      data = d.toISOString().slice(0, 10);
-      gset = GG[(d.getUTCDay() + 6) % 7];
-    }
-    const pm = /--\s*([\d\s/]+?)\s*Pag/.exec(coda);
-    const om = /orario\s+(\d{1,2})(?:[.:](\d{2}))?\s*\/\s*(\d{1,2})(?:[.:](\d{2}))?/i.exec(seg);
-
-    const mie = scene.filter(s => s._pos >= prev && s._pos < ini);
-    const conta = {};
-    mie.forEach(s => { if (s.location) conta[s.location] = (conta[s.location] || 0) + 1; });
-
-    giorni.push({
-      numero_giorno: parseInt(m[1]), data, giorno_settimana: gset,
-      ora_inizio: om ? String(+om[1]).padStart(2, '0') + ':' + (om[2] || '00') : 'TBD',
-      ora_fine:   om ? String(+om[3]).padStart(2, '0') + ':' + (om[4] || '00') : 'TBD',
-      ora_incerta: false,
-      location_principale: Object.keys(conta).sort((a, b) => conta[b] - conta[a])[0] || '',
-      pagine_giorno: pm ? pm[1].trim() : '',
-      unita_secondarie: [],
-      scene: mie.map(({ _pos, ...s }) => s),
-      _pos: ini
-    });
-    prev = fin;
-  }
-  if (!giorni.length || !giorni.some(g => g.data)) return null;
-
-  // ── le settimane ──
-  const tagli = [...text.matchAll(/FINE\s+(\d+)[aª]?\s+SETTIMANA/gi)].map(m => m.index);
-  tagli.push(text.length);
-  const settimane = [];
-  let idx = 0;
-  for (const taglio of tagli) {
-    const gruppo = giorni.slice(idx).filter(g => g._pos < taglio);
-    if (!gruppo.length) continue;
-    idx += gruppo.length;
-    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1),
-                     giorni: gruppo.map(({ _pos, ...g }) => g) });
-  }
-  if (!settimane.length) return null;
-
-  const tm = /\n([A-Z][A-Z\s']{4,40})\s+bozza/.exec(text);
-  const vm = /bozza\s+(PdL\s+\d+\s+del\s+[\w\s]+?\d{4})/i.exec(text);
-
-  const senzaOrario = giorni.filter(g => g.ora_inizio === 'TBD').map(g => g.numero_giorno);
-  if (senzaOrario.length) console.log('[Pdl] giornate senza orario nel PDF: ' + senzaOrario.join(', '));
-  const fuori = scene.length - giorni.reduce((a, g) => a + g.scene.length, 0);
-  if (fuori > 0) console.log('[Pdl] ' + fuori + ' scene fuori piano, escluse dal calendario');
-
-  return {
-    titolo: tm ? tm[1].trim() : 'PDL',
-    regista: '', versione: vm ? vm[1].trim() : '',
-    totale_giorni: giorni.length,
-    totale_scene: giorni.reduce((a, g) => a + g.scene.length, 0),
-    data_inizio: giorni[0].data, data_fine: giorni[giorni.length - 1].data,
-    settimane
-  };
+  return scene.length ? scene : null;
 }
 
 /*
- * Riserva: il modello, ma sul testo e a blocchi.
+ * Le scene chieste al modello, una giornata per volta.
  *
- * Mandare il PDF costava 37.807 token in ingresso contro i circa 5.800 del
- * testo. E chiedere tutto il piano in una risposta sola la faceva troncare:
- * spezzandolo in gruppi di giornate, ogni risposta e' corta e completa.
+ * Ogni giornata va nel prompt dentro un blocco "### GIORNATA n" che
+ * delimitiamo noi: il modello deve solo elencare le scene che vede in quel
+ * blocco, non decidere a quale giorno appartengono. E' la differenza che
+ * elimina lo slittamento, qualunque sia l'impianto della tabella.
  */
-const PDL_GIORNI_PER_BLOCCO = 8;
+const PDL_GIORNATE_PER_CHIAMATA = 6;
 
-function pdlDividiPerBlocchi(text) {
-  const { segmenti } = pdlSegmentiPerGiorno(text);
-  if (segmenti.length <= PDL_GIORNI_PER_BLOCCO) return [text];
+const PDL_SYS_SCENE = `Elenchi le scene di un piano di lavorazione cinematografico.
+Ricevi uno o piu' blocchi, ognuno introdotto da "### GIORNATA n". Per ogni blocco elenca SOLO le scene contenute in quel blocco.
+Restituisci SOLO JSON compatto, senza backtick:
+{"giornate":[{"n":1,"location":"string","scene":[{"numero":"string","int_ext":"INT","momento":"D","location":"string","cast":["1"],"pagine":"string","stunt":false}]}]}
+I numeri di scena possono contenere lettere (es. 35APT, 71Pt1, 63A): riportali esatti.
+int_ext: INT, EXT o INT/EXT. momento: D=giorno N=notte M=mattina E=sera. cast: solo i numeri dei personaggi. pagine: come scritto (es. "2 2/8").
+"location" della giornata e' quella prevalente. Non aggiungere giornate che non compaiono. Rispondi SOLO con il JSON.`;
 
-  // Si taglia alla fine del marcatore dell'ultima giornata di ogni gruppo.
-  const fini = [];
-  let scorri = 0;
-  for (const forma of PDL_FINE_GIORNO) {
-    forma.re.lastIndex = 0;
-    const t = [...text.matchAll(forma.re)];
-    if (t.length > fini.length) { fini.length = 0; t.forEach(m => fini.push(m.index + m[0].length)); }
-  }
+async function pdlSceneDalModello(giorni) {
   const blocchi = [];
-  let da = 0;
-  for (let i = PDL_GIORNI_PER_BLOCCO - 1; i < fini.length; i += PDL_GIORNI_PER_BLOCCO) {
-    blocchi.push(text.slice(da, fini[i]));
-    da = fini[i];
+  for (let i = 0; i < giorni.length; i += PDL_GIORNATE_PER_CHIAMATA) {
+    blocchi.push(giorni.slice(i, i + PDL_GIORNATE_PER_CHIAMATA));
   }
-  if (da < text.length - 50) blocchi.push(text.slice(da));
-  return blocchi;
-}
+  console.log('[Pdl] scene al modello: ' + giorni.length + ' giornate in ' +
+    blocchi.length + ' chiamate (~' +
+    Math.round(giorni.reduce((a, g) => a + g._seg.length, 0) / 4) + ' token di testo)');
 
-const PDL_SYS_BLOCCO = `Sei un esperto analizzatore di piani di lavorazione cinematografici (PDL).
-Ricevi un ESTRATTO di PDL contenente alcune giornate. Restituisci SOLO un JSON valido, compatto, senza backtick:
-{"giorni":[{"numero_giorno":1,"data":"YYYY-MM-DD","giorno_settimana":"Monday","ora_inizio":"TBD","ora_fine":"TBD","ora_incerta":false,"location_principale":"string","pagine_giorno":"string","unita_secondarie":[],"scene":[{"numero":"string","int_ext":"INT/EXT","momento":"D","location":"string","cast":["1"],"pagine":"string","stunt":false}]}]}
-Includi SOLO le giornate che si chiudono dentro l'estratto. momento D=Day N=Night M=Morning E=Evening. cast solo numeri.
-La struttura e' [scene del giorno N] -> [orario del giorno N] -> [fine del giorno N]: tutto cio' che precede il marcatore di fine giornata appartiene a quella giornata. Se per una giornata non trovi un orario esplicito usa "TBD": non inventarlo.
-Rispondi SOLO con il JSON.`;
+  const risposte = await Promise.all(blocchi.map(gruppo => {
+    const testo = gruppo.map(g => '### GIORNATA ' + g.numero_giorno + '\n' + g._seg.trim()).join('\n\n');
+    return callApi('api/pdl', {
+      system: PDL_SYS_SCENE, max_tokens: 16000,
+      messages: [{ role: 'user', content: [{ type: 'text', text: testo }] }]
+    }).catch(e => { console.warn('[Pdl] blocco fallito: ' + e.message); return null; });
+  }));
 
-async function pdlEstraiConModello(text) {
-  const blocchi = pdlDividiPerBlocchi(text);
-  console.log('[PdlModello] ' + blocchi.length + ' blocchi, ' +
-    Math.round(text.length / 4) + ' token stimati in tutto');
-
-  const risposte = await Promise.all(blocchi.map(b => callApi('api/pdl', {
-    system: PDL_SYS_BLOCCO,
-    max_tokens: 16000,
-    messages: [{ role: 'user', content: [{ type: 'text', text: b }] }]
-  })));
-
-  const giorni = [];
-  risposte.forEach((d, i) => {
+  const perGiorno = new Map();
+  risposte.forEach(d => {
+    if (!d) return;
     const raw = d.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
     try {
-      const j = JSON.parse(raw);
-      (j.giorni || []).forEach(g => giorni.push(g));
+      (JSON.parse(raw).giornate || []).forEach(g => perGiorno.set(g.n, g));
     } catch (e) {
-      console.warn('[PdlModello] blocco ' + (i + 1) + ' illeggibile: ' + pdlDiagnosi(d, raw));
+      console.warn('[Pdl] risposta illeggibile: ' + pdlDiagnosi(d, raw));
     }
   });
-  if (!giorni.length) throw new Error('Il modello non ha restituito nessuna giornata leggibile.');
+  return perGiorno;
+}
 
-  // Deduplica e ordina: un marcatore a cavallo di due blocchi puo' ripetersi.
-  const visti = new Map();
-  giorni.forEach(g => { if (!visti.has(g.numero_giorno)) visti.set(g.numero_giorno, g); });
-  const ordinati = [...visti.values()].sort((a, b) => a.numero_giorno - b.numero_giorno);
+// Il titolo sta nella riga d'intestazione, quella subito dopo l'elenco
+// attori, ma ogni produzione lo scrive a modo suo: fra virgolette, prima
+// di "Regia:", prima di "PDL", o dopo "Stripboard". Si provano in ordine e
+// si tiene il primo credibile.
+//
+// Due accorgimenti che contano: si guarda SOLO quella riga (altrove le
+// virgolette compaiono dentro le descrizioni delle scene), e il titolo non
+// puo' contenere spazi doppi, perche' quelli separano le colonne — e' cosi'
+// che da "IIF  ALLE FESTA DELLA RIVOLUZIONE" si prende solo il titolo.
+const PDL_PAROLA = "[A-ZÀ-Ü0-9'’.&#-]+";
+const PDL_NOME = PDL_PAROLA + "(?: " + PDL_PAROLA + ")*";
+const PDL_RUMORE = /^(?:PDL|PIANO|PROVA|STRIPBOARD|CAST|ATTORI|PERSONAGGI|TRASFERIMENTO|STOP|RIPRESE|TROUPE|PRELIGHT|INIZIO|SETTIMANA|LOCATION|UNITA|EXT|INT)\b/i;
+const PDL_TITOLO = [
+  // Fra virgolette, ma solo se e' tutto maiuscolo: nelle descrizioni delle
+  // scene le virgolette abbondano ("entra", "esce") e non sono titoli.
+  /"([A-ZÀ-Ü0-9][A-ZÀ-Ü0-9 '’.&#-]{2,49})"/,
+  new RegExp('(' + PDL_NOME + ')\\s{2,}(?:regia|Regia)\\b'),
+  new RegExp('(' + PDL_NOME + ')\\s{2,}(?:bozza|PDL|PdL)\\b'),
+  new RegExp('Stripboard\\s{2,}(' + PDL_NOME + ')'),
+];
+const PDL_REGISTA = [/Regia:\s*([^\n]{3,40}?)\s{2,}/i, /regia\s+di\s+([^\n]{3,40}?)\s{2,}/i];
 
+function pdlIntestazione(text) {
+  // La prima riga e' l'elenco attori; la seconda e' l'intestazione.
+  const righe = text.split('\n').filter(r => r.trim().length > 20);
+  return (righe[1] || righe[0] || '').slice(0, 400);
+}
+function pdlTitolo(text) {
+  const riga = pdlIntestazione(text);
+  for (const re of PDL_TITOLO) {
+    const m = re.exec(riga);
+    if (!m) continue;
+    const t = m[1].trim().replace(/\s{2,}/g, ' ');
+    if (t.length >= 3 && !PDL_RUMORE.test(t)) return t;
+  }
+  return 'PDL';
+}
+function pdlRegista(text) {
+  const testa = text.slice(0, 4000);
+  for (const re of PDL_REGISTA) { const m = re.exec(testa); if (m) return m[1].trim(); }
+  return '';
+}
+
+// Mette insieme il piano finito dalle giornate.
+function pdlComponi(giorni, text) {
   const settimane = [];
-  ordinati.forEach((g, i) => {
-    if (i % 6 === 0) settimane.push({ numero: settimane.length + 1,
-                                      label: 'Settimana ' + (settimane.length + 1), giorni: [] });
-    settimane[settimane.length - 1].giorni.push(g);
-  });
+  const tagli = [...text.matchAll(/FINE\s+(?:\d+[aª]?\s+)?SETTIMANA/gi)].map(m => m.index);
+  tagli.push(text.length);
+  let idx = 0;
+  for (const taglio of tagli) {
+    const gruppo = giorni.slice(idx).filter(g => g._fin < taglio);
+    if (!gruppo.length) continue;
+    idx += gruppo.length;
+    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1), giorni: gruppo });
+  }
+  // Nessun marcatore di settimana: si raggruppa a sei giornate.
+  if (settimane.length <= 1 && giorni.length > 8) {
+    settimane.length = 0;
+    giorni.forEach((g, i) => {
+      if (i % 6 === 0) settimane.push({ numero: settimane.length + 1,
+        label: 'Settimana ' + (settimane.length + 1), giorni: [] });
+      settimane[settimane.length - 1].giorni.push(g);
+    });
+  }
+  settimane.forEach(s => s.giorni = s.giorni.map(({ _seg, _ini, _fin, ...g }) => g));
 
-  const tm = /\n([A-Z][A-Z\s']{4,40})\s+bozza/.exec(text);
+  const vm = /(?:bozza\s+)?(PdL\s*#?\s*\d+[^\n]{0,30}?\d{4}|PDL\s+del\s+[^\n]{0,30}?\d{4})/i.exec(text);
+  const tutte = settimane.flatMap(s => s.giorni);
   return {
-    titolo: tm ? tm[1].trim() : 'PDL', regista: '', versione: '',
-    totale_giorni: ordinati.length,
-    totale_scene: ordinati.reduce((a, g) => a + (g.scene?.length || 0), 0),
-    data_inizio: ordinati[0]?.data || null,
-    data_fine: ordinati[ordinati.length - 1]?.data || null,
+    titolo: pdlTitolo(text),
+    regista: pdlRegista(text),
+    versione: vm ? vm[1].trim() : '',
+    totale_giorni: tutte.length,
+    totale_scene: tutte.reduce((a, g) => a + g.scene.length, 0),
+    data_inizio: tutte.find(g => g.data)?.data || null,
+    data_fine: [...tutte].reverse().find(g => g.data)?.data || null,
     settimane
   };
 }
 
-// Sceglie la strada e restituisce il PDL.
+// Sceglie la strada e restituisce il piano.
 async function pdlAnalizza(b64) {
   const testo = await pdlEstraiTesto(b64);
-  const det = pdlParseDeterministico(testo);
-  if (det && det.totale_giorni > 0 && det.totale_scene > 0) {
-    console.log('[Pdl] lettura diretta dal PDF: ' + det.totale_giorni + ' giornate, ' +
-      det.totale_scene + ' scene, ' + det.settimane.length + ' settimane — nessuna chiamata al modello');
-    return { pdl: det, testo, metodo: 'deterministico' };
+  const str = pdlStrutturaDaTesto(testo);
+
+  // Nessun marcatore di giornata: non c'e' struttura da cui partire, va
+  // tutto al modello. E' il caso dei piani a stripboard continuo.
+  if (!str) {
+    console.log('[Pdl] nessun marcatore di giornata: tutto al modello');
+    return { pdl: await pdlTuttoAlModello(testo), testo, metodo: 'modello' };
   }
-  console.log('[Pdl] impianto non riconosciuto, passo al modello sul testo a blocchi');
-  return { pdl: await pdlEstraiConModello(testo), testo, metodo: 'modello' };
+  console.log('[Pdl] struttura letta dal PDF: ' + str.giorni.length + ' giornate ("' +
+    str.dicitura + '"), ' + str.giorni.filter(g => g.data).length + ' con data, ' +
+    str.giorni.filter(g => g.ora_inizio !== 'TBD').length + ' con orario');
+
+  // Impianto riconosciuto: anche le scene si leggono dal PDF.
+  const dirette = pdlSceneDaAncora(testo);
+  if (dirette) {
+    str.giorni.forEach(g => {
+      g.scene = dirette.filter(s => s._pos >= g._ini && s._pos < g._fin)
+                       .map(({ _pos, ...s }) => s);
+      const c = {};
+      g.scene.forEach(s => { if (s.location) c[s.location] = (c[s.location] || 0) + 1; });
+      g.location_principale = Object.keys(c).sort((a, b) => c[b] - c[a])[0] || '';
+    });
+    const tot = str.giorni.reduce((a, g) => a + g.scene.length, 0);
+    if (tot > 0) {
+      console.log('[Pdl] anche le scene dal PDF: ' + tot + ' — nessuna chiamata al modello');
+      return { pdl: pdlComponi(str.giorni, testo), testo, metodo: 'deterministico' };
+    }
+  }
+
+  // Impianto non riconosciuto: le scene al modello, una giornata per volta.
+  const perGiorno = await pdlSceneDalModello(str.giorni);
+  let conScene = 0;
+  str.giorni.forEach(g => {
+    const r = perGiorno.get(g.numero_giorno);
+    if (r) {
+      g.scene = (r.scene || []).map(s => ({ ...s, cast: s.cast || [] }));
+      g.location_principale = r.location || '';
+      if (g.scene.length) conScene++;
+    }
+  });
+  console.log('[Pdl] scene ottenute per ' + conScene + '/' + str.giorni.length + ' giornate');
+  return { pdl: pdlComponi(str.giorni, testo), testo, metodo: 'misto' };
+}
+
+
+/*
+ * Riserva estrema: nessun marcatore di giornata nel PDF, quindi non c'e'
+ * struttura da cui partire. Si manda il testo al modello a blocchi di
+ * dimensione fissa — il PDF intero costerebbe sei volte tanto e la
+ * risposta si troncherebbe.
+ */
+const PDL_CARATTERI_PER_BLOCCO = 14000;
+
+const PDL_SYS_INTERO = `Sei un esperto analizzatore di piani di lavorazione cinematografici (PDL).
+Ricevi un ESTRATTO di PDL. Restituisci SOLO JSON compatto, senza backtick:
+{"giorni":[{"numero_giorno":1,"data":"YYYY-MM-DD","giorno_settimana":"Monday","ora_inizio":"TBD","ora_fine":"TBD","ora_incerta":false,"location_principale":"string","pagine_giorno":"string","unita_secondarie":[],"scene":[{"numero":"string","int_ext":"INT","momento":"D","location":"string","cast":["1"],"pagine":"string","stunt":false}]}]}
+momento D=giorno N=notte M=mattina E=sera. cast solo numeri. Se per una giornata non trovi un orario esplicito usa "TBD": non inventarlo. Rispondi SOLO con il JSON.`;
+
+async function pdlTuttoAlModello(text) {
+  const blocchi = [];
+  for (let i = 0; i < text.length; i += PDL_CARATTERI_PER_BLOCCO) {
+    blocchi.push(text.slice(i, i + PDL_CARATTERI_PER_BLOCCO));
+  }
+  const risposte = await Promise.all(blocchi.map(b => callApi('api/pdl', {
+    system: PDL_SYS_INTERO, max_tokens: 16000,
+    messages: [{ role: 'user', content: [{ type: 'text', text: b }] }]
+  }).catch(e => { console.warn('[Pdl] blocco fallito: ' + e.message); return null; })));
+
+  const visti = new Map();
+  risposte.forEach(d => {
+    if (!d) return;
+    const raw = d.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+    try { (JSON.parse(raw).giorni || []).forEach(g => { if (!visti.has(g.numero_giorno)) visti.set(g.numero_giorno, g); }); }
+    catch (e) { console.warn('[Pdl] risposta illeggibile: ' + pdlDiagnosi(d, raw)); }
+  });
+  if (!visti.size) throw new Error('Il modello non ha restituito nessuna giornata leggibile.');
+
+  const giorni = [...visti.values()].sort((a, b) => a.numero_giorno - b.numero_giorno)
+    .map(g => ({ ...g, scene: g.scene || [], _fin: 0 }));
+  return pdlComponi(giorni, text);
 }
 
 /*
