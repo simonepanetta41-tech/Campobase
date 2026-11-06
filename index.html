@@ -7370,16 +7370,21 @@ function ttInizioNotte(data){
  *
  * [daM,aM] sta sulla linea del tempo ancorata alla mezzanotte del giorno del
  * turno, quindi aM puo' superare 1440 se il turno scavalca la mezzanotte.
- * Le finestre notturne esaminate sono tre — la notte precedente, quella del
- * turno e la successiva: bastano a coprire qualunque turno, perche' l'inizio
- * sta sempre entro le 24h e la fine entro le 24h dall'inizio.
+ *
+ * Si guardano solo le notti che COMINCIANO il giorno del turno o dopo, non
+ * quella precedente. La fascia non e' una finestra sull'orologio: e' la
+ * giornata che si prolunga nella notte. Una giornata che comincia all'alba
+ * non prende maggiorazione, nemmeno per le ore prima delle 07:00 — se il
+ * turno inizia prima delle 07:00 la maggiorazione non spetta. Prende invece
+ * tutte le ore fino alle 07:00 la giornata che scavalca la mezzanotte, perche'
+ * quelle sono il prolungamento della sera prima.
  *
  * L'inizio di ogni finestra si calcola sulla data di quella notte, non su
  * quella del turno: una notte a cavallo del 31 marzo cambia fascia.
  */
 function ttMinutiNotte(daM,aM,dataTurno){
   let tot=0;
-  for(const k of [-1,0,1]){
+  for(const k of [0,1]){
     const d=dataTurno?new Date(dataTurno.getTime()+k*86400000):null;
     const ini=k*1440+ttInizioNotte(d);   // 21:00 o 22:00 di quella sera
     const fin=(k+1)*1440+420;            // 07:00 del mattino dopo
@@ -7424,11 +7429,12 @@ function ttCalcDay(d,orari,isSestoGiorno){
    *
    * Prima la fascia era fissa 23:00–02:30 per il 55% e "oltre le 02:30" per
    * l'80%: nessuna delle due corrisponde al CCNL, e il risultato era sempre
-   * in difetto. Mancava l'ora dalle 21:00 (o 22:00) alle 23:00, mancava
-   * tutto il tratto dalle 02:30 alle 07:00, e mancavano del tutto le notturne
-   * di una giornata che COMINCIA presto: un inizio alle 05:30 ha due ore in
-   * fascia prima delle 07:00, che la vecchia formula non vedeva perche'
-   * guardava solo la fine del turno.
+   * in difetto: mancava l'ora dalle 21:00 (o 22:00) alle 23:00 e mancava
+   * tutto il tratto dalle 02:30 alle 07:00.
+   *
+   * Una giornata che comincia prima delle 07:00 non prende maggiorazione:
+   * la fascia vale per la giornata che si prolunga nella notte, non per
+   * quella che comincia all'alba. Se ne occupa ttMinutiNotte.
    *
    * Lo 80% spetta alle ore notturne che sono anche straordinario, cioe' che
    * cadono oltre la soglia della giornata contrattuale; le notturne dentro la
