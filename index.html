@@ -5844,7 +5844,53 @@ function pdlViaggioDaSegmento(seg) {
    * sono l'orario quotidiano della troupe, non un viaggio.
    */
   if (!dest) return null;
-  return parola + ' ' + dest;
+  return { etichetta: parola + ' ' + dest, indice: m.index };
+}
+
+/*
+ * Le due forme di data del piano, in copia globale: le originali servono
+ * altrove con exec e non sono globali. Si costruiscono alla prima
+ * chiamata, perche' PDL_DATE e' dichiarata piu' sotto.
+ */
+let _pdlDateG = null;
+function pdlDateGlobali() {
+  if (!_pdlDateG) _pdlDateG = PDL_DATE.map(re => new RegExp(re.source, 'gi'));
+  return _pdlDateG;
+}
+
+/* Prima data di un testo, in forma YYYY-MM-DD, oppure null. */
+function pdlDataIso(s) {
+  for (const re of PDL_DATE) {
+    const d = re.exec(s);
+    if (!d) continue;
+    const [gg, mm, aa] = /^\d/.test(d[1])
+      ? [+d[1], PDL_MESI[d[2].toLowerCase()], +d[3]]
+      : [+d[2], PDL_MESI[d[1].toLowerCase()], +d[3]];
+    if (!mm) continue;
+    return new Date(Date.UTC(aa, mm - 1, gg)).toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+/* L'ultima data che compare prima della posizione idx. */
+function pdlDataPrimaDi(seg, idx) {
+  let best = null;
+  for (const re of pdlDateGlobali()) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(seg)) !== null) {
+      if (m.index >= idx) break;
+      if (!best || m.index > best.index) best = m;
+    }
+  }
+  return best ? pdlDataIso(best[0]) : null;
+}
+
+/* Le giornate di solo viaggio, indicizzate per data. */
+function pdlViaggiPerData() {
+  const m = {};
+  (pdlData?.giorni_viaggio || []).forEach(v => { if (v.data) m[v.data] = v.etichetta; });
+  return m;
 }
 
 /*
@@ -5857,15 +5903,29 @@ function pdlViaggioBreve(label) {
   return label.slice(m.index + m[0].length).trim() || m[0].trim();
 }
 
+/*
+ * Trova gli spostamenti e decide a quale giorno appartengono.
+ *
+ * Ne escono due insiemi, perche' i piani scrivono due cose diverse:
+ *  - perGiorno: uno spostamento dentro una giornata di riprese numerata;
+ *  - perData:   una giornata di solo viaggio, che il piano NON numera e
+ *               che quindi non ha un "Fine del giorno" tutto suo. Il
+ *               piano le da' pero' una data propria, scritta subito
+ *               prima dello spostamento:
+ *                 End of Day 25 -- sabato 14 novembre 2026 --
+ *                 lunedi' 16 novembre 2026 -- TRASFERIMENTO TROUPE A NAPOLI --
+ *               Senza distinguerle, quel viaggio finiva appiccicato alla
+ *               giornata seguente e il 16 restava una casella vuota.
+ */
 function parseTrasferimentiFromText(text) {
-  const result = {};
+  const perGiorno = {}, perData = {};
 
   /*
    * Le giornate si delimitano con la stessa lista di marcatori usata per
    * leggere la struttura, scegliendo la forma piu' presente nel piano.
    * Prima qui era fissata "Fine del Giorno #N", una sola delle cinque
-   * forme conosciute: sui piani che ne usano un'altra i blocchi uscivano
-   * vuoti e nessun viaggio veniva mai trovato.
+   * forme conosciute: questo piano usa "End of Day N" e non ne aveva
+   * nemmeno una, quindi non trovava mai niente.
    */
   let marker = [];
   for (const forma of PDL_FINE_GIORNO) {
@@ -5873,26 +5933,46 @@ function parseTrasferimentiFromText(text) {
     const t = [...text.matchAll(forma.re)];
     if (t.length > marker.length) marker = t;
   }
-  if (!marker.length) return result;
+  if (!marker.length) return { perGiorno, perData };
   marker.sort((a, b) => a.index - b.index);
+
+  // Le date delle giornate numerate: servono a riconoscere quando la data
+  // che precede uno spostamento e' invece un giorno a se'.
+  const dateGiornate = new Set();
+  for (const m of marker) {
+    const fin = m.index + m[0].length;
+    const d = pdlDataIso(text.slice(fin, fin + 100));
+    if (d) dateGiornate.add(d);
+  }
 
   // Il testo che precede il marcatore della giornata N appartiene alla
   // giornata N: e' li' che il piano scrive lo spostamento, dopo le scene.
   let prev = 0;
   for (const m of marker) {
-    const etichetta = pdlViaggioDaSegmento(text.slice(prev, m.index));
-    if (etichetta) result[parseInt(m[1])] = etichetta;
+    const seg = text.slice(prev, m.index);
+    const v = pdlViaggioDaSegmento(seg);
+    if (v) {
+      const data = pdlDataPrimaDi(seg, v.indice);
+      if (data && !dateGiornate.has(data)) perData[data] = v.etichetta;
+      else perGiorno[parseInt(m[1])] = v.etichetta;
+    }
     prev = m.index + m[0].length;
   }
-  return result;
+  return { perGiorno, perData };
 }
 
-function applyTrasferimenti(transferMap) {
-  if (!pdlData?.settimane || !Object.keys(transferMap).length) return;
+function applyTrasferimenti(mappa) {
+  if (!pdlData) return;
+  const perGiorno = mappa?.perGiorno || {};
+  // Le giornate di solo viaggio non stanno fra le giornate di riprese —
+  // il piano non le numera — ma hanno una data, e quindi una casella.
+  pdlData.giorni_viaggio = Object.entries(mappa?.perData || {})
+    .map(([data, etichetta]) => ({ data, etichetta }));
+  if (!pdlData.settimane) return;
   pdlData.settimane.forEach(s => {
     (s.giorni || []).forEach(g => {
-      if (transferMap[g.numero_giorno]) {
-        g.trasferimento = transferMap[g.numero_giorno];
+      if (perGiorno[g.numero_giorno]) {
+        g.trasferimento = perGiorno[g.numero_giorno];
         // Giornata di viaggio contro spostamento dentro una giornata di
         // riprese: la differenza e' se quel giorno si gira o no. Una
         // giornata senza scene in cui il piano segna un viaggio e' una
@@ -6441,7 +6521,9 @@ async function extractAndApplyTrasferimenti(b64) {
       JSON.stringify(fullText.slice(Math.max(0, iScena - 400), iScena + 600)));
 
     const transferMap = parseTrasferimentiFromText(fullText);
-    console.log('[TransferParser] trovati:', transferMap);
+    const nViaggi = Object.keys(transferMap.perGiorno).length + Object.keys(transferMap.perData).length;
+    console.log('[TransferParser] spostamenti nelle giornate:', transferMap.perGiorno,
+                '— giornate di solo viaggio:', transferMap.perData);
     applyTrasferimenti(transferMap);
 
     // Orari deterministici — sovrascrive i valori AI con quelli letti dal PDF
@@ -6449,7 +6531,7 @@ async function extractAndApplyTrasferimenti(b64) {
     // orari e scene vengono di li': correggerli con gli stessi dati non
     // aggiunge nulla e riempirebbe la console di rumore.
     if (window._pdlMetodo === 'deterministico') {
-      if (Object.keys(transferMap).length) { applyTrasferimenti(transferMap); renderPdlCalendar(); savePdlToSupabase(); }
+      if (nViaggi) { renderPdlCalendar(); savePdlToSupabase(); }
       return;
     }
 
@@ -6866,6 +6948,7 @@ function renderPdlCalendar() {
   ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(d=>{const el=document.createElement('div');el.className='cal-dow';el.textContent=d;grid.appendChild(el);});
   const dateMap={};
   getPdlAllGiorni().forEach(g=>{if(g.data)dateMap[g.data]=g;});
+  const viaggiMap=pdlViaggiPerData();
   const firstDay=new Date(pdlCurrentYear,pdlCurrentMonth,1);
   const lastDay=new Date(pdlCurrentYear,pdlCurrentMonth+1,0);
   const todayStr=new Date().toISOString().split('T')[0];
@@ -6898,6 +6981,11 @@ function renderPdlCalendar() {
       } else {
         el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">DAY ${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
       }
+    } else if (viaggiMap[dateStr]) {
+      // Giornata di solo viaggio: non e' una giornata di riprese, quindi
+      // non ha un numero ne' un orario, ma non e' nemmeno un giorno vuoto.
+      el.className=`cal-cell is-viaggio ${isToday?'is-today':''}`;
+      el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(window.innerWidth<=600?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
     } else {
       el.className=`cal-cell ${isToday?'is-today':''}`;
       el.style.background='rgba(255,255,255,0.02)'; el.style.border='1px solid rgba(255,255,255,0.04)';
@@ -6921,6 +7009,7 @@ function renderPdlCalendarWeekly() {
   grid.innerHTML = '';
   const dateMap = {};
   getPdlAllGiorni().forEach(g => { if (g.data) dateMap[g.data] = g; });
+  const viaggiMap = pdlViaggiPerData();
   const todayStr = new Date().toISOString().split('T')[0];
 
   // On mobile, make empty columns narrower
@@ -6977,6 +7066,10 @@ function renderPdlCalendarWeekly() {
         ${g.unita_secondarie?.length ? `<div style="font-size:8px;color:var(--muted);margin-top:3px;letter-spacing:0.05em">2° UNIT</div>` : ''}
         ${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}
         ${sd.notes ? `<div class="cal-cell-note">${sd.notes}</div>` : ''}`;
+    } else if (viaggiMap[dateStr]) {
+      el.className = `cal-cell is-viaggio ${isToday?'is-today':''}`;
+      el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
+      el.innerHTML = `<div class="cal-cell-day">${d.getDate()}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(isMobile?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
     } else {
       el.className = `cal-cell ${isToday?'is-today':''}`;
       el.style.background = 'rgba(255,255,255,0.02)';
