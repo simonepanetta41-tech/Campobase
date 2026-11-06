@@ -5900,8 +5900,30 @@ const PDLD = {
 
 function pdlParseDeterministico(text) {
   const ancore = [...text.matchAll(PDLD.ANCORA)];
-  const marker = [...text.matchAll(/End of Day\s+(\d+)/gi)];
-  if (ancore.length < 2 || marker.length < 2) return null;
+  if (ancore.length < 2) return null;
+
+  // I marcatori di fine giornata si cercano con la stessa tabella usata
+  // altrove, non con la sola dicitura inglese: un PDL italiano con questo
+  // impianto di tabella merita la lettura diretta quanto uno bilingue.
+  let marker = [];
+  for (const forma of PDL_FINE_GIORNO) {
+    forma.re.lastIndex = 0;
+    const t = [...text.matchAll(forma.re)];
+    if (t.length > marker.length) marker = t;
+  }
+  if (marker.length < 2) return null;
+  marker.sort((a, b) => a.index - b.index);
+
+  // Le giornate devono essere numerate di fila: una numerazione sconnessa
+  // vuol dire che stiamo leggendo la cosa sbagliata, e conviene lasciar
+  // fare al modello invece di produrre un piano plausibile ma falso.
+  const numeri = marker.map(m => parseInt(m[1]));
+  const consecutivi = numeri.every((n, i) => i === 0 || n === numeri[i - 1] + 1);
+  if (!consecutivi) {
+    console.log('[Pdl] numerazione delle giornate non consecutiva (' +
+      numeri.slice(0, 8).join(',') + '…): lascio fare al modello');
+    return null;
+  }
 
   // ── le scene ──
   const scene = [];
@@ -6008,6 +6030,11 @@ function pdlParseDeterministico(text) {
 
   const tm = /\n([A-Z][A-Z\s']{4,40})\s+bozza/.exec(text);
   const vm = /bozza\s+(PdL\s+\d+\s+del\s+[\w\s]+?\d{4})/i.exec(text);
+
+  const senzaOrario = giorni.filter(g => g.ora_inizio === 'TBD').map(g => g.numero_giorno);
+  if (senzaOrario.length) console.log('[Pdl] giornate senza orario nel PDF: ' + senzaOrario.join(', '));
+  const fuori = scene.length - giorni.reduce((a, g) => a + g.scene.length, 0);
+  if (fuori > 0) console.log('[Pdl] ' + fuori + ' scene fuori piano, escluse dal calendario');
 
   return {
     titolo: tm ? tm[1].trim() : 'PDL',
