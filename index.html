@@ -4113,7 +4113,12 @@ function buildTimetableContext() {
   const TT_DAYS = ['LUN','MAR','MER','GIO','VEN','SAB'];
 
   let lines = [`TIMETABLE${film?' — '+film:''} Sett.${sett||'?'} (${dal||'?'} → ${al||'?'})`];
-  lines.push(`Tipo giornata: ${ttMeta.tipoGiornata}h | Raddoppio: ${ttMeta.raddoppio>0?'dopo '+ttMeta.raddoppio+'h':'off'} | Magg.nott: ${ttMeta.maggiorazioniNott?'on':'off'}`);
+  // La fascia va detta: altrimenti in chat viene ricalcolata a memoria, e la
+  // memoria sul CCNL non e' affidabile.
+  const fascia=ttMeta.maggiorazioniNott
+    ? `on (fascia ${Math.floor(ttInizioNotte(ttDataGiorno(0))/60)}:00–07:00, 80% sulle notturne in straordinario)`
+    : 'off';
+  lines.push(`Tipo giornata: ${ttMeta.tipoGiornata}h | Raddoppio: ${ttMeta.raddoppio>0?'dopo '+ttMeta.raddoppio+'h':'off'} | Magg.nott: ${fascia}`);
 
   ttTabelle.forEach((tab, ti) => {
     const workers = tab.workers.length > 0 ? tab.workers.join(', ') : 'Nessun lavoratore';
@@ -7328,6 +7333,61 @@ function ttOrdinaGiornata(par,ini,pau,fin,rie){
   };
 }
 
+/*
+ * Data del giorno idx (LUN=0 … SAB=5) della settimana in corso.
+ *
+ * Si ricava dal campo "Dal": qualunque giorno vi sia stato inserito, si
+ * risale al lunedi' di quella settimana e si contano i giorni da li', cosi'
+ * la data resta giusta anche se "Dal" non e' un lunedi'. Serve solo a sapere
+ * in che periodo dell'anno cade il turno, per la fascia notturna.
+ */
+function ttDataGiorno(idx){
+  const v=document.getElementById('tt-dal')?.value;
+  if(!v)return null;
+  const d=new Date(v+'T00:00:00');
+  if(isNaN(d))return null;
+  d.setDate(d.getDate()-((d.getDay()+6)%7)+idx);   // (getDay()+6)%7: 0 = lunedi'
+  return d;
+}
+
+/*
+ * Inizio della fascia notturna, in minuti dalla mezzanotte.
+ *
+ * CCNL: dalle 21:00 alle 07:00 dal 1 ottobre al 31 marzo, dalle 22:00 alle
+ * 07:00 dal 1 aprile al 30 settembre. I due periodi cominciano e finiscono
+ * sempre a inizio mese, quindi basta guardare il mese.
+ * Senza data si usa la fascia piu' ampia (21:00): meglio segnalare ore da
+ * verificare che non contarle affatto.
+ */
+function ttInizioNotte(data){
+  if(!data||isNaN(data))return 21*60;
+  const m=data.getMonth()+1;
+  return (m>=10||m<=3)?21*60:22*60;
+}
+
+/*
+ * Minuti di un intervallo di lavoro che cadono in fascia notturna.
+ *
+ * [daM,aM] sta sulla linea del tempo ancorata alla mezzanotte del giorno del
+ * turno, quindi aM puo' superare 1440 se il turno scavalca la mezzanotte.
+ * Le finestre notturne esaminate sono tre — la notte precedente, quella del
+ * turno e la successiva: bastano a coprire qualunque turno, perche' l'inizio
+ * sta sempre entro le 24h e la fine entro le 24h dall'inizio.
+ *
+ * L'inizio di ogni finestra si calcola sulla data di quella notte, non su
+ * quella del turno: una notte a cavallo del 31 marzo cambia fascia.
+ */
+function ttMinutiNotte(daM,aM,dataTurno){
+  let tot=0;
+  for(const k of [-1,0,1]){
+    const d=dataTurno?new Date(dataTurno.getTime()+k*86400000):null;
+    const ini=k*1440+ttInizioNotte(d);   // 21:00 o 22:00 di quella sera
+    const fin=(k+1)*1440+420;            // 07:00 del mattino dopo
+    tot+=Math.max(0,Math.min(aM,fin)-Math.max(daM,ini));
+  }
+  return tot;
+}
+
 function ttToHM(mins){
   if(!mins||mins<=0)return'—';
   const h=Math.floor(mins/60),m=mins%60;
@@ -7359,15 +7419,34 @@ function ttCalcDay(d,orari,isSestoGiorno){
     const netto=Math.max(0,viaggioLordo-ttMeta.viaggioConcesso);
     r.oreViaggio=netto>0?netto:null;
   }
+  /*
+   * Maggiorazioni notturne.
+   *
+   * Prima la fascia era fissa 23:00–02:30 per il 55% e "oltre le 02:30" per
+   * l'80%: nessuna delle due corrisponde al CCNL, e il risultato era sempre
+   * in difetto. Mancava l'ora dalle 21:00 (o 22:00) alle 23:00, mancava
+   * tutto il tratto dalle 02:30 alle 07:00, e mancavano del tutto le notturne
+   * di una giornata che COMINCIA presto: un inizio alle 05:30 ha due ore in
+   * fascia prima delle 07:00, che la vecchia formula non vedeva perche'
+   * guardava solo la fine del turno.
+   *
+   * Lo 80% spetta alle ore notturne che sono anche straordinario, cioe' che
+   * cadono oltre la soglia della giornata contrattuale; le notturne dentro la
+   * giornata vanno al 55%. Si calcolano quindi le notturne di tutto il turno
+   * e quelle del solo tratto in straordinario: la differenza e' il 55%.
+   */
+  const dataTurno=ttDataGiorno(d);
+  const sogliaM=iniM+soglia;
+  const nottTot=ttMinutiNotte(iniM,finM,dataTurno);
+  const nottStr=finM>sogliaM?ttMinutiNotte(Math.max(iniM,sogliaM),finM,dataTurno):0;
   if(ttMeta.maggiorazioniNott){
-    // 23:00 e 02:30 del giorno dopo, sulla stessa linea del tempo di iniM.
-    const N1=23*60,N2=24*60+150;
-    const o55=Math.max(0,Math.min(finM,N2)-Math.max(iniM,N1));
-    const o80=Math.max(0,finM-Math.max(iniM,N2));
-    if(o55>0)r.nottOrd=o55;
-    if(o80>0)r.nottStr=o80;
+    if(nottTot-nottStr>0)r.nottOrd=nottTot-nottStr;
+    if(nottStr>0)r.nottStr=nottStr;
   }
-  const isNott=finM>(24*60+150);
+  // Golden notturna: lo straordinario che cade in fascia. Prima era "il turno
+  // finisce dopo le 02:30", che non ha riscontro nel contratto e lasciava in
+  // "ordinario" lo straordinario di una serata chiusa all'una.
+  const isNott=nottStr>0;
   let gMin=goldenRaw+mancataG;
   if(gMin>0){
     if(isSestoGiorno)r.golden6=gMin;
