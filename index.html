@@ -7419,11 +7419,11 @@ function ttRenderAll(){
 function ttRenderTab(tab){
   const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
   const mancDays=days.map((d,i)=>d.mancataPausa?TT_DAYS[i]:null).filter(Boolean);
-  const mancBadge=mancDays.length>0?`<span onclick="ttShowMancata('${mancDays.join(',')}')" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--danger);border-radius:999px;padding:2px 9px;font-size:9px;cursor:pointer;margin-left:8px">⚠ Mancata pausa</span>`:'';
+  const mancBadge=mancDays.length>0?`<span onclick="ttShowMancata('${mancDays.join(',')}')" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--danger);border-radius:999px;padding:2px 9px;font-size:9px;cursor:pointer">⚠ Mancata pausa</span>`:'';
   // Badge sesto giorno se c'è golden6
   // Due stati: da decidere (apre il popup) oppure gia' raddoppiata, e in
   // quel caso accanto compare il bottone per riportarla a valore normale.
-  const pill='display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 9px;font-size:9px;cursor:pointer;margin-left:8px';
+  const pill='display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10px;cursor:pointer';
   const sestoBadge=!tot.golden6?'':(tab.sestoRaddoppio
     ?`<span style="${pill};background:rgba(245,166,35,0.28);border:1px solid var(--orange);color:var(--orange);cursor:default">★ Golden 6°g. raddoppiata (${ttToHM(tot.golden6)})</span>`
      +`<span onclick="ttSestoRipristina('${tab.id}')" title="Riporta la golden del 6° giorno al valore normale" style="${pill};background:none;border:1px solid var(--border-l);color:var(--muted)">↺ Normale</span>`
@@ -7464,10 +7464,11 @@ function ttRenderTab(tab){
   return `<div id="ttb-${tab.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)">
       <div>
-        <div style="font-size:11px;color:var(--white);font-weight:500">${wLabel}${mancBadge}${sestoBadge}</div>
+        <div style="font-size:11px;color:var(--white);font-weight:500">${wLabel}</div>
         <div style="font-size:9px;color:var(--muted);margin-top:2px">${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}</div>
+        ${(mancBadge||sestoBadge)?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px">${mancBadge}${sestoBadge}</div>`:''}
       </div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-shrink:0;align-self:flex-start">
         <button onclick="ttOpenScorporo('${tab.id}')" style="padding:5px 12px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">⊕ Scorporo</button>
         ${delBtn}
       </div>
