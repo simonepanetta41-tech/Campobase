@@ -272,6 +272,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .cal-cell-scenes { display:flex;flex-wrap:wrap;gap:2px;margin-top:3px; }
 .cal-cell-sc { font-size:7px;padding:1px 4px;border-radius:3px;font-weight:600;background:rgba(0,0,0,0.3); }
 .cal-cell-note { font-size:8px;color:rgba(255,255,255,0.55);margin-top:2px;font-style:italic;overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+/* Giornata di viaggio: non si gira, quindi non deve somigliare a una
+   giornata di riprese ne' a una casella vuota. Righe diagonali e bordo
+   tratteggiato la distinguono a colpo d'occhio, anche sul telefono. */
+.cal-cell.is-viaggio {
+  background:repeating-linear-gradient(135deg,rgba(90,170,255,0.16) 0 7px,rgba(90,170,255,0.05) 7px 14px) !important;
+  border:1px dashed rgba(120,180,255,0.55) !important;
+}
+.cal-cell.is-viaggio .cal-cell-giorno { color:#8fc4ff; }
+.cal-cell-viaggio { font-size:8px;font-weight:700;color:#8fc4ff;margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; }
+@media (max-width:600px){ .cal-cell-viaggio { font-size:7px; } }
 .cal-cell.status-complete { border:2px solid var(--green); }
 .cal-cell.status-partial { border:2px solid var(--orange); }
 .cal-cell.status-pending { border:1px solid rgba(255,255,255,0.06); }
@@ -5783,51 +5793,93 @@ function applyOrari(orariMap) {
   return changed;
 }
 
-// ══ TRANSFER PARSER — local, no API ══
+// ══ GIORNI DI VIAGGIO E TRASFERIMENTI — lettura locale, nessuna chiamata ══
+
+/*
+ * Come i piani scrivono uno spostamento.
+ *
+ * Prima si cercava la sola parola "TRASFERIMENTO": bastava che una
+ * produzione scrivesse "VIAGGIO" o "PARTENZA PER" perche' la giornata di
+ * viaggio sparisse dal calendario. Ogni piano ha la sua parola, e i piani
+ * bilingui le mescolano.
+ */
+const PDL_VIAGGIO = /\b(?:TRASFERIMENT[OI]|TRASFERTA|SPOSTAMENTO|VIAGGI[OA]|PARTENZA|RIENTRO|TRAVEL(?:\s+DAY)?|COMPANY\s+MOVE|UNIT\s+MOVE)\b/i;
+
+/*
+ * Parole che da sole non bastano.
+ *
+ * Quasi tutti i piani scrivono "PARTENZA 06:00" e "RIENTRO 20:30" per
+ * l'orario quotidiano della troupe: prese alla lettera segnerebbero come
+ * viaggio ogni singola giornata di riprese. Per queste si pretende una
+ * destinazione scritta ("PARTENZA PER NAPOLI"), altrimenti non e' un
+ * viaggio ma un orario.
+ */
+const PDL_VIAGGIO_DEBOLE = /^(?:PARTENZA|RIENTRO|MOVE)$/i;
+
+/*
+ * La destinazione, quando il piano la scrive: "TRASFERIMENTO A NAPOLI",
+ * "VIAGGIO VERSO NAPOLI", "PARTENZA PER NAPOLI", "TRAVEL TO NAPLES".
+ * Fino a quattro parole, per reggere "REGGIA DI CASERTA" o "SAN GIOVANNI
+ * A TEDUCCIO". Si ferma su un numero o una parola in minuscolo, che nei
+ * piani segnano sempre l'inizio di un'altra informazione.
+ */
+const PDL_VIAGGIO_DEST = /\b(?:A|AD|AL|ALLA|AI|ALLE|PER|VERSO|IN|DA|DAL|TO|FROM)\s+([A-ZÀ-Ü][A-ZÀ-Ü'\u2019.-]+(?:\s+(?:DI|DE|DEL|DELLA|A|IN)?\s*[A-ZÀ-Ü][A-ZÀ-Ü'\u2019.-]+){0,3})/;
+
+/*
+ * Cerca uno spostamento nel testo di una giornata e ne restituisce
+ * l'etichetta, oppure null.
+ */
+function pdlViaggioDaSegmento(seg) {
+  const m = PDL_VIAGGIO.exec(seg);
+  if (!m) return null;
+  // La destinazione si cerca solo DOPO la parola chiave e nella stessa
+  // frase: piu' in la' si incontrano le location delle scene, che sono
+  // un'altra cosa.
+  const coda = seg.slice(m.index + m[0].length, m.index + m[0].length + 60);
+  const d = PDL_VIAGGIO_DEST.exec(coda);
+  const parola = m[0].trim().toUpperCase().replace(/\s+/g, ' ');
+  const dest = d ? d[1].trim().replace(/\s+/g, ' ').slice(0, 40) : '';
+  if (!dest && PDL_VIAGGIO_DEBOLE.test(parola)) return null;
+  return dest ? parola + ' ' + dest : parola;
+}
+
+/*
+ * Etichetta corta per le caselle strette del calendario su telefono:
+ * la destinazione se il piano la scrive, altrimenti la parola del piano.
+ */
+function pdlViaggioBreve(label) {
+  const m = PDL_VIAGGIO.exec(label || '');
+  if (!m) return label || '';
+  return label.slice(m.index + m[0].length).trim() || m[0].trim();
+}
+
 function parseTrasferimentiFromText(text) {
   const result = {};
 
-  // Split by "Fine del Giorno #N" markers
-  const blockRe = /Fine del Giorno\s*#\s*(\d+)/gi;
-  const blocks = [];
-  let lastIdx = 0, m;
-  while ((m = blockRe.exec(text)) !== null) {
-    blocks.push({ dayNum: parseInt(m[1]), start: lastIdx, end: m.index });
-    lastIdx = m.index + m[0].length;
+  /*
+   * Le giornate si delimitano con la stessa lista di marcatori usata per
+   * leggere la struttura, scegliendo la forma piu' presente nel piano.
+   * Prima qui era fissata "Fine del Giorno #N", una sola delle cinque
+   * forme conosciute: sui piani che ne usano un'altra i blocchi uscivano
+   * vuoti e nessun viaggio veniva mai trovato.
+   */
+  let marker = [];
+  for (const forma of PDL_FINE_GIORNO) {
+    forma.re.lastIndex = 0;
+    const t = [...text.matchAll(forma.re)];
+    if (t.length > marker.length) marker = t;
   }
+  if (!marker.length) return result;
+  marker.sort((a, b) => a.index - b.index);
 
-  // Match transfer lines — cerca TRASFERIMENTO nel testo del blocco
-  // Il trasferimento appare DOPO le scene del giorno, prima del marker "Fine del giorno #N+1"
-  // Quindi va assegnato al giorno N (il blocco tra Fine#N e Fine#N+1)
-  const transferRe = /TRASFERIMENTO(?:\s+(?:A|DA|AL|DEL|DELLA|DI))?\s+([A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙa-zàèéìòùA-Z0-9\s\-\']{1,50}?)(?=\s*(?:Fine|\-{3,}|$|\n))/gi;
-
-  blocks.forEach(({ dayNum, start, end }) => {
-    const chunk = text.slice(start, end);
-    transferRe.lastIndex = 0;
-    const match = transferRe.exec(chunk);
-    if (match) {
-      // match[1] è il gruppo catturato (destinazione), match[0] è tutto
-      const dest = (match[1] || '').trim().replace(/\s+/g, ' ').slice(0, 40);
-      const label = `TRASFERIMENTO ${dest}`.trim();
-      if (label.length > 15) result[dayNum] = label;
-    }
-  });
-
-  // Fallback: cerca anche nel testo grezzo senza blocchi (per PDL con struttura diversa)
-  if (Object.keys(result).length === 0) {
-    const lines = text.split(/\n/);
-    let currentDay = null;
-    lines.forEach(line => {
-      const dayMatch = line.match(/Fine del giorno\s*#\s*(\d+)/i);
-      if (dayMatch) currentDay = parseInt(dayMatch[1]);
-      const trMatch = line.match(/TRASFERIMENTO(?:\s+(?:A|DA|AL|DEL|DELLA|DI))?\s+([A-ZÀÈÉÌÒÙ][^\n]{1,40})/i);
-      if (trMatch && currentDay !== null) {
-        const dest = trMatch[1].trim().replace(/\s+/g,' ').slice(0,40);
-        result[currentDay] = `TRASFERIMENTO ${dest}`;
-      }
-    });
+  // Il testo che precede il marcatore della giornata N appartiene alla
+  // giornata N: e' li' che il piano scrive lo spostamento, dopo le scene.
+  let prev = 0;
+  for (const m of marker) {
+    const etichetta = pdlViaggioDaSegmento(text.slice(prev, m.index));
+    if (etichetta) result[parseInt(m[1])] = etichetta;
+    prev = m.index + m[0].length;
   }
-
   return result;
 }
 
@@ -5837,6 +5889,12 @@ function applyTrasferimenti(transferMap) {
     (s.giorni || []).forEach(g => {
       if (transferMap[g.numero_giorno]) {
         g.trasferimento = transferMap[g.numero_giorno];
+        // Giornata di viaggio contro spostamento dentro una giornata di
+        // riprese: la differenza e' se quel giorno si gira o no. Una
+        // giornata senza scene in cui il piano segna un viaggio e' una
+        // giornata di viaggio, e nel calendario va detta, non lasciata
+        // come una casella vuota.
+        g.giorno_viaggio = !(g.scene || []).length;
       }
     });
   });
@@ -6818,7 +6876,7 @@ function renderPdlCalendar() {
       const sd=pdlShootingData[g.numero_giorno]||{};
       const status=sd.status||'pending';
       const bgClass=getPdlCellBgClass(g.pagine_giorno);
-      el.className=`cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''}`;
+      el.className=`cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}`;
       el.addEventListener('click', ()=>openPdlDayModal(g.numero_giorno));
       el.addEventListener('touchstart', (e)=>{ el._touchMoved=false; }, {passive:true});
       el.addEventListener('touchmove', ()=>{ el._touchMoved=true; }, {passive:true});
@@ -6828,9 +6886,13 @@ function renderPdlCalendar() {
       const isMobile = window.innerWidth <= 600;
       if (isMobile) {
         const oraStr = (g.ora_inizio && g.ora_inizio !== 'TBD') ? ' ' + g.ora_inizio : '';
-        el.innerHTML = '<div class="cal-cell-day">' + day + '</div><div class="cal-cell-giorno" style="font-size:8px;opacity:0.8">D' + g.numero_giorno + oraStr + '</div>';
+        // Il viaggio va mostrato anche qui: prima la riga del bus esisteva
+        // solo nella versione da schermo grande, cioe' mancava proprio dove
+        // il piano si guarda davvero, sul telefono.
+        el.innerHTML = '<div class="cal-cell-day">' + day + '</div><div class="cal-cell-giorno" style="font-size:8px;opacity:0.8">D' + g.numero_giorno + oraStr + '</div>' +
+          (g.trasferimento ? '<div class="cal-cell-viaggio">\u{1F68C} ' + escapeHtml(pdlViaggioBreve(g.trasferimento)) + '</div>' : '');
       } else {
-        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">DAY ${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div style="font-size:13px;margin-top:4px" title="${g.trasferimento}">🚌</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
+        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">DAY ${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
       }
     } else {
       el.className=`cal-cell ${isToday?'is-today':''}`;
@@ -6886,7 +6948,7 @@ function renderPdlCalendarWeekly() {
       const sd = pdlShootingData[g.numero_giorno] || {};
       const status = sd.status || 'pending';
       const bgClass = getPdlCellBgClass(g.pagine_giorno);
-      el.className = `cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''}`;
+      el.className = `cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
       el.addEventListener('click', ()=>openPdlDayModal(g.numero_giorno));
       el.addEventListener('touchstart', ()=>{ el._touchMoved=false; }, {passive:true});
@@ -6909,7 +6971,7 @@ function renderPdlCalendarWeekly() {
         ${locHtml}
         <div class="cal-cell-scenes" style="display:flex">${sceneHtml}</div>
         ${g.unita_secondarie?.length ? `<div style="font-size:8px;color:var(--muted);margin-top:3px;letter-spacing:0.05em">2° UNIT</div>` : ''}
-        ${g.trasferimento ? `<div style="font-size:13px;margin-top:4px" title="${g.trasferimento}">🚌</div>` : ''}
+        ${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}
         ${sd.notes ? `<div class="cal-cell-note">${sd.notes}</div>` : ''}`;
     } else {
       el.className = `cal-cell ${isToday?'is-today':''}`;
