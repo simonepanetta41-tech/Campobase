@@ -30,6 +30,8 @@
   --bg: #000;
   --surface: #111;
   --surface2: #1a1a1a;
+  --viaggio: #8fc4ff;
+  --viaggio-rgb: 120,180,255;
   --border: #2e2e2e;
   --border-l: #3d3d3d;
   --yellow: #f5e642;
@@ -45,6 +47,8 @@ body.light {
   --bg: #f0ede6;
   --surface: #ffffff;
   --surface2: #f5f2ec;
+  --viaggio: #2b6cb0;
+  --viaggio-rgb: 43,108,176;
   --border: #e0dbd0;
   --border-l: #ccc8be;
   --yellow: #a07828;
@@ -203,7 +207,13 @@ body.light .wrap-place-card.slow-food { background:#fff !important;border-color:
 .tt-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border-l);border-radius:999px;padding:3px 10px 3px 12px;font-size:10px;color:var(--white-dim)}
 .tt-chip-x{background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;line-height:1;padding:0;transition:color 0.1s}
 .tt-chip-x:hover{color:var(--danger)}
-table.tt2{width:100%;border-collapse:collapse;font-size:11px;min-width:620px}
+/* border-collapse:separate e non collapse: con collapse i bordi
+   appartengono alla tabella e non alla cella, e una cella sticky li lascia
+   indietro quando si scorre. */
+table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:620px}
+/* Prima colonna ferma: scorrendo verso destra si perdeva l'intestazione di
+   riga e non si capiva piu' quale orario si stesse leggendo. */
+.tt2 th.lbl2,.tt2 td.lbl2{position:sticky;left:0;z-index:2;background:var(--surface)}
 .tt2 th{padding:7px 4px;text-align:center;font-size:9px;font-weight:500;letter-spacing:0.07em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
 .tt2 th.lbl2{text-align:left;width:130px;padding-left:0}
 .tt2 td{padding:2px 3px;border-bottom:1px solid var(--border);text-align:center}
@@ -211,7 +221,7 @@ table.tt2{width:100%;border-collapse:collapse;font-size:11px;min-width:620px}
 .tt2 td.lbl2.calc2{color:var(--muted);font-style:italic}
 .tt2 td.sat2{background:rgba(245,166,35,0.06)}
 .tt2 td.tot2{background:var(--surface2);font-family:'DM Mono',monospace;font-size:11px;color:var(--white);font-weight:500;border-left:1px solid var(--border);width:82px;min-width:82px;padding:4px 8px}
-.tt2 tr.secrow2 td{background:rgba(255,255,255,0.03);font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:4px 3px}
+.tt2 tr.secrow2 td{background:var(--surface2);font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:4px 3px}
 .tt2 td input.ti{width:100%;background:transparent;border:none;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--white);padding:4px 1px;outline:none;border-radius:3px;transition:background 0.1s}
 .tt2 td input.ti:focus{background:rgba(245,230,66,0.07)}
 .tt2 td input.ti::placeholder{color:var(--border-l)}
@@ -280,11 +290,11 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
    giornata di riprese ne' a una casella vuota. Righe diagonali e bordo
    tratteggiato la distinguono a colpo d'occhio, anche sul telefono. */
 .cal-cell.is-viaggio {
-  background:repeating-linear-gradient(135deg,rgba(90,170,255,0.16) 0 7px,rgba(90,170,255,0.05) 7px 14px) !important;
-  border:1px dashed rgba(120,180,255,0.55) !important;
+  background:repeating-linear-gradient(135deg,rgba(var(--viaggio-rgb),0.16) 0 7px,rgba(var(--viaggio-rgb),0.05) 7px 14px) !important;
+  border:1px dashed rgba(var(--viaggio-rgb),0.55) !important;
 }
-.cal-cell.is-viaggio .cal-cell-giorno { color:#8fc4ff; }
-.cal-cell-viaggio { font-size:8px;font-weight:700;color:#8fc4ff;margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere; }
+.cal-cell.is-viaggio .cal-cell-giorno { color:var(--viaggio); }
+.cal-cell-viaggio { font-size:8px;font-weight:700;color:var(--viaggio);margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere; }
 @media (max-width:600px){ .cal-cell-viaggio { font-size:7px; } }
 .cal-cell.status-complete { border:2px solid var(--green); }
 .cal-cell.status-partial { border:2px solid var(--orange); }
@@ -7573,12 +7583,25 @@ function ttCalcDay(d,orari,isSestoGiorno){
   const goldenRaw=Math.max(0,r.oreLav-soglia);
   let mancataG=0;
   if(T.pauM!==null&&(T.pauM-iniM)>360){r.mancataPausa=true;mancataG=60;}
-  // Ore viaggio: calcolo grezzo poi sottrai franchigia
+  /*
+   * Ore viaggio: calcolo grezzo, poi sottrazione della franchigia.
+   *
+   * Il tragitto di andata sta per definizione fuori dalla giornata, perche'
+   * precede l'inizio delle riprese, e si conta tutto.
+   *
+   * Il rientro no: conta solo per la parte che esce dalla giornata
+   * contrattuale. Se si comincia alle 09:00 con la giornata da 8h, le 17:00
+   * sono ancora dentro, e un rientro alle 17:00 non e' tempo di viaggio da
+   * retribuire a parte — e' tempo gia' compreso. Prima si contava tutto cio'
+   * che cadeva dopo la fine delle riprese, e quell'ora risultava pagata due
+   * volte.
+   */
   if(isTrasf){
     const parM=T.parM, rieM=T.rieM;
+    const fineGiornata=iniM+soglia;
     let v=0;
     if(parM!==null)v+=Math.max(0,iniM-parM);
-    if(rieM!==null)v+=Math.max(0,rieM-finM);
+    if(rieM!==null)v+=Math.max(0,rieM-Math.max(finM,fineGiornata));
     const viaggioLordo=Math.min(v,120); // cap fisico a 2h
     const netto=Math.max(0,viaggioLordo-ttMeta.viaggioConcesso);
     r.oreViaggio=netto>0?netto:null;
@@ -7685,7 +7708,7 @@ function ttRenderTab(tab){
     return `<th class="${cls}" style="${isSesto?'color:var(--orange)':''}">${label}</th>`;
   }).join('');
   let th=`<table class="tt2"><thead><tr><th class="lbl2"></th>${dayHeaders}<th style="width:82px;min-width:82px">TOTALE</th></tr></thead><tbody>`;
-  th+=`<tr class="secrow2"><td colspan="8">orari</td></tr>`;
+  th+=`<tr class="secrow2"><td class="lbl2">orari</td><td colspan="7"></td></tr>`;
   iRows.forEach(r=>{
     th+=`<tr><td class="lbl2">${r.l}</td>`;
     TT_DAYS.forEach((_,i)=>{
@@ -7696,7 +7719,7 @@ function ttRenderTab(tab){
     });
     th+=`<td class="tot2">—</td></tr>`;
   });
-  th+=`<tr class="secrow2"><td colspan="8">calcolato</td></tr>`;
+  th+=`<tr class="secrow2"><td class="lbl2">calcolato</td><td colspan="7"></td></tr>`;
   cRows.forEach(r=>{
     const dv=days.map(d=>d[r.k]||null),tv=tot[r.k]||null;
     th+=`<tr><td class="lbl2 calc2">${r.l}</td>`;
