@@ -7683,11 +7683,11 @@ function ttRenderAll(){
   c.innerHTML=ttTabelle.map(t=>ttRenderTab(t)).join('');
 }
 
-function ttRenderTab(tab){
-  const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
+/* I badge della tabella: servono sia al disegno completo sia agli
+   aggiornamenti in posto, quindi stanno in una funzione sola. */
+function ttBadgesHtml(tab,days,tot){
   const mancDays=days.map((d,i)=>d.mancataPausa?TT_DAYS[i]:null).filter(Boolean);
   const mancBadge=mancDays.length>0?`<span onclick="ttShowMancata('${mancDays.join(',')}')" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--danger);border-radius:999px;padding:2px 9px;font-size:9px;cursor:pointer">⚠ Mancata pausa</span>`:'';
-  // Badge sesto giorno se c'è golden6
   // Due stati: da decidere (apre il popup) oppure gia' raddoppiata, e in
   // quel caso accanto compare il bottone per riportarla a valore normale.
   const pill='display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10px;cursor:pointer';
@@ -7695,6 +7695,65 @@ function ttRenderTab(tab){
     ?`<span style="${pill};background:rgba(245,166,35,0.28);border:1px solid var(--orange);color:var(--orange);cursor:default">★ Golden 6°g. raddoppiata (${ttToHM(tot.golden6)})</span>`
      +`<span onclick="ttSestoRipristina('${tab.id}')" title="Riporta la golden del 6° giorno al valore normale" style="${pill};background:none;border:1px solid var(--border-l);color:var(--muted)">↺ Normale</span>`
     :`<span onclick="ttShowSestoPopup('${tab.id}')" style="${pill};background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);color:var(--orange)">★ Golden 6°g. — raddoppiare?</span>`);
+  return mancBadge+sestoBadge;
+}
+
+/*
+ * Aggiorna i valori calcolati senza ridisegnare la tabella.
+ *
+ * Prima ogni campo compilato faceva ricostruire tutto il riquadro, e il
+ * contenitore che scorre in orizzontale nasceva nuovo, con lo scorrimento
+ * a zero: sul telefono bastava scrivere l'orario del sabato per ritrovarsi
+ * al lunedi'. Lo scorrimento veniva poi rimesso a mano, ma e' un rimedio
+ * che dipende da quando il browser calcola il layout, e su iOS non teneva.
+ * Non ricostruendo piu' niente, non c'e' niente da rimettere a posto: le
+ * caselle degli orari e il contenitore restano gli stessi, e con loro la
+ * posizione e il campo attivo.
+ */
+function ttAggiornaCalc(tabId){
+  const tab=ttTabelle.find(t=>t.id==tabId); if(!tab) return;
+  const el=document.getElementById(`ttb-${tabId}`); if(!el) return;
+  const {days,tot,sestoIdx}=ttCalcTab(tab.orari,tab.sestoRaddoppio);
+  const cRows=[{k:'oreViaggio',c:''},{k:'nottOrd',c:'nott2'},{k:'nottStr',c:'nott2'},
+               {k:'goldenOrd',c:'gold2'},{k:'goldenNott',c:'gold2'},{k:'golden6',c:'gold2'}];
+  for(const r of cRows){
+    days.forEach((d,i)=>{
+      const td=el.querySelector(`td[data-c="${r.k}"][data-ci="${i}"]`); if(!td) return;
+      const v=d[r.k]||null;
+      td.textContent=v?ttToHM(v):'—';
+      td.className=[i===5?'sat2':'',i===sestoIdx?'sesto2':'','comp2',v&&r.c?r.c:'',v?'hv':''].filter(Boolean).join(' ');
+    });
+    const tt=el.querySelector(`td[data-tot="${r.k}"]`);
+    if(tt){
+      const tv=tot[r.k]||null;
+      tt.textContent=tv?ttToHM(tv):'—';
+      tt.className=['tot2',tv&&r.c?r.c:''].filter(Boolean).join(' ');
+    }
+  }
+  // Il sesto giorno puo' spostarsi quando si aggiunge o si toglie un orario.
+  TT_DAYS.forEach((d,i)=>{
+    const th=el.querySelector(`th[data-dh="${i}"]`); if(!th) return;
+    const isSesto=i===sestoIdx;
+    th.innerHTML=isSesto?`${d}<br><span style="font-size:8px;opacity:0.7;font-weight:400">6°g.</span>`:d;
+    th.style.color=isSesto?'var(--orange)':'';
+  });
+  el.querySelectorAll('td[data-ci]:not([data-c])').forEach(td=>{
+    const i=+td.dataset.ci;
+    td.className=[i===5?'sat2':'',i===sestoIdx?'sesto2':''].filter(Boolean).join(' ');
+  });
+  const sub=el.querySelector('.tt-sub');
+  if(sub)sub.textContent=`${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}`;
+  const badges=el.querySelector('.tt-badges');
+  if(badges){
+    const html=ttBadgesHtml(tab,days,tot);
+    badges.innerHTML=html;
+    badges.style.display=html?'flex':'none';
+  }
+}
+
+function ttRenderTab(tab){
+  const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
+  const badges=ttBadgesHtml(tab,days,tot);
   const wLabel=tab.workers.length>0?tab.workers.join(', '):`<span style="color:var(--muted)">Nessun lavoratore</span>`;
   const chips=tab.workers.map((w,i)=>`<span class="tt-chip">${w}<button class="tt-chip-x" onclick="ttRemoveW('${tab.id}',${i})">×</button></span>`).join('');
   const iRows=[{k:'partenza',l:'Partenza'},{k:'inizio',l:'Inizio'},{k:'pausa',l:'Pausa'},{k:'stop',l:'Stop'},{k:'fine',l:'Fine'},{k:'rientro',l:'Rientro'}];
@@ -7705,7 +7764,7 @@ function ttRenderTab(tab){
     const isSat=i===5;
     const label=isSesto?`${d}<br><span style="font-size:8px;opacity:0.7;font-weight:400">6°g.</span>`:d;
     const cls=isSat&&isSesto?'sat2':isSat?'sat2':'';
-    return `<th class="${cls}" style="${isSesto?'color:var(--orange)':''}">${label}</th>`;
+    return `<th class="${cls}" data-dh="${i}" style="${isSesto?'color:var(--orange)':''}">${label}</th>`;
   }).join('');
   let th=`<table class="tt2"><thead><tr><th class="lbl2"></th>${dayHeaders}<th style="width:82px;min-width:82px">TOTALE</th></tr></thead><tbody>`;
   th+=`<tr class="secrow2"><td class="lbl2">orari</td><td colspan="7"></td></tr>`;
@@ -7715,7 +7774,7 @@ function ttRenderTab(tab){
       const isSesto=i===sestoIdx;
       const cl=[i===5?'sat2':'',isSesto?'sesto2':''].filter(Boolean).join(' ');
       const v=tab.orari[r.k][i]||'';
-      th+=`<td class="${cl}"><input class="ti" type="text" placeholder="—" value="${v}" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
+      th+=`<td class="${cl}" data-ci="${i}"><input class="ti" type="text" placeholder="—" value="${v}" data-f="${r.k}" data-i="${i}" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
     });
     th+=`<td class="tot2">—</td></tr>`;
   });
@@ -7723,8 +7782,8 @@ function ttRenderTab(tab){
   cRows.forEach(r=>{
     const dv=days.map(d=>d[r.k]||null),tv=tot[r.k]||null;
     th+=`<tr><td class="lbl2 calc2">${r.l}</td>`;
-    dv.forEach((v,i)=>{const isSesto=i===sestoIdx;const cl=[i===5?'sat2':'',isSesto?'sesto2':'','comp2',v&&r.c?r.c:'',v?'hv':''].filter(Boolean).join(' ');th+=`<td class="${cl}">${v?ttToHM(v):'—'}</td>`;});
-    th+=`<td class="${['tot2',tv&&r.c?r.c:''].filter(Boolean).join(' ')}">${tv?ttToHM(tv):'—'}</td></tr>`;
+    dv.forEach((v,i)=>{const isSesto=i===sestoIdx;const cl=[i===5?'sat2':'',isSesto?'sesto2':'','comp2',v&&r.c?r.c:'',v?'hv':''].filter(Boolean).join(' ');th+=`<td class="${cl}" data-c="${r.k}" data-ci="${i}">${v?ttToHM(v):'—'}</td>`;});
+    th+=`<td class="${['tot2',tv&&r.c?r.c:''].filter(Boolean).join(' ')}" data-tot="${r.k}">${tv?ttToHM(tv):'—'}</td></tr>`;
   });
   th+=`</tbody></table>`;
   const delBtn=ttTabelle.length>1?`<button onclick="ttDelTab('${tab.id}')" style="padding:5px 10px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕</button>`:'';
@@ -7732,8 +7791,8 @@ function ttRenderTab(tab){
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)">
       <div>
         <div style="font-size:11px;color:var(--white);font-weight:500">${wLabel}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:2px">${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}</div>
-        ${(mancBadge||sestoBadge)?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:9px">${mancBadge}${sestoBadge}</div>`:''}
+        <div class="tt-sub" style="font-size:9px;color:var(--muted);margin-top:2px">${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}</div>
+        <div class="tt-badges" style="display:${badges?'flex':'none'};flex-wrap:wrap;gap:6px;margin-top:9px">${badges}</div>
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;align-self:flex-start">
         <button onclick="ttOpenScorporo('${tab.id}')" style="padding:5px 12px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">⊕ Scorporo</button>
@@ -7746,7 +7805,7 @@ function ttRenderTab(tab){
         <input type="text" id="ttawi-${tab.id}" placeholder="Aggiungi lavoratore..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:11px;padding:5px 9px;border-radius:5px;outline:none" onkeydown="if(event.key==='Enter')ttAddW('${tab.id}')" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'">
         <button onclick="ttAddW('${tab.id}')" style="padding:5px 12px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:10px;border-radius:5px;cursor:pointer">+</button>
       </div>
-      <div style="overflow-x:auto">${th}</div>
+      <div class="tt-scroll" style="overflow-x:auto">${th}</div>
     </div>
   </div>`;
 }
@@ -7768,7 +7827,28 @@ async function ttClear(){
   showToast('Orari svuotati.');
 }
 async function ttDelTab(id){if(ttTabelle.length<=1)return;if(!await askConfirm('Eliminare questa tabella?'))return;ttTabelle=ttTabelle.filter(t=>t.id!=id);ttRenderAll();}
-function ttSetO(tabId,field,di,val){const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.orari[field][di]=val;const el=document.getElementById(`ttb-${tabId}`);if(el)el.outerHTML=ttRenderTab(t);}
+/*
+ * Scrive un orario e ridisegna la tabella.
+ *
+ * Ridisegnarla significa ricostruirla da zero, e il contenitore che scorre
+ * nasce nuovo con lo scorrimento a zero: su iPhone, dove le sei giornate
+ * non ci stanno in larghezza, dopo ogni orario inserito si tornava al
+ * lunedi' e bisognava riscorrere fino al sabato. Posizione e campo attivo
+ * vanno quindi rimessi a posto dopo il ridisegno.
+ *
+ * I campi chiamano questa funzione sia su change sia su blur: senza il
+ * controllo sul valore invariato, confermare un orario ridisegnava due
+ * volte.
+ */
+function ttSetO(tabId,field,di,val){
+  const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;
+  if(t.orari[field][di]===val)return;
+  t.orari[field][di]=val;
+  // Solo i valori calcolati cambiano: le caselle degli orari e il
+  // contenitore che scorre restano quelli, insieme alla posizione
+  // orizzontale e al campo su cui si sta scrivendo.
+  ttAggiornaCalc(tabId);
+}
 function ttAddW(tabId){const inp=document.getElementById(`ttawi-${tabId}`);if(!inp)return;const n=inp.value.trim();if(!n)return;const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.push(n);ttRenderAll();}
 function ttRemoveW(tabId,wi){const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.splice(wi,1);ttRenderAll();}
 
