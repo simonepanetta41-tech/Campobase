@@ -952,7 +952,9 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
     </div>
-    <div id="homePage">
+    <div id="benvenuto" style="display:none;padding:20px 16px"></div>
+
+      <div id="homePage">
       <h2 class="prog-tit">I tuoi progetti</h2>
       <div id="historyGrid">
         <div class="prog-vuoto">Caricamento…</div>
@@ -1163,7 +1165,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div>
 
       <!-- CHAT -->
-      <div id="chatSection">
+      <div id="chatSection" style="display:none !important">
         <div class="chat-intro">
           <div class="chat-intro-icon"><svg viewBox="0 0 100 110" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#F5C542"/><ellipse cx="50" cy="68" rx="22" ry="24" fill="#F5C542"/><path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#F5C542"/><path d="M28 58 Q27 48 30 44 Q28 52 29 61z" fill="#000"/><path d="M72 58 Q73 48 70 44 Q72 52 71 61z" fill="#000"/><path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M31 50 Q32 34 46 28 Q54 25 62 28 Q58 26 50 28 Q39 30 34 42z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M33 46 Q40 36 54 32" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M32 50 Q40 41 55 37" stroke="#F5C542" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M32 60 Q38 57 44 58" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 58 Q62 57 68 60" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><path d="M47 67 Q50 65.5 53 67" stroke="#F5C542" stroke-width="1" fill="none"/><line x1="27" y1="67" x2="23" y2="66" stroke="#F5C542" stroke-width="1.2"/><line x1="73" y1="67" x2="77" y2="66" stroke="#F5C542" stroke-width="1.2"/><path d="M42 84 Q46 82.5 50 83 Q54 82.5 58 84" stroke="#F5C542" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M36 87 Q38 92 43 94 Q50 96 57 94 Q62 92 64 87" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M43 94 Q47 98 50 98.5 Q53 98 57 94" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M38 102 Q44 107 50 108 Q56 107 62 102" stroke="#F5C542" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2.5,1.5"/><circle cx="50" cy="110" r="4" stroke="#F5C542" stroke-width="1" fill="none"/><text x="50" y="113" font-size="4.5" text-anchor="middle" fill="#F5C542" font-weight="700" font-family="serif">N</text></svg></div>
           <div class="chat-intro-text">
@@ -1632,7 +1634,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
           <button onclick="switchResultTab('script')"><span class="t">Sceneggiatura</span><span class="s">Testo e analisi</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('cast')"><span class="t">Cast</span><span class="s">Personaggi e interpreti</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('wrap')"><span class="t">Wrap</span><span class="s">Locali e indirizzi di fine giornata</span><span class="ch">›</span></button>
-          <button onclick="toggleGennaroDrawer()"><span class="t">Gennaro</span><span class="s">Domande sulla produzione</span><span class="ch">›</span></button>
+          <!-- Gennaro e' nascosto per i primi test: il codice resta, la voce no. -->
         </div>
       </div>
 
@@ -2243,7 +2245,8 @@ async function showApp() {
     provider: currentUser.app_metadata?.provider || 'email',
     last_seen: new Date().toISOString()
   }, { onConflict: 'id' });
-  loadHistory();
+  if (!profiloBenvenuto()) loadHistory();
+  else loadHistory();
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -2282,9 +2285,37 @@ function cbTestata() {
   if (g) g.style.visibility = nome ? 'visible' : 'hidden';
 }
 
+/*
+ * Chi sei: si chiede una volta, appena entrato, e mai piu'.
+ *
+ * Prima la domanda compariva al primo ordine del giorno, che e' il
+ * momento sbagliato: uno ha appena caricato un file e vuole vedere il
+ * risultato, non compilare un modulo. E rispuntava a ogni OdG finche'
+ * non si rispondeva.
+ */
+function profiloBenvenuto(){
+  if (profiloCompleto()) return false;
+  const el = document.getElementById('benvenuto'); if (!el) return false;
+  el.innerHTML = profiloChiediHtml();
+  el.style.display = 'block';
+  document.getElementById('homePage').style.display = 'none';
+  document.getElementById('resultsPage')?.classList.remove('on');
+  return true;
+}
+function profiloChiudiBenvenuto(){
+  const el = document.getElementById('benvenuto');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  showPage('home');
+}
+
 function showPage(page) {
   setTimeout(cbTestata, 0);
   if (page === 'settings') try { profiloRenderImpostazioni(); } catch(_) {}
+  // I risultati sono una pagina come le altre: restando accesi comparivano
+  // sotto le impostazioni, con l'ordine del giorno che continuava in fondo.
+  const rp = document.getElementById('resultsPage');
+  if (rp) rp.classList.remove('on');
+  const bv = document.getElementById('benvenuto'); if (bv) bv.style.display = 'none';
   document.getElementById('homePage').style.display    = page === 'home' ? '' : 'none';
   document.getElementById('settingsPage').style.display = page === 'settings' ? '' : 'none';
   document.getElementById('systemPage').style.display = page === 'system' ? '' : 'none';
@@ -7327,6 +7358,8 @@ async function profiloConferma() {
   const p = { nome: v('profNome'), cognome: v('profCognome'), reparto: v('profReparto') };
   if (!p.nome || !p.cognome) { showToast('Servono nome e cognome.'); return; }
   await profiloSalva(p);
+  const bv = document.getElementById('benvenuto');
+  if (bv && bv.style.display !== 'none') { profiloChiudiBenvenuto(); return; }
   if (typeof odgRender === 'function') odgRender();
   if (typeof profiloRenderImpostazioni === 'function') profiloRenderImpostazioni();
   showToast('Fatto.');
@@ -7445,15 +7478,44 @@ async function odgTestoDaPdf(file) {
 let odgCorrente = null;       // l'OdG mostrato adesso
 let odgInCorso = false;
 
+/*
+ * Che documento e' questo.
+ *
+ * Nella mail dell'ordine del giorno arrivano quasi sempre tre allegati:
+ * l'OdG, la lista dei trasporti e gli stralci con le scene del giorno.
+ * Si riconoscono dal contenuto, non dal nome del file, che cambia da
+ * produzione a produzione.
+ */
+function odgTipoDoc(t){
+  const u = t.toUpperCase().replace(/\s+/g,' ');
+  if (/GIRI\s?AUTO|TRANSPORT\s?LIST|LISTA\s?TRASPORT/.test(u)) return 'giri';
+  if (/O\s?D\s?G|ORDINE DEL GIORNO|CONVOCAZIONE TROUPE/.test(u)) return 'odg';
+  if (/STRALC/.test(u)) return 'stralci';
+  // Gli stralci non si annunciano: sono sceneggiatura, e si riconoscono
+  // dalle intestazioni di scena, che nessun altro documento ha.
+  if ((t.match(/\b\d{1,3}[A-Z]*\s+(INT|EST|EXT|I\/E)[\s.]/gi)||[]).length >= 2) return 'stralci';
+  return 'odg';
+}
+
 async function odgScegliFile(input) {
-  const file = input.files && input.files[0];
+  const files = [...(input.files||[])];
   input.value = '';
-  if (!file) return;
-  if (odgInCorso) return;
+  if (!files.length || odgInCorso) return;
   odgInCorso = true;
   odgRender();
   try {
-    const testo = await odgTestoDaPdf(file);
+    // Si leggono tutti, poi si decide: l'OdG comanda, gli altri si
+    // agganciano a lui.
+    const letti = [];
+    for (const f of files) {
+      odgPasso('Lettura di ' + f.name);
+      const t = await odgTestoDaPdf(f);
+      letti.push({ nome: f.name, testo: t, tipo: odgTipoDoc(t) });
+    }
+    const principale = letti.find(x => x.tipo === 'odg') || letti[0];
+    const file = { name: principale.nome };
+    const testo = principale.testo;
+    const extra = letti.filter(x => x !== principale);
     // Un OdG sono due o tre pagine di testo. Molto meno vuol dire che il
     // PDF e' una scansione senza testo, e il modello leggerebbe il vuoto.
     if (testo.replace(/\s+/g, '').length < 400) {
@@ -7465,6 +7527,11 @@ async function odgScegliFile(input) {
     }
     dati.nomeFile = file.name;
     dati.caricatoIl = new Date().toISOString();
+    // Gli allegati che non sono l'OdG restano come testo, pronti per la
+    // scheda scena: gli stralci sono la sceneggiatura del giorno, e i giri
+    // auto hanno il pick-up di ognuno.
+    dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo }));
+    if (extra.length) dati.conAllegati = extra.map(x => x.tipo);
     odgCorrente = dati;
     await odgSalva(dati);
     showToast('Ordine del giorno caricato.');
@@ -7598,10 +7665,11 @@ function odgVuotoHtml() {
     <div class="odg-ic">${ODG_SEGNI.luogo}</div>
     <div class="odg-t">Nessun ordine del giorno</div>
     <div class="odg-s">Salvalo dalla mail e caricalo qui: orari, scene, cast,
-      numeri utili e il tuo pick-up compaiono da soli.</div>
+      numeri utili e il tuo pick-up compaiono da soli. Se hai anche i giri auto
+      e gli stralci, selezionali tutti insieme.</div>
     ${err}
     <label class="odg-btn">Carica l'OdG
-      <input type="file" accept="application/pdf,.pdf" style="display:none" onchange="odgScegliFile(this)">
+      <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
     </label>
   </div>`;
 }
@@ -7678,7 +7746,7 @@ function odgPienoHtml(d) {
   </div></div>
   <button class="odg-togli" onclick="odgRimuovi()">Rimuovi OdG</button>
   <label class="odg-btn" style="margin-top:9px">Carica un altro OdG
-    <input type="file" accept="application/pdf,.pdf" style="display:none" onchange="odgScegliFile(this)">
+    <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
   </label>`;
 }
 
@@ -7690,10 +7758,6 @@ function odgBadgeHtml(d, io) {
     // Niente convocazione troupe nel documento: resta l'orario generale.
     if (!t.length) return d.convocazione
       ? `<div class="odg-badge"><span class="r">Convocazione</span><span class="o num">${esc(d.convocazione)}</span></div>` : '';
-
-    // Senza nome in profilo non c'e' niente con cui cercare: prima si
-    // chiede come ti chiami, che e' una domanda sola invece di una lista.
-    if (!profiloCompleto()) return profiloChiediHtml();
 
     // Con il nome, la riga si trova da sola e resta solo da confermare.
     const i = odgForzaElenco ? -1 : profiloTrovaInTroupe(t);
@@ -8978,7 +9042,7 @@ function ttGiornoHtml(tab,days,tot,sestoIdx){
     <label for="ttg-${tab.id}-${r.k}">${r.l}</label>
     <input id="ttg-${tab.id}-${r.k}" type="text" inputmode="decimal" placeholder="—"
       value="${tab.orari[r.k][i]||''}"
-      oninput="ttDigita(this)"
+      oninput="ttDigita(this);ttBozza(this,'${tab.id}','${r.k}',${i})"
       onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)"
       onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></div>`).join('');
   return `<div class="ttg-giorni">${giorni}</div>
@@ -9055,7 +9119,7 @@ function ttSommari(){
   metti('regole', regole.join(' · '));
 
   const n=document.querySelectorAll('#tt-storico [data-sett]').length;
-  metti('storico', n?n+(n===1?' settimana':' settimane'):'vuoto');
+  metti('storico', n?n+(n===1?' settimana':' settimane'):'');
 }
 
 /* All'apertura: tutto chiuso, tranne quello che non e' ancora compilato —
@@ -9103,7 +9167,7 @@ function ttRenderTab(tab){
       const isSesto=i===sestoIdx;
       const cl=[i===5?'sat2':'',isSesto?'sesto2':''].filter(Boolean).join(' ');
       const v=tab.orari[r.k][i]||'';
-      th+=`<td class="${cl}" data-ci="${i}"><input class="ti" type="text" inputmode="decimal" placeholder="—" value="${v}" data-f="${r.k}" data-i="${i}" oninput="ttDigita(this)" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
+      th+=`<td class="${cl}" data-ci="${i}"><input class="ti" type="text" inputmode="decimal" placeholder="—" value="${v}" data-f="${r.k}" data-i="${i}" oninput="ttDigita(this);ttBozza(this,'${tab.id}','${r.k}',${i})" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
     });
     th+=`<td class="tot2">—</td></tr>`;
   });
@@ -9224,6 +9288,23 @@ function ttNormalizzaOra(v){
  * cursore, e correggere una cifra diventerebbe impossibile. Quello che
  * sfugge qui viene comunque sistemato da ttNormalizzaOra alla conferma.
  */
+/*
+ * Si salva a ogni tasto, non quando il campo viene confermato.
+ *
+ * Prima il salvataggio partiva da "change" e "blur", che su iOS non
+ * arrivano mai se l'app viene chiusa mentre la tastiera e' ancora aperta:
+ * si scriveva l'orario, si chiudeva l'app, e quell'orario non era mai
+ * esistito. Ora ogni tasto scrive la bozza sul telefono; la messa in
+ * forma resta alla conferma, perche' "07." mentre si digita non e' un
+ * errore.
+ */
+function ttBozza(el, tabId, field, di){
+  const t = ttTabelle.find(t => t.id == tabId); if (!t) return;
+  if (t.orari[field][di] === el.value) return;
+  t.orari[field][di] = el.value;
+  ttTocca();
+}
+
 function ttDigita(el){
   const fine = el.selectionStart===el.value.length;
   if(!fine)return;
@@ -9479,6 +9560,25 @@ async function ttSync(){
 
 /* Alla ripresa della rete la coda e' una sola cosa: la bozza corrente. */
 window.addEventListener('online',()=>{ if(ttInited)ttSync().then(ok=>{if(ok)ttRenderStorico();}); });
+/*
+ * Su iOS un'app chiusa dal selettore non riceve "beforeunload": gli unici
+ * eventi su cui si puo' contare sono questi due, che scattano quando
+ * finisce in secondo piano. Qui si scrive subito sul telefono, senza
+ * aspettare il mezzo secondo di attesa del salvataggio normale.
+ */
+['visibilitychange','pagehide'].forEach(ev=>
+  document.addEventListener(ev, ()=>{
+    if(!ttInited) return;
+    if(ev==='visibilitychange' && document.visibilityState!=='hidden') return;
+    // Il campo attivo potrebbe non aver ancora confermato: si legge da li'.
+    const a=document.activeElement;
+    if(a && a.id && a.id.startsWith('ttg-')){
+      const [,tabId,field]=a.id.split('-');
+      const t=ttTabelle.find(t=>t.id==tabId);
+      if(t && t.orari[field]) t.orari[field][ttGiornoSel]=a.value;
+    }
+    try{ localStorage.setItem(TT_BOZZA, JSON.stringify({rec:ttRecord(), ts:Date.now()})); }catch(_){}
+  }));
 window.addEventListener('offline',()=>{ if(ttInited)ttStato('salvato sul telefono · in attesa di rete'); });
 
 /* Il tasto resta, per chi vuole la conferma esplicita e per aggiornare
