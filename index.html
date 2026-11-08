@@ -24,38 +24,46 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
+/* Tavolozza Campobase.
+ * I nomi delle variabili restano quelli di prima — --yellow, --surface,
+ * --white — perche' sono usati in centinaia di punti: cambiarli sarebbe
+ * stato un rinominare a tappeto senza guadagnarci niente. Cambiano i
+ * valori, e con loro tutta l'app in una volta.
+ * --yellow e' l'ambra dell'icona, cosi' l'app e la sua icona dicono la
+ * stessa cosa. Il fondo e' piu' scuro e appena freddo: su OLED il nero
+ * pieno fa sbavare il testo quando si scorre. */
 :root {
-  --bg: #000;
-  --surface: #111;
-  --surface2: #1a1a1a;
-  --viaggio: #8fc4ff;
-  --viaggio-rgb: 120,180,255;
-  --border: #2e2e2e;
-  --border-l: #3d3d3d;
-  --yellow: #f5e642;
-  --white: #fff;
-  --white-dim: #c8c8c8;
-  --muted: #666;
-  --danger: #ff5555;
-  --green: #6ee7b7;
-  --orange: #f5a623;
+  --bg: #0A0B0D;
+  --surface: #15181C;
+  --surface2: #1B1F24;
+  --viaggio: #5090e0;
+  --viaggio-rgb: 80,144,224;
+  --border: #272D34;
+  --border-l: #39424C;
+  --yellow: #F5C542;
+  --white: #EDEFF2;
+  --white-dim: #99A3AE;
+  --muted: #626C77;
+  --danger: #FF6B5A;
+  --green: #5FD6A4;
+  --orange: #F5A623;
 }
 
 body.light {
-  --bg: #f0ede6;
-  --surface: #ffffff;
-  --surface2: #f5f2ec;
-  --viaggio: #2b6cb0;
+  --bg: #F3F1EC;
+  --surface: #FFFFFF;
+  --surface2: #F6F4EF;
+  --viaggio: #2B6CB0;
   --viaggio-rgb: 43,108,176;
-  --border: #e0dbd0;
-  --border-l: #ccc8be;
-  --yellow: #a07828;
-  --white: #1a1a1a;
-  --white-dim: #444444;
-  --muted: #999;
-  --danger: #cc3333;
-  --green: #2d7a4f;
-  --orange: #c07020;
+  --border: #E2DED4;
+  --border-l: #C9C4B8;
+  --yellow: #9A6F15;
+  --white: #16181C;
+  --white-dim: #44484E;
+  --muted: #8A8F96;
+  --danger: #C2362A;
+  --green: #2D7A4F;
+  --orange: #B4700F;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--white); font-family: 'DM Mono', monospace; min-height: 100vh; }
@@ -122,7 +130,7 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
 .hist-meta { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
 .hist-meta span { color: var(--yellow); }
 .hist-date { font-size: 10px; color: var(--muted); }
-.hist-version { display: inline-block; background: rgba(245,230,66,0.12); color: var(--yellow); border-radius: 4px; padding: 1px 6px; font-size: 9px; margin-bottom: 6px; }
+.hist-version { display: inline-block; background: rgba(245,197,66,0.12); color: var(--yellow); border-radius: 4px; padding: 1px 6px; font-size: 9px; margin-bottom: 6px; }
 .hist-delete { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: all 0.15s; line-height: 1; }
 .hist-delete:hover { color: var(--danger); background: rgba(255,85,85,0.1); }
 .hist-empty { font-size: 11px; color: var(--muted); padding: 8px 0; }
@@ -130,7 +138,7 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
 
 /* ── UPLOAD ── */
 .upload-zone { border: 2px dashed var(--border-l); border-radius: 10px; padding: 40px 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; margin-bottom: 14px; }
-.upload-zone:hover, .upload-zone.over { border-color: var(--yellow); background: rgba(245,230,66,0.03); }
+.upload-zone:hover, .upload-zone.over { border-color: var(--yellow); background: rgba(245,197,66,0.03); }
 .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .upload-icon { font-size: 32px; margin-bottom: 10px; }
 .upload-primary { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
@@ -174,9 +182,9 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
 }
 .result-tab { flex: 1; background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; padding: 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .wrap-chip { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;border:1.5px solid var(--border);color:var(--muted);background:none;transition:all 0.15s;user-select:none; }
-.wrap-chip.active { border-color:var(--yellow);color:var(--yellow);background:rgba(245,230,66,0.08); }
+.wrap-chip.active { border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,0.08); }
 .wrap-place-card { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px; }
-.wrap-place-card.slow-food { border-color:rgba(245,230,66,0.4);background:rgba(245,230,66,0.04); }
+.wrap-place-card.slow-food { border-color:rgba(245,197,66,0.4);background:rgba(245,197,66,0.04); }
 body.light .wrap-place-card,
 body.light .wrap-place-card.slow-food { background:#fff !important;border-color:#e5e5e5 !important; }
 .wrap-place-name { font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:var(--white); }
@@ -186,7 +194,7 @@ body.light .wrap-place-card.slow-food { background:#fff !important;border-color:
 .result-tab.coming-soon { opacity: 0.5; }
 .coming-soon-section { display:none;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center;gap:16px; }
 .type-selector { display:flex;align-items:center;gap:7px;padding:9px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;cursor:pointer;transition:all 0.15s;flex:1;justify-content:center; }
-.type-selector.active { background:rgba(245,230,66,0.08);border-color:var(--yellow);color:var(--yellow); }
+.type-selector.active { background:rgba(245,197,66,0.08);border-color:var(--yellow);color:var(--yellow); }
 .episode-card { display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px; }
 .episode-label { font-size:11px;font-weight:700;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;min-width:80px; }
 .episode-filename { flex:1;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
@@ -221,7 +229,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt2 td.tot2{background:var(--surface2);font-family:'DM Mono',monospace;font-size:11px;color:var(--white);font-weight:500;border-left:1px solid var(--border);width:82px;min-width:82px;padding:4px 8px}
 .tt2 tr.secrow2 td{background:var(--surface2);font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:4px 3px}
 .tt2 td input.ti{width:100%;background:transparent;border:none;text-align:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--white);padding:4px 1px;outline:none;border-radius:3px;transition:background 0.1s}
-.tt2 td input.ti:focus{background:rgba(245,230,66,0.07)}
+.tt2 td input.ti:focus{background:rgba(245,197,66,0.07)}
 .tt2 td input.ti::placeholder{color:var(--border-l)}
 .tt2 td.comp2{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);background:var(--surface2)}
 .tt2 td.comp2.hv{color:var(--white-dim)}
@@ -253,7 +261,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .ttg-riga input{width:104px;flex:0 0 104px;background:transparent;border:none;text-align:right;
   font-family:'DM Mono',monospace;font-size:19px;color:var(--white);padding:9px 4px;outline:none;
   border-radius:5px}
-.ttg-riga input:focus{background:rgba(245,230,66,0.07)}
+.ttg-riga input:focus{background:rgba(245,197,66,0.07)}
 .ttg-riga input::placeholder{color:var(--border-l)}
 .ttg-calc{margin-top:13px;border:1px solid var(--border);border-radius:9px;overflow:hidden}
 .ttg-calc>div{display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -282,7 +290,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-hdr-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
 .tt-sc-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:7px;cursor:pointer;transition:border-color 0.15s}
 .tt-sc-row:hover{border-color:var(--border-l)}
-.tt-sc-row.sel{border-color:var(--yellow);background:rgba(245,230,66,0.04)}
+.tt-sc-row.sel{border-color:var(--yellow);background:rgba(245,197,66,0.04)}
 .tt-sc-chk{width:17px;height:17px;border:1px solid var(--border-l);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
 .tt-sc-row.sel .tt-sc-chk{background:var(--yellow);border-color:var(--yellow);color:#000}
 .tt-stor-hdr{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:border-color 0.15s;margin-bottom:2px}
@@ -301,7 +309,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 #pdlSection { display: none; }
 #pdlSection.on { display: block; }
 .pdl-upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 36px 24px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; margin-bottom: 16px; }
-.pdl-upload-zone:hover, .pdl-upload-zone.over { border-color: var(--yellow); background: rgba(245,230,66,0.03); }
+.pdl-upload-zone:hover, .pdl-upload-zone.over { border-color: var(--yellow); background: rgba(245,197,66,0.03); }
 .pdl-upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
 /* Calendar (reuse from PDL standalone) */
@@ -373,7 +381,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .pdl-chip.standby { border-style:dashed!important;opacity:0.75; }
 .pdl-chip.critical::after { content:'🎙️';font-size:8px;margin-left:2px; }
 .pdl-chip-num { font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px; }
-.type-int-day { background:rgba(245,230,66,0.15);color:#c8aa00;border-color:rgba(245,230,66,0.5); }
+.type-int-day { background:rgba(245,197,66,0.15);color:#c8aa00;border-color:rgba(245,197,66,0.5); }
 .type-ext-day { background:rgba(245,166,35,0.15);color:#d4820a;border-color:rgba(245,166,35,0.5); }
 .type-int-night { background:rgba(123,156,204,0.15);color:#7b9ccc;border-color:rgba(123,156,204,0.5); }
 .type-ext-night { background:rgba(42,74,127,0.3);color:#a8c4e8;border-color:rgba(42,74,127,0.7); }
@@ -404,7 +412,7 @@ body.light .type-morning { color:#9a6200; }
 .stat-desc { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); line-height: 1.4; }
 .stat-sub { font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; margin-top: 4px; letter-spacing: 0.04em; }
 .max-info { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 28px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; text-align: center; }
-.max-info .badge { background: rgba(245,230,66,0.12); color: var(--yellow); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; white-space: nowrap; }
+.max-info .badge { background: rgba(245,197,66,0.12); color: var(--yellow); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; white-space: nowrap; }
 .max-info .scene-text { color: var(--white-dim); }
 
 #riassuntoBox { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--yellow); border-radius: 10px; padding: 18px 20px; margin-bottom: 28px; font-size: 12px; line-height: 1.8; color: var(--white-dim); }
@@ -421,13 +429,13 @@ body.light .type-morning { color:#9a6200; }
 .cat-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .cat-ico { font-size: 17px; color: var(--yellow); }
 .cat-name { font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; flex: 1; line-height: 1.3; }
-.badge-count { background: rgba(245,230,66,0.15); color: var(--yellow); border-radius: 20px; padding: 2px 9px; font-size: 10px; white-space: nowrap; }
+.badge-count { background: rgba(245,197,66,0.15); color: var(--yellow); border-radius: 20px; padding: 2px 9px; font-size: 10px; white-space: nowrap; }
 .badge-absent { background: rgba(255,255,255,0.05); color: var(--muted); border-radius: 20px; padding: 2px 9px; font-size: 10px; }
 .cat-items { display: flex; flex-direction: column; gap: 5px; }
 .ci { background: var(--surface2); border-radius: 6px; padding: 7px 10px; font-size: 11px; line-height: 1.5; color: var(--white-dim); }
 .ci strong { color: var(--white); }
 .ref { color: var(--yellow); font-size: 10px; }
-.ref.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(245,230,66,0.4); text-underline-offset: 3px; transition: color 0.15s; }
+.ref.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(245,197,66,0.4); text-underline-offset: 3px; transition: color 0.15s; }
 .ref.clickable:hover { color: var(--white); }
 .subsec { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 10px; }
 .subsec-title { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
@@ -435,7 +443,7 @@ body.light .type-morning { color:#9a6200; }
 /* ── VERSION COMPARE ── */
 #versionBar { display:none;margin:20px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
 .btn-new-version { display:flex;align-items:center;gap:7px;padding:9px 16px;background:none;border:1px solid var(--yellow);border-radius:8px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;cursor:pointer;transition:all 0.15s; }
-.btn-new-version:hover { background:rgba(245,230,66,0.08); }
+.btn-new-version:hover { background:rgba(245,197,66,0.08); }
 .btn-prev-version { display:flex;align-items:center;gap:7px;padding:9px 16px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;cursor:pointer;transition:all 0.15s; }
 .btn-prev-version:hover { border-color:var(--muted);color:var(--white); }
 .version-label { font-size:11px;color:var(--muted);font-family:'DM Mono',monospace; }
@@ -456,8 +464,8 @@ body.light .type-morning { color:#9a6200; }
 .compare-item { padding:8px 12px;border-radius:7px;margin-bottom:5px;font-size:12px;line-height:1.5; }
 .compare-item.added { background:rgba(110,231,183,0.08);border:1px solid rgba(110,231,183,0.2);color:rgba(110,231,183,0.9); }
 .compare-item.removed { background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);color:rgba(239,68,68,0.8); }
-.compare-item.modified { background:rgba(245,230,66,0.06);border:1px solid rgba(245,230,66,0.2);color:var(--white-dim); }
-.compare-item.critical { background:rgba(245,230,66,0.1);border:1px solid rgba(245,230,66,0.35);color:var(--white); }
+.compare-item.modified { background:rgba(245,197,66,0.06);border:1px solid rgba(245,197,66,0.2);color:var(--white-dim); }
+.compare-item.critical { background:rgba(245,197,66,0.1);border:1px solid rgba(245,197,66,0.35);color:var(--white); }
 .compare-item strong { color:var(--yellow); }
 .compare-footer { padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0; }
 .compare-loading { display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;padding:32px 0;justify-content:center; }
@@ -480,7 +488,7 @@ body.light .type-morning { color:#9a6200; }
 #chatSection { display: none; margin-top: 40px; }
 #chatSection.on { display: block; }
 .chat-intro { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-.chat-intro-icon { width: 34px; height: 34px; background: var(--surface2); border: 1px solid rgba(245,230,66,0.3); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.chat-intro-icon { width: 34px; height: 34px; background: var(--surface2); border: 1px solid rgba(245,197,66,0.3); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .chat-intro-text .t { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; }
 .chat-intro-text .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .chat-messages { background: var(--surface); border: 1px solid var(--border); border-radius: 12px 12px 0 0; min-height: 260px; max-height: 480px; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; scroll-behavior: smooth; }
@@ -588,7 +596,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 /* ── SHARE VIEW ── */
 #shareView { display:none; }
 #shareView.on { display:block; }
-.share-banner { background:rgba(245,230,66,0.08); border:1px solid rgba(245,230,66,0.25); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; margin-bottom:28px; flex-wrap:wrap; }
+.share-banner { background:rgba(245,197,66,0.08); border:1px solid rgba(245,197,66,0.25); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:12px; margin-bottom:28px; flex-wrap:wrap; }
 .share-banner-icon { font-size:20px; }
 .share-banner-text .t { font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:700; color:var(--yellow); }
 .share-banner-text .s { font-size:11px; color:var(--muted); margin-top:2px; }
@@ -600,7 +608,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 .share-auth-note a { color:var(--yellow); cursor:pointer; }
 .btn-share { background:var(--surface); border:1px solid var(--border); color:var(--white-dim); padding:8px 14px; border-radius:8px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; transition:all 0.15s; }
 .btn-share:hover { border-color:var(--yellow); color:var(--yellow); }
-.btn-share.active { border-color:var(--yellow); color:var(--yellow); background:rgba(245,230,66,0.08); }
+.btn-share.active { border-color:var(--yellow); color:var(--yellow); background:rgba(245,197,66,0.08); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -650,7 +658,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
       <div class="user-bar">
-        <div class="user-avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="#f5e642" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8.5"/><circle cx="10" cy="8" r="3"/><path d="M4.5 17c0-2.761 2.462-5 5.5-5s5.5 2.239 5.5 5"/></svg></div>
+        <div class="user-avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="#F5C542" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8.5"/><circle cx="10" cy="8" r="3"/><path d="M4.5 17c0-2.761 2.462-5 5.5-5s5.5 2.239 5.5 5"/></svg></div>
         <div class="user-email" id="userEmail"></div>
         <button class="btn-logout" onclick="logout()">Esci</button>
       </div>
@@ -741,7 +749,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div id="uploadFilm">
           <div class="upload-zone" id="uploadZone">
             <input type="file" id="fileInput" accept=".pdf" multiple>
-            <div class="upload-icon"><svg viewBox="0 0 60 80" width="44" height="44" fill="none" stroke="#f5e642" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M30 14V4"/><path d="M26 8l4-4 4 4"/><path d="M22 14h16"/><rect x="8" y="22" width="44" height="56" rx="3"/><path d="M44 22 L52 30 L44 30 L44 22"/><path d="M16 44h28M16 52h20M16 60h24"/></svg></div>
+            <div class="upload-icon"><svg viewBox="0 0 60 80" width="44" height="44" fill="none" stroke="#F5C542" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M30 14V4"/><path d="M26 8l4-4 4 4"/><path d="M22 14h16"/><rect x="8" y="22" width="44" height="56" rx="3"/><path d="M44 22 L52 30 L44 30 L44 22"/><path d="M16 44h28M16 52h20M16 60h24"/></svg></div>
             <div class="upload-primary">Trascina il PDF qui o clicca per selezionare</div>
             <div class="upload-secondary">Accetta PDF</div>
           </div>
@@ -934,7 +942,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <!-- CHAT -->
       <div id="chatSection">
         <div class="chat-intro">
-          <div class="chat-intro-icon"><svg viewBox="0 0 100 110" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#f5e642"/><ellipse cx="50" cy="68" rx="22" ry="24" fill="#f5e642"/><path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#f5e642"/><path d="M28 58 Q27 48 30 44 Q28 52 29 61z" fill="#000"/><path d="M72 58 Q73 48 70 44 Q72 52 71 61z" fill="#000"/><path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000" stroke="#f5e642" stroke-width="0.5"/><path d="M31 50 Q32 34 46 28 Q54 25 62 28 Q58 26 50 28 Q39 30 34 42z" fill="#000" stroke="#f5e642" stroke-width="0.5"/><path d="M33 46 Q40 36 54 32" stroke="#f5e642" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M32 50 Q40 41 55 37" stroke="#f5e642" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M32 60 Q38 57 44 58" stroke="#f5e642" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 58 Q62 57 68 60" stroke="#f5e642" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#f5e642" stroke-width="1.3" fill="#000"/><rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#f5e642" stroke-width="1.3" fill="#000"/><path d="M47 67 Q50 65.5 53 67" stroke="#f5e642" stroke-width="1" fill="none"/><line x1="27" y1="67" x2="23" y2="66" stroke="#f5e642" stroke-width="1.2"/><line x1="73" y1="67" x2="77" y2="66" stroke="#f5e642" stroke-width="1.2"/><path d="M42 84 Q46 82.5 50 83 Q54 82.5 58 84" stroke="#f5e642" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M36 87 Q38 92 43 94 Q50 96 57 94 Q62 92 64 87" stroke="#f5e642" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M43 94 Q47 98 50 98.5 Q53 98 57 94" stroke="#f5e642" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M38 102 Q44 107 50 108 Q56 107 62 102" stroke="#f5e642" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2.5,1.5"/><circle cx="50" cy="110" r="4" stroke="#f5e642" stroke-width="1" fill="none"/><text x="50" y="113" font-size="4.5" text-anchor="middle" fill="#f5e642" font-weight="700" font-family="serif">N</text></svg></div>
+          <div class="chat-intro-icon"><svg viewBox="0 0 100 110" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#F5C542"/><ellipse cx="50" cy="68" rx="22" ry="24" fill="#F5C542"/><path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#F5C542"/><path d="M28 58 Q27 48 30 44 Q28 52 29 61z" fill="#000"/><path d="M72 58 Q73 48 70 44 Q72 52 71 61z" fill="#000"/><path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M31 50 Q32 34 46 28 Q54 25 62 28 Q58 26 50 28 Q39 30 34 42z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M33 46 Q40 36 54 32" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M32 50 Q40 41 55 37" stroke="#F5C542" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M32 60 Q38 57 44 58" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 58 Q62 57 68 60" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><path d="M47 67 Q50 65.5 53 67" stroke="#F5C542" stroke-width="1" fill="none"/><line x1="27" y1="67" x2="23" y2="66" stroke="#F5C542" stroke-width="1.2"/><line x1="73" y1="67" x2="77" y2="66" stroke="#F5C542" stroke-width="1.2"/><path d="M42 84 Q46 82.5 50 83 Q54 82.5 58 84" stroke="#F5C542" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M36 87 Q38 92 43 94 Q50 96 57 94 Q62 92 64 87" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M43 94 Q47 98 50 98.5 Q53 98 57 94" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M38 102 Q44 107 50 108 Q56 107 62 102" stroke="#F5C542" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2.5,1.5"/><circle cx="50" cy="110" r="4" stroke="#F5C542" stroke-width="1" fill="none"/><text x="50" y="113" font-size="4.5" text-anchor="middle" fill="#F5C542" font-weight="700" font-family="serif">N</text></svg></div>
           <div class="chat-intro-text">
             <div class="t">Chiedi a Gennaro</div>
             <div class="s">Gennaro conosce l'intero spoglio — fai domande specifiche sul reparto suono</div>
@@ -1067,7 +1075,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div id="castContent" style="max-width:700px;margin:0 auto;padding:24px 0">
 
           <!-- Alert provvisorio -->
-          <div id="castAlert" style="display:none;background:rgba(245,230,66,0.08);border:1px solid rgba(245,230,66,0.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px">
+          <div id="castAlert" style="display:none;background:rgba(245,197,66,0.08);border:1px solid rgba(245,197,66,0.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px">
             <span style="font-size:16px">⚠️</span>
             <div>
               <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:3px">Lista provvisoria</div>
@@ -1403,14 +1411,14 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <div style="display:flex;align-items:center;gap:8px">
             <svg viewBox="0 0 100 110" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#f5e642"/>
-              <ellipse cx="50" cy="68" rx="22" ry="24" fill="#f5e642"/>
-              <path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#f5e642"/>
+              <path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#F5C542"/>
+              <ellipse cx="50" cy="68" rx="22" ry="24" fill="#F5C542"/>
+              <path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#F5C542"/>
               <path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000"/>
-              <path d="M32 60 Q38 57 44 58" stroke="#f5e642" stroke-width="2" fill="none" stroke-linecap="round"/>
-              <path d="M56 58 Q62 57 68 60" stroke="#f5e642" stroke-width="2" fill="none" stroke-linecap="round"/>
-              <rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#f5e642" stroke-width="1.3" fill="#000"/>
-              <rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#f5e642" stroke-width="1.3" fill="#000"/>
+              <path d="M32 60 Q38 57 44 58" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <path d="M56 58 Q62 57 68 60" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/>
+              <rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/>
+              <rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/>
             </svg>
             <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px">Gennaro</span>
           </div>
@@ -2083,7 +2091,7 @@ function exportPdf() {
 
   // ── Palette ──
   const C = {
-    yellow:   [245, 230, 66],
+    yellow:   [245, 197, 66],
     yellowBg: [252, 249, 218],
     dark:     [22,  22,  22],
     mid:      [55,  55,  55],
@@ -3757,8 +3765,8 @@ function renderCompareResult(data) {
   const body = document.getElementById('compareBody');
   const ico_plus   = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="rgba(110,231,183,0.9)" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v6M5 8h6"/></svg>`;
   const ico_minus  = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="rgba(239,68,68,0.8)" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><path d="M5 8h6"/></svg>`;
-  const ico_edit   = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="#f5e642" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3z"/></svg>`;
-  const ico_alert  = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="#f5e642" stroke-width="1.5" stroke-linecap="round"><path d="M8 1l7 13H1z"/><path d="M8 6v4M8 11.5v.5"/></svg>`;
+  const ico_edit   = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="#F5C542" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-8 8H3v-3z"/></svg>`;
+  const ico_alert  = `<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="#F5C542" stroke-width="1.5" stroke-linecap="round"><path d="M8 1l7 13H1z"/><path d="M8 6v4M8 11.5v.5"/></svg>`;
 
   let html = '';
 
@@ -4420,7 +4428,7 @@ function updateRagDebug() {
   // Detected scenes + how they were found
   const badge = classifiedBy === 'haiku'
     ? `<span style="background:rgba(110,231,183,0.15);color:var(--green);border-radius:4px;padding:1px 6px;font-size:9px;margin-left:6px">via Haiku</span>`
-    : `<span style="background:rgba(245,230,66,0.12);color:var(--yellow);border-radius:4px;padding:1px 6px;font-size:9px;margin-left:6px">keyword</span>`;
+    : `<span style="background:rgba(245,197,66,0.12);color:var(--yellow);border-radius:4px;padding:1px 6px;font-size:9px;margin-left:6px">keyword</span>`;
   html += `<div style="margin-bottom:8px">
     <span style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.08em">Scene rilevate</span>${badge}<br>
     <span style="color:var(--yellow)">${sceneNums.length ? sceneNums.map(s=>'SC.'+s).join(', ') : '—'}</span>
@@ -4956,7 +4964,7 @@ window.initGoogleMap = function() {
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: 14,
-        fillColor: isSlowFood ? '#f5e642' : '#fff',
+        fillColor: isSlowFood ? '#F5C542' : '#fff',
         fillOpacity: 1,
         strokeColor: isSlowFood ? '#c8b800' : '#888',
         strokeWeight: 1.5
@@ -5042,7 +5050,7 @@ async function wrapOpenReviews(placeId, name, mapsUrl) {
 
     if (myReview) {
       // Show own review as card + edit button
-      html += `<div style="background:var(--surface2);border-radius:10px;padding:12px;border:1px solid rgba(245,230,66,0.2)">
+      html += `<div style="background:var(--surface2);border-radius:10px;padding:12px;border:1px solid rgba(245,197,66,0.2)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
           <span style="font-size:11px;font-weight:600;color:var(--yellow)">La tua recensione</span>
           <div style="display:flex;align-items:center;gap:8px">
@@ -5095,7 +5103,7 @@ function saStars(n){
 function saReviewForm(rating, note, anon, placeId, name, username) {
   return `<div id="saEditForm" data-place-id="${placeId}" data-place-name="${encodeURIComponent(name)}" data-username="${encodeURIComponent(username)}" style="background:var(--surface2);border-radius:10px;padding:12px">
     <div id="saStars" data-rating="${rating}" style="display:flex;gap:4px;margin-bottom:8px">
-      ${[1,2,3,4,5].map(i=>`<span onclick="saSetStar(${i})" style="font-size:22px;cursor:pointer;color:${i<=rating?'#f5e642':'#444'}">★</span>`).join('')}
+      ${[1,2,3,4,5].map(i=>`<span onclick="saSetStar(${i})" style="font-size:22px;cursor:pointer;color:${i<=rating?'#F5C542':'#444'}">★</span>`).join('')}
     </div>
     <textarea id="saNote" placeholder="Lascia una nota..." style="width:100%;padding:8px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--white);font-size:12px;resize:none;height:60px;box-sizing:border-box;font-family:'DM Mono',monospace">${esc(note)}</textarea>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
@@ -5116,10 +5124,10 @@ function saShowEditForm(placeId, name, username, rating) {
   // Find the own review card and replace with edit form
   const body = document.getElementById('wrapReviewsBody');
   // Get current note from the card text if any
-  const noteEl = body.querySelector('div[style*="border:1px solid rgba(245,230,66"] div[style*="font-size:12px"]');
+  const noteEl = body.querySelector('div[style*="border:1px solid rgba(245,197,66"] div[style*="font-size:12px"]');
   const currentNote = noteEl?.textContent || '';
   // Replace first child (own review card) with form
-  const ownCard = body.querySelector('div[style*="border:1px solid rgba(245,230,66"]');
+  const ownCard = body.querySelector('div[style*="border:1px solid rgba(245,197,66"]');
   if (ownCard) {
     const formDiv = document.createElement('div');
     formDiv.innerHTML = saReviewForm(rating, currentNote, false, placeId, name, username);
@@ -5172,7 +5180,7 @@ function saConfirmDelete() {
 
 function saSetStar(n) {
   document.querySelectorAll('#saStars span').forEach((s,i) => {
-    s.style.color = i < n ? '#f5e642' : '#444';
+    s.style.color = i < n ? '#F5C542' : '#444';
   });
   document.getElementById('saStars').dataset.rating = n;
 }
@@ -5254,7 +5262,7 @@ async function scriptRenderPage(n, highlight) {
     if (highlight) {
       const tc = await page.getTextContent();
       const query = highlight.toLowerCase();
-      ctx.fillStyle = 'rgba(245,230,66,0.35)';
+      ctx.fillStyle = 'rgba(245,197,66,0.35)';
       for (const item of tc.items) {
         if (!item.str.toLowerCase().includes(query)) continue;
         const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
@@ -6605,6 +6613,136 @@ function isSceneCritical(scNum) {
   }
   return false;
 }
+
+// ══ ORDINE DEL GIORNO ══════════════════════════════════════════════════════
+
+/*
+ * Riconoscimento deterministico dell'intestazione di un ordine del giorno.
+ *
+ * pdf.js restituisce il testo con spazi dove nel PDF non ce ne sono:
+ * "C ONVOCAZIONE", "0 8.30", "33 9 7564743", "06 : 36". Succede perche'
+ * ogni glifo e' posizionato per conto suo e la spaziatura del titolo viene
+ * letta come separazione. Quindi ogni confronto deve tollerare spazi in
+ * mezzo a tutto: le etichette si cercano lettera per lettera e i numeri si
+ * ricompongono togliendo gli spazi.
+ *
+ * Questa parte non costa token. Al modello restano solo le tabelle a piu'
+ * colonne — scene, cast, troupe — dove il testo arriva intrecciato e un
+ * riconoscimento a regole sarebbe fragile.
+ */
+
+// "CONVOCAZIONE" -> /C\s*O\s*N\s*V\s*.../i  — una etichetta con spazi ovunque
+function odgEtichetta(s) {
+  return s.split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+}
+
+// "0 8.30" -> "08.30" ; "06 : 36" -> "06.36" ; "18. 25" -> "18.25"
+function odgOra(s) {
+  if (!s) return null;
+  const m = String(s).replace(/\s+/g, '').match(/^(\d{1,2})[.:,](\d{2})/);
+  if (!m) return null;
+  const h = +m[1], mn = +m[2];
+  if (h > 23 || mn > 59) return null;
+  return String(h).padStart(2, '0') + '.' + String(mn).padStart(2, '0');
+}
+
+/*
+ * Il testo che segue un'etichetta.
+ *
+ * La stessa parola puo' comparire piu' volte: "AMBIENTE" sta sia nel campo
+ * dell'intestazione sia dentro il paragrafo sul protocollo green film
+ * ("RISPETTOSA DELL'AMBIENTE"). A distinguerli sono i due punti, che il
+ * campo ha e la prosa no. Quindi fra tutte le occorrenze si preferisce
+ * quella seguita dai due punti, e solo se non ce n'e' nessuna si ripiega
+ * sulla prima — perche' qualche campo i due punti non ce li ha davvero
+ * ("PRONTI A GIRARE 08.30", "OSPEDALE SAN GIUSEPPE").
+ */
+function odgDopo(testo, et, lunghezza = 90) {
+  const re = new RegExp(odgEtichetta(et) + '(\\s*:)?\\s*', 'gi');
+  let primo = null, conDuePunti = null, m;
+  while ((m = re.exec(testo)) !== null) {
+    const p = m.index + m[0].length;
+    if (primo === null) primo = p;
+    if (m[1] && conDuePunti === null) conDuePunti = p;
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  const p = conDuePunti !== null ? conDuePunti : primo;
+  return p === null ? null : testo.slice(p, p + lunghezza);
+}
+
+function odgOraDopo(testo, et) {
+  const t = odgDopo(testo, et, 24);
+  return t ? odgOra(t) : null;
+}
+
+/* Un valore testuale: si ferma alla prossima etichetta in maiuscolo seguita
+   da due punti, che e' come l'OdG separa i campi. */
+function odgValoreDopo(testo, et, stop) {
+  let t = odgDopo(testo, et, 160);
+  if (!t) return null;
+  const fine = t.search(new RegExp('(' + stop.map(odgEtichetta).join('|') + ')\\s*:?', 'i'));
+  if (fine > 0) t = t.slice(0, fine);
+  return t.replace(/\s+/g, ' ').trim()
+          .replace(/^[\s.,;:/|-]+/, '')      // residui quando l'etichetta era in mezzo a una frase
+          .replace(/[\s/|-]+$/, '').trim() || null;
+}
+
+const ODG_STOP = ['LOCATION', 'AMBIENTE', 'METEO', 'DAWN', 'ALBA', 'TRAMONTO', 'DUSK',
+  'CONVOCAZIONE', 'PRONTI', 'PAUSA', 'FINE RIPRESE', 'FINE LAVORAZIONE',
+  'OSPEDALE', 'Catering', 'CB /', 'MEZZI TECNICI', 'SC.', 'https'];
+
+const ODG_MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio',
+              'agosto','settembre','ottobre','novembre','dicembre'];
+
+function odgIntestazione(testo) {
+  const t = String(testo || '');
+  const r = {};
+
+  // Numero dell'OdG e data: "ODG # 20  Lunedì 09 Novembre 2026"
+  const mN = t.match(new RegExp(odgEtichetta('ODG') + '\\s*#?\\s*(\\d{1,3})', 'i'));
+  if (mN) r.numero = +mN[1];
+  const mD = t.match(new RegExp('(\\d{1,2})\\s*(' + ODG_MESI.map(odgEtichetta).join('|') + ')\\s*(\\d{4})', 'i'));
+  if (mD) {
+    const mese = ODG_MESI.findIndex(x => x.toLowerCase() === mD[2].replace(/\s+/g, '').toLowerCase());
+    if (mese >= 0) r.data = `${mD[3]}-${String(mese + 1).padStart(2, '0')}-${String(+mD[1]).padStart(2, '0')}`;
+  }
+
+  // Orari della giornata
+  r.convocazione   = odgOraDopo(t, 'CONVOCAZIONE');
+  r.prontiAGirare  = odgOraDopo(t, 'PRONTI A GIRARE');
+  r.fineRiprese    = odgOraDopo(t, 'FINE RIPRESE');
+  r.fineLavorazione= odgOraDopo(t, 'FINE LAVORAZIONE');
+  r.catering       = odgOraDopo(t, 'Catering Pronto');
+
+  // Luce
+  r.dawn     = odgOraDopo(t, 'DAWN');
+  r.alba     = odgOraDopo(t, 'ALBA');
+  r.tramonto = odgOraDopo(t, 'TRAMONTO');
+  r.dusk     = odgOraDopo(t, 'DUSK');
+
+  // Luoghi e testi
+  r.ambiente = odgValoreDopo(t, 'AMBIENTE', ODG_STOP);
+  r.location = odgValoreDopo(t, 'LOCATION', ODG_STOP);
+  r.meteo    = odgValoreDopo(t, 'METEO', ODG_STOP);
+  r.ospedale = odgValoreDopo(t, 'OSPEDALE', ODG_STOP);
+  r.pausa    = odgValoreDopo(t, 'PAUSA', ODG_STOP);
+
+  // Cestini del catering: "N° Cestini : 90"
+  const mC = t.match(new RegExp(odgEtichetta('Cestini') + '\\s*:?\\s*(\\d[\\d\\s]{0,4})', 'i'));
+  if (mC) r.cestini = +mC[1].replace(/\s+/g, '');
+
+  // Il link alla mappa, se c'e'. Si ferma al primo spazio: l'etichetta che
+  // segue nel PDF ("METEO:") finirebbe dentro l'indirizzo.
+  const mM = t.match(/https?:\/\/\S+/);
+  if (mM) r.mappa = mM[0].replace(/[.,;:]+$/, '');
+
+  // Regia e produzione, utili per intitolare il progetto
+  r.regia = odgValoreDopo(t, 'Regia di', ['MAD', 'Piazza', 'S.p.A', 'Produttore']);
+
+  return r;
+}
+
+
 
 // ══ CAST PARSER — from PDL PDF text ══
 async function extractCastFromPdf(b64) {
