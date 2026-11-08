@@ -66,7 +66,13 @@ body.light {
   --orange: #B4700F;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--white); font-family: 'DM Mono', monospace; min-height: 100vh; }
+/* Space Grotesk per il testo, DM Mono per i numeri.
+   Prima tutta l'app era monospaziata: le cifre stavano bene, le frasi no —
+   una sinossi di scena o la spiegazione di un'impostazione, in monospazio,
+   si leggono a fatica e occupano una riga in piu'. Dove contano le cifre
+   (orari, totali, conteggi) il monospazio resta, dichiarato dove serve. */
+body { background: var(--bg); color: var(--white); font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; min-height: 100vh; }
+.num, .mono { font-family: 'DM Mono', monospace; }
 
 /* ── AUTH PAGE ── */
 #authPage { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -235,6 +241,22 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt2 td.comp2.hv{color:var(--white-dim)}
 .tt2 td.gold2{color:var(--orange)!important;background:rgba(245,166,35,0.07)!important}
 .tt2 td.nott2{color:#5090e0!important;background:rgba(80,144,224,0.07)!important}
+/* I pannelli degli orari si piegano.
+   Intestazione, regole e storico servono quando si imposta la settimana;
+   dopo sono tre schermate di roba da scorrere prima di arrivare alle
+   caselle, che e' l'unica cosa che si tocca ogni giorno. Chiusi mostrano
+   una riga di riepilogo: cosa c'e' dentro, senza aprirli. */
+.tt-sez{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.tt-sez-t{display:flex;align-items:center;gap:10px;width:100%;min-height:50px;padding:13px 16px;
+  background:none;border:none;cursor:pointer;color:inherit;font-family:inherit;text-align:left}
+.tt-sez-t .n{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
+.tt-sez-t .r{flex:1;min-width:0;font-size:12px;color:var(--white-dim);text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-sez-t .c{color:var(--muted);font-size:15px;transition:transform .18s;flex:0 0 auto}
+.tt-sez-c{display:none;padding:0 16px 16px}
+.tt-sez.aperta .tt-sez-c{display:block}
+.tt-sez.aperta .tt-sez-t .c{transform:rotate(90deg)}
+.tt-sez.aperta .tt-sez-t .r{display:none}
 /* ── foglio giornata ─────────────────────────────────────────────────
  * La tabella a sette colonne resta per il computer e per la revisione di
  * fine settimana. Sul telefono non ci sta in larghezza, e scrivere un
@@ -315,6 +337,30 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .ch{color:var(--muted);font-size:16px}
 /* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
    il modo di tornare alla scelta del progetto. */
+/* ── Accesso ───────────────────────────────────────────────────────── */
+.acc{min-height:100dvh;max-width:420px;margin:0 auto;display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 28px)}
+.acc-alto{flex:1;display:flex;flex-direction:column;justify-content:center}
+.acc-marchio{width:68px;height:68px;display:block;margin-bottom:22px}
+.acc h1{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  letter-spacing:-.03em;margin:0;color:var(--white)}
+.acc-claim{font-family:'Space Grotesk',sans-serif;font-size:16px;color:var(--white-dim);margin:8px 0 0;line-height:1.4}
+.acc-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+  min-height:52px;border-radius:13px;margin-top:10px;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:500;
+  border:1px solid var(--border-l);background:none;color:var(--white)}
+.acc-btn.amb{background:var(--yellow);border-color:var(--yellow);color:#0A0B0D;font-weight:600}
+.acc-btn .google-icon{width:19px;height:19px;flex:0 0 19px}
+.acc-campo{width:100%;min-height:52px;margin-top:10px;padding:14px 16px;border-radius:13px;
+  background:var(--surface);border:1px solid var(--border);color:var(--white);
+  font-family:'Space Grotesk',sans-serif;font-size:16px}
+.acc-campo::placeholder{color:var(--muted)}
+.acc-tabs{display:flex;gap:6px;margin-bottom:4px}
+.acc-tabs .auth-tab{flex:1;min-height:40px;border-radius:10px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13px;cursor:pointer}
+.acc-tabs .auth-tab.active{border-color:var(--yellow);color:var(--yellow)}
+.acc-minuto{font-size:12px;color:var(--muted);text-align:center;margin:18px 0 0;line-height:1.5}
+#authPage .auth-msg{margin-top:12px;font-size:13px;text-align:center;min-height:18px}
 .cb-testa{position:sticky;top:0;z-index:120;display:flex;align-items:center;gap:8px;
   padding:9px 0;background:var(--bg);border-bottom:1px solid var(--border)}
 .cb-ident{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;
@@ -759,34 +805,41 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 <body>
 
 <!-- ══ AUTH PAGE ══ -->
+<!-- Accesso.
+     La vecchia metteva davanti due caselle e una scelta Accedi/Registrati
+     prima ancora di dire cosa fosse l'app. Qui prima si dice cos'e', poi
+     si entra: Google in evidenza, perche' e' un tocco, e la mail dietro un
+     tasto per chi preferisce. La riga in fondo e' la cosa che la gente
+     vuole sapere davvero prima di registrarsi, cioe' se deve farlo. -->
 <div id="authPage">
-  <div class="auth-wrap">
-    <div class="auth-logo">
-      <div class="auth-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></div>
-      <div class="auth-logo-text">Campo<em>base</em></div>
+  <div class="acc">
+    <div class="acc-alto">
+      <svg class="acc-marchio" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg>
+      <h1>Campobase</h1>
+      <p class="acc-claim">Le tue ore, il piano e lo spoglio.<br>Per tutta la troupe.</p>
     </div>
-    <div class="auth-card">
-      <div class="auth-tabs">
-        <button class="auth-tab active" id="tabLogin" onclick="setAuthMode('login')">Accedi</button>
-        <button class="auth-tab" id="tabSignup" onclick="setAuthMode('signup')">Registrati</button>
+
+    <div class="acc-basso">
+      <div id="accMail" style="display:none">
+        <div class="acc-tabs">
+          <button class="auth-tab active" id="tabLogin" onclick="setAuthMode('login')">Accedi</button>
+          <button class="auth-tab" id="tabSignup" onclick="setAuthMode('signup')">Registrati</button>
+        </div>
+        <input class="acc-campo" type="email" id="authEmail" placeholder="Email"
+          autocomplete="email" onkeydown="if(event.key==='Enter')authSubmit()">
+        <input class="acc-campo" type="password" id="authPassword" placeholder="Password"
+          autocomplete="current-password" onkeydown="if(event.key==='Enter')authSubmit()">
+        <button class="acc-btn amb" id="authBtn" onclick="authSubmit()">Accedi</button>
       </div>
-      <div class="auth-field">
-        <label>Email</label>
-        <input type="email" id="authEmail" placeholder="email@esempio.com" onkeydown="if(event.key==='Enter')authSubmit()">
+
+      <div id="accScelte">
+        <button class="acc-btn amb" onclick="loginWithGoogle()"><svg class="google-icon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continua con Google</button>
+        <button class="acc-btn" onclick="accMostraMail()">Entra con una mail</button>
       </div>
-      <div class="auth-field">
-        <label>Password</label>
-        <input type="password" id="authPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')authSubmit()">
-      </div>
-      <button class="btn-auth" id="authBtn" onclick="authSubmit()">Accedi</button>
-      <div class="auth-divider">oppure</div>
-      <button class="btn-google" onclick="loginWithGoogle()">
-        <svg class="google-icon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-        Continua con Google
-      </button>
+
       <div id="authMsg" class="auth-msg"></div>
+      <p class="acc-minuto">Le ore restano sul telefono.<br>Entri per ritrovarle sugli altri dispositivi.</p>
     </div>
-    <div class="auth-footer">by ohsfaccimmarosound</div>
   </div>
 </div>
 
@@ -1243,23 +1296,27 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <div id="timetableSection" style="display:none;flex-direction:column;padding:12px 16px;gap:12px;overflow-y:auto;padding-bottom:96px">
 
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Timetables</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Ore</div>
           <div style="display:flex;gap:8px">
             <button onclick="ttExportModal()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">↓ PDF</button>
-            <button onclick="ttClear()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">✕ Clear</button>
+            <button onclick="ttClear()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">✕ Svuota</button>
             <button onclick="ttSave()" style="padding:7px 14px;background:var(--yellow);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer">Salva</button>
           </div>
         </div>
 
         <!-- Storico -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
-          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Storico settimane</div>
+        <div class="tt-sez" id="sez-storico">
+          <button class="tt-sez-t" onclick="ttPiega('storico')"><span class="n">Storico settimane</span><span class="r" id="sum-storico"></span><span class="c">›</span></button>
+          <div class="tt-sez-c">
+
           <div id="tt-storico"><div style="font-size:11px;color:var(--muted)">Nessuna settimana salvata.</div></div>
-        </div>
+          </div></div>
 
         <!-- Intestazione -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
-          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Intestazione</div>
+        <div class="tt-sez" id="sez-testa">
+          <button class="tt-sez-t" onclick="ttPiega('testa')"><span class="n">Intestazione</span><span class="r" id="sum-testa"></span><span class="c">›</span></button>
+          <div class="tt-sez-c">
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
             <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Produzione</div><input id="tt-produzione" type="text" placeholder="Es. Indigo Film" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
             <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Film</div><input id="tt-film" type="text" placeholder="Da analisi..." style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'" oninput="this.dataset.manuallyEdited='1'"></div>
@@ -1272,11 +1329,13 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
             <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Dal</div><input id="tt-dal" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
             <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Al</div><input id="tt-al" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
           </div>
-        </div>
+          </div></div>
 
         <!-- Regole di calcolo -->
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
-          <div style="font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Regole di calcolo</div>
+        <div class="tt-sez" id="sez-regole">
+          <button class="tt-sez-t" onclick="ttPiega('regole')"><span class="n">Regole di calcolo</span><span class="r" id="sum-regole"></span><span class="c">›</span></button>
+          <div class="tt-sez-c">
+
           <div style="margin-bottom:12px">
             <div style="font-size:10px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em">Tipo giornata</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -1317,7 +1376,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
               <button class="tt-tog tt-vtog" data-mins="120" onclick="ttSetViaggio(120)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">2h</button>
             </div>
           </div>
-        </div>
+          </div></div>
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
@@ -2077,6 +2136,14 @@ initApp();
 
 // ══ AUTH ══
 let authMode = 'login';
+
+/* La mail sta dietro un tasto: chi usa Google non deve nemmeno vederla,
+   e chi la vuole la trova al primo tocco. */
+function accMostraMail(){
+  document.getElementById('accMail').style.display='block';
+  document.getElementById('accScelte').style.display='none';
+  setTimeout(()=>document.getElementById('authEmail')?.focus(),80);
+}
 
 function setAuthMode(mode) {
   authMode = mode;
@@ -8245,6 +8312,7 @@ function initTimetable(){
   ttTabelle=[ttMkTab([])];
   ttRipristinaBozza();
   ttAscoltaIntestazione();
+  ttPieghePrime();
   ttSoloVista=true; ttRenderAll(); ttSoloVista=false;
   ttMigrateLocalStorico().then(()=>ttRenderStorico());
 }
@@ -8570,6 +8638,7 @@ function ttRenderAll(){
   // Unico aggancio del salvataggio: ogni funzione che cambia i dati passa
   // di qui, cosi' non ce n'e' una che possa dimenticarselo.
   if(!ttSoloVista)ttTocca();
+  try{ ttSommari(); }catch(_){}
 }
 
 /* I badge della tabella: servono sia al disegno completo sia agli
@@ -8730,6 +8799,47 @@ function ttAggiornaGiorno(tabId){
 /* Cambiare giorno o vista non cambia i dati: sono gli unici due casi in cui
    ttRenderAll non deve far scattare un salvataggio. */
 let ttSoloVista=false;
+/* Apre e chiude un pannello degli orari, e ricorda la scelta. */
+function ttPiega(chiave){
+  const el=document.getElementById('sez-'+chiave); if(!el)return;
+  const aperta=el.classList.toggle('aperta');
+  try{ localStorage.setItem('cb_tt_sez_'+chiave, aperta?'1':'0'); }catch(_){}
+  ttSommari();
+}
+
+/* Le righe di riepilogo: dicono cosa c'e' dentro senza aprire. */
+function ttSommari(){
+  const t=id=>(document.getElementById(id)?.value||'').trim();
+  const metti=(k,v)=>{const e=document.getElementById('sum-'+k); if(e)e.textContent=v;};
+
+  const testa=[t('tt-film')||t('tt-produzione'), t('tt-reparto'),
+               t('tt-settimana')?'sett. '+t('tt-settimana'):''].filter(Boolean);
+  metti('testa', testa.length?testa.join(' · '):'da compilare');
+
+  const viaggio=ttMeta.viaggioConcesso;
+  const regole=[ttMeta.tipoGiornata+'h',
+    viaggio?'viaggio '+(viaggio>=60?(viaggio/60)+'h':viaggio+' min'):'niente viaggio',
+    ttMeta.maggiorazioniNott?'maggiorazioni attive':'maggiorazioni off',
+    ttMeta.raddoppio?'raddoppio dopo '+ttMeta.raddoppio+'h':''].filter(Boolean);
+  metti('regole', regole.join(' · '));
+
+  const n=document.querySelectorAll('#tt-storico [data-sett]').length;
+  metti('storico', n?n+(n===1?' settimana':' settimane'):'vuoto');
+}
+
+/* All'apertura: tutto chiuso, tranne quello che non e' ancora compilato —
+   alla prima settimana l'intestazione serve subito. */
+function ttPieghePrime(){
+  const stato={testa: !document.getElementById('tt-film')?.value, regole:false, storico:false};
+  for(const k of ['storico','testa','regole']){
+    let v=null;
+    try{ v=localStorage.getItem('cb_tt_sez_'+k); }catch(_){}
+    const aperta = v===null ? stato[k] : v==='1';
+    document.getElementById('sez-'+k)?.classList.toggle('aperta', aperta);
+  }
+  ttSommari();
+}
+
 function ttSetGiorno(n){ ttSoloVista=true; ttGiornoSel=n; ttRenderAll(); ttSoloVista=false; }
 function ttSetVista(v){
   ttSoloVista=true;
