@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campobase</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#111111">
+<meta name="theme-color" content="#0A0B0D">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -227,6 +227,59 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt2 td.comp2.hv{color:var(--white-dim)}
 .tt2 td.gold2{color:var(--orange)!important;background:rgba(245,166,35,0.07)!important}
 .tt2 td.nott2{color:#5090e0!important;background:rgba(80,144,224,0.07)!important}
+/* ── foglio giornata ─────────────────────────────────────────────────
+ * La tabella a sette colonne resta per il computer e per la revisione di
+ * fine settimana. Sul telefono non ci sta in larghezza, e scrivere un
+ * orario significava scorrere, mirare una casella alta ventidue pixel e
+ * perdere il posto a ogni conferma. Qui una giornata alla volta occupa
+ * tutta la larghezza: niente scorrimento orizzontale, niente colonna
+ * bloccata, caselle che si centrano senza guardare.
+ * I calcoli non cambiano: la vista legge gli stessi ttCalcTab.
+ */
+.ttg-giorni{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.ttg-g{flex:1;min-width:0;background:none;border:none;border-bottom:2px solid transparent;
+  padding:7px 2px 8px;cursor:pointer;font-family:'DM Mono',monospace;color:var(--muted);
+  display:flex;flex-direction:column;align-items:center;gap:3px}
+.ttg-g .d{font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.ttg-g .p{width:4px;height:4px;border-radius:50%;background:var(--border-l)}
+.ttg-g.pieno .p{background:var(--yellow)}
+.ttg-g.sesto .d{color:var(--orange)}
+.ttg-g.sel{border-bottom-color:var(--yellow)}
+.ttg-g.sel .d{color:var(--white)}
+.ttg-riga{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:0 2px;border-bottom:1px solid var(--border);min-height:46px}
+.ttg-riga:last-child{border-bottom:none}
+.ttg-riga>label{font-size:12px;color:var(--white-dim);flex:1;min-width:0}
+.ttg-riga input{width:104px;flex:0 0 104px;background:transparent;border:none;text-align:right;
+  font-family:'DM Mono',monospace;font-size:19px;color:var(--white);padding:9px 4px;outline:none;
+  border-radius:5px}
+.ttg-riga input:focus{background:rgba(245,230,66,0.07)}
+.ttg-riga input::placeholder{color:var(--border-l)}
+.ttg-calc{margin-top:13px;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.ttg-calc>div{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px}
+.ttg-calc>div:last-child{border-bottom:none}
+.ttg-calc .k{color:var(--muted)}
+.ttg-calc .v{font-family:'DM Mono',monospace;font-size:12px;color:var(--white-dim)}
+.ttg-calc .oro .v{color:var(--orange)}
+.ttg-calc .notte .v{color:#5090e0}
+.ttg-calc .vuoto{color:var(--muted);font-style:italic;justify-content:center}
+.ttg-tot{display:flex;align-items:baseline;gap:8px;padding:11px 12px;background:var(--surface2)}
+.ttg-tot .n{font-family:'DM Mono',monospace;font-size:21px;color:var(--white)}
+.ttg-tot .u{font-size:11px;color:var(--muted)}
+.ttg-vista{display:flex;gap:6px}
+.ttg-vista button{padding:5px 12px;background:none;border:1px solid var(--border-l);
+  color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer}
+.ttg-vista button.on{border-color:var(--yellow);color:var(--yellow)}
+/* Intestazione del riquadro: i nomi su una riga sola, i tasti sotto quando
+   non ci stanno. Prima si spezzavano i nomi parola per parola e "Scorporo"
+   finiva fuori dallo schermo. */
+.tt-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.tt-hdr-n{flex:1 1 180px;min-width:0}
+.tt-hdr-w{font-size:11px;color:var(--white);font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-hdr-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
 .tt-sc-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:7px;cursor:pointer;transition:border-color 0.15s}
 .tt-sc-row:hover{border-color:var(--border-l)}
 .tt-sc-row.sel{border-color:var(--yellow);background:rgba(245,230,66,0.04)}
@@ -557,46 +610,8 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 <div id="authPage">
   <div class="auth-wrap">
     <div class="auth-logo">
-      <div class="auth-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 310" width="80" height="80">
-<defs><clipPath id="ahc"><circle cx="155" cy="155" r="112"/></clipPath></defs>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(0,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(24,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(48,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(72,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(96,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(120,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(144,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(168,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(192,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(216,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(240,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(264,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(288,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(312,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(336,155,155)"/>
-<circle cx="155" cy="155" r="113" fill="none" stroke="#f5e642" stroke-width="1" stroke-opacity=".35"/>
-<g clip-path="url(#ahc)">
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,155 162.5,168 147.5,168 140,155 147.5,142 162.5,142"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,155 192.5,168 177.5,168 170,155 177.5,142 192.5,142"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="140,155 132.5,168 117.5,168 110,155 117.5,142 132.5,142"/>
-<polygon fill="#f5e642" fill-opacity=".2" stroke="#f5e642" stroke-width="1.3" points="185,129 177.5,142 162.5,142 155,129 162.5,116 177.5,116"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="215,129 207.5,142 192.5,142 185,129 192.5,116 207.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="155,129 147.5,142 132.5,142 125,129 132.5,116 147.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="125,129 117.5,142 102.5,142 95,129 102.5,116 117.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,103 162.5,116 147.5,116 140,103 147.5,90 162.5,90"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,103 192.5,116 177.5,116 170,103 177.5,90 192.5,90"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="140,103 132.5,116 117.5,116 110,103 117.5,90 132.5,90"/>
-<polygon fill="#f5e642" fill-opacity=".2" stroke="#f5e642" stroke-width="1.3" points="185,181 177.5,194 162.5,194 155,181 162.5,168 177.5,168"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="215,181 207.5,194 192.5,194 185,181 192.5,168 207.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="155,181 147.5,194 132.5,194 125,181 132.5,168 147.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="125,181 117.5,194 102.5,194 95,181 102.5,168 117.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,207 162.5,220 147.5,220 140,207 147.5,194 162.5,194"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,207 192.5,220 177.5,220 170,207 177.5,194 192.5,194"/>
-<polygon fill="#f5e642" points="170,155 162.5,168 147.5,168 140,155 147.5,142 162.5,142"/>
-<circle cx="155" cy="155" r="4" fill="#000"/>
-</g>
-</svg></div>
-      <div class="auth-logo-text">Sound<em>Analyst</em></div>
+      <div class="auth-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></div>
+      <div class="auth-logo-text">Campo<em>base</em></div>
     </div>
     <div class="auth-card">
       <div class="auth-tabs">
@@ -628,49 +643,10 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
   <div class="container">
     <header>
       <div class="brand">
-        <div class="brand-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 310" width="80" height="80">
-<defs><clipPath id="bhc"><circle cx="155" cy="155" r="112"/></clipPath></defs>
-
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(0,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(24,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(48,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(72,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(96,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(120,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(144,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(168,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(192,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(216,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(240,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(264,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(288,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(312,155,155)"/>
-<rect x="152.5" y="31.5" width="5" height="7" rx="1" fill="#f5e642" fill-opacity=".55" transform="rotate(336,155,155)"/>
-<circle cx="155" cy="155" r="113" fill="none" stroke="#f5e642" stroke-width="1" stroke-opacity=".35"/>
-<g clip-path="url(#bhc)">
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,155 162.5,168 147.5,168 140,155 147.5,142 162.5,142"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,155 192.5,168 177.5,168 170,155 177.5,142 192.5,142"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="140,155 132.5,168 117.5,168 110,155 117.5,142 132.5,142"/>
-<polygon fill="#f5e642" fill-opacity=".2" stroke="#f5e642" stroke-width="1.3" points="185,129 177.5,142 162.5,142 155,129 162.5,116 177.5,116"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="215,129 207.5,142 192.5,142 185,129 192.5,116 207.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="155,129 147.5,142 132.5,142 125,129 132.5,116 147.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="125,129 117.5,142 102.5,142 95,129 102.5,116 117.5,116"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,103 162.5,116 147.5,116 140,103 147.5,90 162.5,90"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,103 192.5,116 177.5,116 170,103 177.5,90 192.5,90"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="140,103 132.5,116 117.5,116 110,103 117.5,90 132.5,90"/>
-<polygon fill="#f5e642" fill-opacity=".2" stroke="#f5e642" stroke-width="1.3" points="185,181 177.5,194 162.5,194 155,181 162.5,168 177.5,168"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="215,181 207.5,194 192.5,194 185,181 192.5,168 207.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="155,181 147.5,194 132.5,194 125,181 132.5,168 147.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="125,181 117.5,194 102.5,194 95,181 102.5,168 117.5,168"/>
-<polygon fill="none" stroke="#f5e642" stroke-width="1.1" points="170,207 162.5,220 147.5,220 140,207 147.5,194 162.5,194"/>
-<polygon fill="#f5e642" fill-opacity=".07" stroke="#f5e642" stroke-width="1.1" points="200,207 192.5,220 177.5,220 170,207 177.5,194 192.5,194"/>
-<polygon fill="#f5e642" points="170,155 162.5,168 147.5,168 140,155 147.5,142 162.5,142"/>
-<circle cx="155" cy="155" r="4" fill="#111111"/>
-</g>
-</svg></div>
+        <div class="brand-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></div>
         <div class="brand-text">
-          <h1>Sound<em>Analyst</em></h1>
-          <div class="tag">Analisi sceneggiatura — Reparto Suono</div>
+          <h1>Campo<em>base</em></h1>
+          <div class="tag">Ore, piano di lavorazione e spoglio per la troupe</div>
         </div>
       </div>
       <div class="user-bar">
@@ -1204,6 +1180,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
+        <div id="tt-stato" style="font-size:10px;color:var(--muted);text-align:center;min-height:14px;margin-top:-4px"></div>
 
         <!-- Note -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
@@ -1489,7 +1466,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
     </div>
 
     <footer>
-      <div class="fl">Sound<em>Analyst</em></div>
+      <div class="fl">Campo<em>base</em></div>
       <div class="fr">by ohsfaccimmarosound</div>
     </footer>
   </div>
@@ -1549,7 +1526,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
     <!-- Logo -->
     <div style="text-align:center;margin-bottom:32px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;color:var(--white)">
-        Sound<em style="font-style:normal;color:var(--yellow)">Analyst</em>
+        Campo<em style="font-style:normal;color:var(--yellow)">base</em>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:0.06em">by ohsfaccimmarosound</div>
     </div>
@@ -7418,6 +7395,16 @@ const TT_DAYS=['LUN','MAR','MER','GIO','VEN','SAB'];
 let ttMeta={tipoGiornata:10,raddoppio:0,applicazione:'giornaliero',maggiorazioniNott:true,note:'',viaggioConcesso:60};
 let ttTabelle=[];
 let ttScorporoSrcId=null,ttScorporoSel=new Set();
+/*
+ * Vista degli orari: 'giorno' (una giornata per volta, pensata per il
+ * telefono) oppure 'settimana' (la tabella a sette colonne di sempre).
+ * La scelta la ricorda il browser; se non l'ha mai fatta, decide la
+ * larghezza dello schermo, che e' il motivo per cui le due viste esistono.
+ * Il giorno selezionato e' uno solo per tutte le tabelle: si compila il
+ * lunedi' di tutta la squadra, non un giorno diverso per ogni riquadro.
+ */
+let ttVista=localStorage.getItem('cb_tt_vista')||(window.innerWidth<760?'giorno':'settimana');
+let ttGiornoSel=Math.min(5,Math.max(0,(new Date().getDay()+6)%7));
 let ttInited=false;
 let ttSestoPopupCb=null; // callback per popup sesto giorno
 
@@ -7425,8 +7412,77 @@ function initTimetable(){
   if(ttInited)return;
   ttInited=true;
   ttTabelle=[ttMkTab([])];
-  ttRenderAll();
+  ttRipristinaBozza();
+  ttAscoltaIntestazione();
+  ttSoloVista=true; ttRenderAll(); ttSoloVista=false;
   ttMigrateLocalStorico().then(()=>ttRenderStorico());
+}
+
+/*
+ * Rimette in piedi la settimana lasciata a meta'.
+ *
+ * La bozza locale e' l'ultimo stato scritto sul telefono, e puo' essere piu'
+ * recente di quanto sia mai arrivato su Supabase: se la rete e' mancata, o
+ * se l'app e' stata chiusa prima della sincronia, e' li' che sta il lavoro.
+ * Si ricarica sempre, e si segnala che non e' ancora sul cloud.
+ */
+/*
+ * Su quale giorno aprire il foglio.
+ *
+ * Se oggi cade dentro la settimana caricata, oggi: e' il giorno che si sta
+ * compilando. Altrimenti l'ultimo giorno che ha qualcosa scritto — si
+ * riprende da dove si era arrivati. Solo a settimana vuota si parte dal
+ * lunedi'. Prima si apriva sempre sul giorno della settimana corrente, e
+ * riaprendo di domenica una settimana compilata da lunedi' a venerdi' si
+ * trovava un sabato vuoto.
+ */
+function ttGiornoIniziale(){
+  const dal=document.getElementById('tt-dal')?.value;
+  if(dal){
+    const lun=new Date(dal+'T00:00:00');
+    if(!isNaN(lun)){
+      lun.setDate(lun.getDate()-((lun.getDay()+6)%7));
+      const oggi=new Date(); oggi.setHours(0,0,0,0);
+      const n=Math.round((oggi-lun)/86400000);
+      if(n>=0&&n<=5)return n;
+    }
+  }
+  const o=ttTabelle[0]?.orari;
+  if(o)for(let i=5;i>=0;i--)if(ttGiornoHaDati(o,i))return i;
+  return 0;
+}
+
+function ttRipristinaBozza(){
+  let b=null;
+  try{ b=JSON.parse(localStorage.getItem(TT_BOZZA)||'null'); }catch(_){}
+  if(!b||!b.rec||!Array.isArray(b.rec.tabelle)||!b.rec.tabelle.length)return;
+  const m=b.rec.meta||{};
+  const set=(id,v)=>{const e=document.getElementById(id); if(e&&v!=null)e.value=v;};
+  set('tt-produzione',m.produzione); set('tt-film',m.film); set('tt-reparto',m.reparto);
+  set('tt-settimana',m.settimana);   set('tt-dal',m.dal);   set('tt-al',m.al);
+  if(m.tipoGiornata)ttMeta.tipoGiornata=m.tipoGiornata;
+  if(m.raddoppio!=null)ttMeta.raddoppio=m.raddoppio;
+  if(m.applicazione)ttMeta.applicazione=m.applicazione;
+  if(m.maggiorazioniNott!=null)ttMeta.maggiorazioniNott=m.maggiorazioniNott;
+  if(m.viaggioConcesso!=null)ttMeta.viaggioConcesso=m.viaggioConcesso;
+  if(m.note)ttMeta.note=m.note;
+  ttTabelle=b.rec.tabelle;
+  ttGiornoSel=ttGiornoIniziale();
+  const q=new Date(b.ts).toLocaleString('it-IT',{weekday:'short',hour:'2-digit',minute:'2-digit'});
+  ttStato('ripreso da questo telefono · '+q);
+  // Cio' che e' tornato dal telefono potrebbe non essere mai arrivato al
+  // cloud: si prova subito, in silenzio.
+  setTimeout(()=>{ if(currentUser)ttSync(); },1200);
+}
+
+/* I campi dell'intestazione sono HTML statico: il salvataggio lo agganciamo
+   qui una volta sola, invece di ripeterlo su sei onchange. */
+function ttAscoltaIntestazione(){
+  ['tt-produzione','tt-film','tt-reparto','tt-settimana','tt-dal','tt-al'].forEach(id=>{
+    const e=document.getElementById(id); if(!e||e.dataset.cbSave)return;
+    e.dataset.cbSave='1';
+    e.addEventListener('change',()=>{ ttTocca(); if(id==='tt-dal')ttRenderAll(); });
+  });
 }
 
 // Migrazione one-shot: porta lo storico locale (sa_tt3) su Supabase, poi svuota la chiave
@@ -7674,11 +7730,15 @@ function ttCalcTab(orari,raddoppiaSesto){
 
 function ttRenderAll(){
   const c=document.getElementById('tt-tabelle');if(!c)return;
+  const st=document.getElementById('tt-stato'); if(st)st.textContent=ttStatoTxt;
   if(ttTabelle.length===0){
     c.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px;text-align:center;color:var(--muted);font-size:12px">Nessuna tabella.<br><button onclick="ttAddFirst()" style="margin-top:12px;padding:7px 16px;background:var(--yellow);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:6px;cursor:pointer">+ Crea tabella</button></div>`;
     return;
   }
   c.innerHTML=ttTabelle.map(t=>ttRenderTab(t)).join('');
+  // Unico aggancio del salvataggio: ogni funzione che cambia i dati passa
+  // di qui, cosi' non ce n'e' una che possa dimenticarselo.
+  if(!ttSoloVista)ttTocca();
 }
 
 /* I badge della tabella: servono sia al disegno completo sia agli
@@ -7749,6 +7809,104 @@ function ttAggiornaCalc(tabId){
   }
 }
 
+const TTG_ORARI=[{k:'partenza',l:'Partenza'},{k:'inizio',l:'Inizio'},{k:'pausa',l:'Pausa'},
+                 {k:'stop',l:'Stop'},{k:'fine',l:'Fine'},{k:'rientro',l:'Rientro'}];
+const TTG_CALC=[{k:'oreViaggio',l:'Ore viaggio 55%',c:''},
+                {k:'nottOrd',l:'Maggiorazione notturna 55%',c:'notte'},
+                {k:'nottStr',l:'Maggiorazione notturna 80%',c:'notte'},
+                {k:'goldenOrd',l:'Golden ordinaria',c:'oro'},
+                {k:'goldenNott',l:'Golden notturna',c:'oro'},
+                {k:'golden6',l:'Golden 6° giorno',c:'oro'}];
+
+function ttGiornoHaDati(orari,i){
+  return TTG_ORARI.some(r=>(orari[r.k][i]||'').trim()!=='');
+}
+
+/* Nome esteso del giorno scelto, con la data quando "Dal" e' compilato. */
+function ttGiornoTitolo(i){
+  const nomi=['Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const d=ttDataGiorno(i);
+  if(!d)return nomi[i];
+  const mesi=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio',
+              'agosto','settembre','ottobre','novembre','dicembre'];
+  return `${nomi[i]} ${d.getDate()} ${mesi[d.getMonth()]}`;
+}
+
+/* Il corpo del foglio giornata: selettore dei giorni, orari, calcolato.
+   Separato dal contenitore perche' l'aggiornamento in posto riscrive solo
+   la parte calcolata e i pallini, mai le caselle su cui si sta scrivendo. */
+function ttGiornoHtml(tab,days,tot,sestoIdx){
+  const i=ttGiornoSel;
+  const giorni=TT_DAYS.map((d,n)=>{
+    const cls=['ttg-g',n===i?'sel':'',ttGiornoHaDati(tab.orari,n)?'pieno':'',
+               n===sestoIdx?'sesto':''].filter(Boolean).join(' ');
+    return `<button class="${cls}" data-g="${n}" onclick="ttSetGiorno(${n})">
+      <span class="d">${d}</span><span class="p"></span></button>`;
+  }).join('');
+  const righe=TTG_ORARI.map(r=>`<div class="ttg-riga">
+    <label for="ttg-${tab.id}-${r.k}">${r.l}</label>
+    <input id="ttg-${tab.id}-${r.k}" type="text" inputmode="numeric" placeholder="—"
+      value="${tab.orari[r.k][i]||''}"
+      onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)"
+      onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></div>`).join('');
+  return `<div class="ttg-giorni">${giorni}</div>
+    <div class="ttg-data" style="font-size:12px;color:var(--muted);margin-bottom:6px">${ttGiornoTitolo(i)}</div>
+    <div class="ttg-orari">${righe}</div>
+    <div class="ttg-calc">${ttGiornoCalcHtml(days[i],tot)}</div>`;
+}
+
+/* Le voci calcolate del giorno scelto, piu' il totale della settimana.
+   Le voci a zero non si scrivono: una giornata ordinaria deve leggersi
+   in un colpo d'occhio, non fra sei righe di trattini. */
+function ttGiornoCalcHtml(d,tot){
+  const voci=TTG_CALC.filter(r=>d&&d[r.k]).map(r=>
+    `<div class="${r.c}"><span class="k">${r.l}</span><span class="v">${ttToHM(d[r.k])}</span></div>`).join('');
+  const lav=d&&d.oreLav?`<div class="ttg-tot"><span class="n">${ttToHM(d.oreLav)}</span><span class="u">lavorate</span></div>`:'';
+  const corpo=voci||`<div class="vuoto">${d&&d.oreLav?'Nessuna maggiorazione':'Giornata da compilare'}</div>`;
+  // Il totale di settimana si scrive solo se dice qualcosa in piu' del
+  // giorno aperto: a inizio settimana coincidono, e ripeterlo e' rumore.
+  const gSett=(tot?.goldenOrd||0)+(tot?.goldenNott||0)+(tot?.golden6||0);
+  const gGior=(d?.goldenOrd||0)+(d?.goldenNott||0)+(d?.golden6||0);
+  const sett=gSett&&gSett!==gGior
+    ?`<div><span class="k">Golden della settimana</span><span class="v">${ttToHM(gSett)}</span></div>`:'';
+  return lav+corpo+sett;
+}
+
+/* Aggiorna il foglio giornata senza toccare le caselle degli orari: resta
+   il campo attivo, resta la tastiera aperta. */
+function ttAggiornaGiorno(tabId){
+  const tab=ttTabelle.find(t=>t.id==tabId); if(!tab) return;
+  const el=document.getElementById(`ttb-${tabId}`); if(!el) return;
+  const {days,tot,sestoIdx}=ttCalcTab(tab.orari,tab.sestoRaddoppio);
+  const calc=el.querySelector('.ttg-calc');
+  if(calc)calc.innerHTML=ttGiornoCalcHtml(days[ttGiornoSel],tot);
+  el.querySelectorAll('.ttg-g').forEach(b=>{
+    const n=+b.dataset.g;
+    b.classList.toggle('pieno',ttGiornoHaDati(tab.orari,n));
+    b.classList.toggle('sesto',n===sestoIdx);
+  });
+  const sub=el.querySelector('.tt-sub');
+  if(sub)sub.textContent=`${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}`;
+  const badges=el.querySelector('.tt-badges');
+  if(badges){
+    const html=ttBadgesHtml(tab,days,tot);
+    badges.innerHTML=html;
+    badges.style.display=html?'flex':'none';
+  }
+}
+
+/* Cambiare giorno o vista non cambia i dati: sono gli unici due casi in cui
+   ttRenderAll non deve far scattare un salvataggio. */
+let ttSoloVista=false;
+function ttSetGiorno(n){ ttSoloVista=true; ttGiornoSel=n; ttRenderAll(); ttSoloVista=false; }
+function ttSetVista(v){
+  ttSoloVista=true;
+  ttVista=v;
+  localStorage.setItem('cb_tt_vista',v);
+  ttRenderAll();
+  ttSoloVista=false;
+}
+
 function ttRenderTab(tab){
   const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
   const badges=ttBadgesHtml(tab,days,tot);
@@ -7786,13 +7944,17 @@ function ttRenderTab(tab){
   th+=`</tbody></table>`;
   const delBtn=ttTabelle.length>1?`<button onclick="ttDelTab('${tab.id}')" style="padding:5px 10px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕</button>`:'';
   return `<div id="ttb-${tab.id}" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)">
-      <div>
-        <div style="font-size:11px;color:var(--white);font-weight:500">${wLabel}</div>
+    <div class="tt-hdr">
+      <div class="tt-hdr-n">
+        <div class="tt-hdr-w">${wLabel}</div>
         <div class="tt-sub" style="font-size:9px;color:var(--muted);margin-top:2px">${tab.workers.length} lavorator${tab.workers.length===1?'e':'i'}${sestoIdx>=0?' · 6°g: '+TT_DAYS[sestoIdx]:''}</div>
         <div class="tt-badges" style="display:${badges?'flex':'none'};flex-wrap:wrap;gap:6px;margin-top:9px">${badges}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;align-self:flex-start">
+      <div class="tt-hdr-b">
+        <span class="ttg-vista">
+          <button class="${ttVista==='giorno'?'on':''}" onclick="ttSetVista('giorno')">Giorno</button>
+          <button class="${ttVista==='settimana'?'on':''}" onclick="ttSetVista('settimana')">Settimana</button>
+        </span>
         <button onclick="ttOpenScorporo('${tab.id}')" style="padding:5px 12px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;border-radius:6px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">⊕ Scorporo</button>
         ${delBtn}
       </div>
@@ -7803,7 +7965,9 @@ function ttRenderTab(tab){
         <input type="text" id="ttawi-${tab.id}" placeholder="Aggiungi lavoratore..." style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:11px;padding:5px 9px;border-radius:5px;outline:none" onkeydown="if(event.key==='Enter')ttAddW('${tab.id}')" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'">
         <button onclick="ttAddW('${tab.id}')" style="padding:5px 12px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:10px;border-radius:5px;cursor:pointer">+</button>
       </div>
-      <div class="tt-scroll" style="overflow-x:auto">${th}</div>
+      ${ttVista==='giorno'
+        ? ttGiornoHtml(tab,days,tot,sestoIdx)
+        : `<div class="tt-scroll" style="overflow-x:auto">${th}</div>`}
     </div>
   </div>`;
 }
@@ -7845,7 +8009,9 @@ function ttSetO(tabId,field,di,val){
   // Solo i valori calcolati cambiano: le caselle degli orari e il
   // contenitore che scorre restano quelli, insieme alla posizione
   // orizzontale e al campo su cui si sta scrivendo.
-  ttAggiornaCalc(tabId);
+  if(ttVista==='giorno')ttAggiornaGiorno(tabId);
+  else ttAggiornaCalc(tabId);
+  ttTocca();
 }
 function ttAddW(tabId){const inp=document.getElementById(`ttawi-${tabId}`);if(!inp)return;const n=inp.value.trim();if(!n)return;const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.push(n);ttRenderAll();}
 function ttRemoveW(tabId,wi){const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.splice(wi,1);ttRenderAll();}
@@ -7919,64 +8085,164 @@ function ttShowSestoPopup(tabId){
   ov.style.display='flex';
 }
 
-function ttSetViaggio(mins){
-  ttMeta.viaggioConcesso=mins;
-  document.querySelectorAll('.tt-vtog').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tt-vtog').forEach(b=>{if(parseInt(b.dataset.mins)===mins)b.classList.add('active');});
+/*
+ * Le regole di calcolo valgono per tutta la settimana, non da qui in poi:
+ * cambiarle riscrive anche le giornate gia' compilate. E' il comportamento
+ * giusto — il contratto e' uno solo e se lo si corregge e' perche' era
+ * sbagliato prima — ma vedere i numeri di cinque giorni cambiare sotto gli
+ * occhi senza preavviso e' un'altra cosa. Quindi si chiede, e solo quando
+ * c'e' davvero qualcosa da riscrivere.
+ */
+function ttGiorniCompilati(){
+  return ttTabelle.reduce((a,t)=>
+    a+[0,1,2,3,4,5].filter(i=>ttGiornoHaDati(t.orari,i)).length,0);
+}
+
+async function ttCambiaRegola(descrizione,applica){
+  const n=ttGiorniCompilati();
+  if(n>0){
+    const g=n===1?'una giornata gia\' compilata':`${n} giornate gia\' compilate`;
+    const okgo=await askConfirm(
+      `${descrizione} ricalcola ${g}. I nuovi valori sostituiscono quelli di adesso.`,
+      {conferma:'Ricalcola', pericolo:false});
+    if(!okgo){ ttSyncRegole(); return; }
+  }
+  applica();
   ttRenderAll();
 }
 
+/* Riporta i bottoni allo stato di ttMeta: serve quando la conferma viene
+   rifiutata, perche' il tocco ha gia' acceso il bottone sbagliato. */
+function ttSyncRegole(){
+  const g=(id,on)=>{const e=document.getElementById(id); if(e)e.classList.toggle('active',on);};
+  g('tt-tg10',ttMeta.tipoGiornata===10); g('tt-tg8',ttMeta.tipoGiornata===8);
+  [0,1,2,3].forEach(v=>g(`tt-rd${v}`,v===ttMeta.raddoppio));
+  const ex=document.getElementById('tt-rdExtra'); if(ex)ex.style.display=ttMeta.raddoppio>0?'block':'none';
+  const ag=document.getElementById('tt-applG'), as=document.getElementById('tt-applS');
+  if(ag)ag.classList.toggle('active-o',ttMeta.applicazione==='giornaliero');
+  if(as)as.classList.toggle('active-o',ttMeta.applicazione==='settimanale');
+  g('tt-nOn',ttMeta.maggiorazioniNott); g('tt-nOff',!ttMeta.maggiorazioniNott);
+  document.querySelectorAll('.tt-vtog').forEach(b=>
+    b.classList.toggle('active',parseInt(b.dataset.mins)===ttMeta.viaggioConcesso));
+}
+
+function ttSetViaggio(mins){
+  if(mins===ttMeta.viaggioConcesso)return;
+  ttCambiaRegola('Cambiare le ore di viaggio concesse',()=>{
+    ttMeta.viaggioConcesso=mins; ttSyncRegole();
+  });
+}
 function ttSetGiornata(h){
-  ttMeta.tipoGiornata=h;
-  document.getElementById('tt-tg10').classList.toggle('active',h===10);
-  document.getElementById('tt-tg8').classList.toggle('active',h===8);
-  ttRenderAll();
+  if(h===ttMeta.tipoGiornata)return;
+  ttCambiaRegola('Cambiare il tipo di giornata',()=>{
+    ttMeta.tipoGiornata=h; ttSyncRegole();
+  });
 }
 function ttSetRaddoppio(n){
-  ttMeta.raddoppio=n;
-  [0,1,2,3].forEach(v=>document.getElementById(`tt-rd${v}`).classList.toggle('active',v===n));
-  document.getElementById('tt-rdExtra').style.display=n>0?'block':'none';
-  ttRenderAll();
+  if(n===ttMeta.raddoppio)return;
+  ttCambiaRegola('Cambiare il raddoppio',()=>{
+    ttMeta.raddoppio=n; ttSyncRegole();
+  });
 }
 function ttSetApplicazione(tipo){
-  ttMeta.applicazione=tipo;
-  document.getElementById('tt-applG').classList.toggle('active-o',tipo==='giornaliero');
-  document.getElementById('tt-applS').classList.toggle('active-o',tipo==='settimanale');
-  ttRenderAll();
+  if(tipo===ttMeta.applicazione)return;
+  ttCambiaRegola('Cambiare l\'applicazione del raddoppio',()=>{
+    ttMeta.applicazione=tipo; ttSyncRegole();
+  });
 }
 function ttSetNott(on){
-  ttMeta.maggiorazioniNott=on;
-  document.getElementById('tt-nOn').classList.toggle('active',on);
-  document.getElementById('tt-nOff').classList.toggle('active',!on);
-  ttRenderAll();
+  if(on===ttMeta.maggiorazioniNott)return;
+  ttCambiaRegola(on?'Attivare le maggiorazioni notturne':'Disattivare le maggiorazioni notturne',()=>{
+    ttMeta.maggiorazioniNott=on; ttSyncRegole();
+  });
 }
 
 // ── Storico settimane su Supabase (sync cross-device) ──
 let ttStoricoCache=[]; // record fetchati, indicizzati per la UI
 
+/* Lo stato della settimana aperta, nella forma in cui va salvata. */
+function ttRecord(){
+  const v=id=>document.getElementById(id)?.value||'';
+  return {meta:{
+    produzione:v('tt-produzione'), film:v('tt-film'), reparto:v('tt-reparto'),
+    settimana:v('tt-settimana'), dal:v('tt-dal'), al:v('tt-al'),
+    note:ttMeta.note||'',
+    tipoGiornata:ttMeta.tipoGiornata, raddoppio:ttMeta.raddoppio,
+    applicazione:ttMeta.applicazione, maggiorazioniNott:ttMeta.maggiorazioniNott,
+    viaggioConcesso:ttMeta.viaggioConcesso
+  }, tabelle:JSON.parse(JSON.stringify(ttTabelle))};
+}
+
+/* ── salvataggio automatico ───────────────────────────────────────────
+ * Prima la settimana viveva in memoria e saliva su Supabase solo premendo
+ * "Salva": chi chiudeva la scheda prima perdeva la giornata. E sul set la
+ * rete spesso non c'e' — masserie, capannoni, gallerie — quindi far
+ * dipendere il salvataggio dalla rete significa perdere i dati proprio
+ * quando servono.
+ *
+ * Quindi due livelli. Il locale e' la verita' mentre si gira: una scrittura
+ * sincrona che non puo' fallire, fatta a ogni modifica. Supabase e' la
+ * verita' quando si cambia telefono: parte con qualche secondo di ritardo,
+ * e se non c'e' rete resta in coda e riparte da solo quando torna.
+ */
+const TT_BOZZA='cb_tt_bozza';
+let ttSyncT=null, ttStatoTxt='', ttUltimoSync=null;
+
+function ttStato(txt){
+  ttStatoTxt=txt;
+  const el=document.getElementById('tt-stato');
+  if(el)el.textContent=txt;
+}
+
+/* Chiamata a ogni modifica: scrive subito in locale, programma la sincronia. */
+function ttTocca(){
+  if(!ttInited)return;
+  const rec=ttRecord();
+  try{
+    localStorage.setItem(TT_BOZZA,JSON.stringify({rec,ts:Date.now()}));
+  }catch(e){ console.log('[tt] locale non scritto:',e.message); }
+  ttStato(navigator.onLine?'salvataggio…':'salvato sul telefono · in attesa di rete');
+  clearTimeout(ttSyncT);
+  ttSyncT=setTimeout(ttSync,2500);
+}
+
+async function ttSync(){
+  if(!currentUser||!navigator.onLine){
+    ttStato('salvato sul telefono · in attesa di rete');
+    return false;
+  }
+  const rec=ttRecord();
+  // Senza settimana, film e reparto la chiave di conflitto non distingue
+  // nulla e ogni salvataggio sovrascriverebbe il precedente.
+  if(!rec.meta.settimana&&!rec.meta.film){ ttStato('salvato sul telefono'); return false; }
+  try{
+    const{error}=await sb.from('timetable_weeks').upsert({
+      user_id:currentUser.id,
+      settimana:rec.meta.settimana||'', film:rec.meta.film||'', reparto:rec.meta.reparto||'',
+      data:rec, updated_at:new Date().toISOString()
+    },{onConflict:'user_id,settimana,film,reparto'});
+    if(error)throw new Error(error.message);
+  }catch(e){
+    console.log('[tt] sync fallita:',e.message);
+    ttStato('salvato sul telefono · riprovo appena c\'è rete');
+    return false;
+  }
+  ttUltimoSync=Date.now();
+  ttStato('salvato · '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
+  return true;
+}
+
+/* Alla ripresa della rete la coda e' una sola cosa: la bozza corrente. */
+window.addEventListener('online',()=>{ if(ttInited)ttSync().then(ok=>{if(ok)ttRenderStorico();}); });
+window.addEventListener('offline',()=>{ if(ttInited)ttStato('salvato sul telefono · in attesa di rete'); });
+
+/* Il tasto resta, per chi vuole la conferma esplicita e per aggiornare
+   subito lo storico. Non e' piu' l'unico modo di non perdere il lavoro. */
 async function ttSave(){
   if(!currentUser){showToast('Devi essere loggato per salvare.');return;}
-  const rec={meta:{
-    produzione:document.getElementById('tt-produzione').value,
-    film:document.getElementById('tt-film').value,
-    reparto:document.getElementById('tt-reparto').value,
-    settimana:document.getElementById('tt-settimana').value,
-    dal:document.getElementById('tt-dal').value,
-    al:document.getElementById('tt-al').value,
-    note:ttMeta.note||'',
-    tipoGiornata:ttMeta.tipoGiornata,raddoppio:ttMeta.raddoppio,
-    applicazione:ttMeta.applicazione,maggiorazioniNott:ttMeta.maggiorazioniNott,
-    viaggioConcesso:ttMeta.viaggioConcesso
-  },tabelle:JSON.parse(JSON.stringify(ttTabelle))};
-  const{error}=await sb.from('timetable_weeks').upsert({
-    user_id:currentUser.id,
-    settimana:rec.meta.settimana||'',
-    film:rec.meta.film||'',
-    reparto:rec.meta.reparto||'',
-    data:rec,
-    updated_at:new Date().toISOString()
-  },{onConflict:'user_id,settimana,film,reparto'});
-  if(error){console.log('[ttSave] error:',error.message);showToast('Errore salvataggio: '+error.message);return;}
+  clearTimeout(ttSyncT);
+  const ok=await ttSync();
+  if(!ok){showToast('Salvato sul telefono. Va sul cloud appena torna la rete.');return;}
   await ttRenderStorico();showToast('Settimana salvata!');
 }
 

@@ -4,8 +4,8 @@
   "description": "Ore e maggiorazioni CCNL, piano di lavorazione e spoglio per la troupe",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111111",
-  "theme_color": "#111111",
+  "background_color": "#0A0B0D",
+  "theme_color": "#0A0B0D",
   "orientation": "any",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },

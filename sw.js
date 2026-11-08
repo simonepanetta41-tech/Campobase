@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v4';
+const CACHE = 'campobase-v5';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -7,6 +7,7 @@ const STATIC = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/installa.html',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
@@ -58,15 +59,21 @@ self.addEventListener('fetch', e => {
   // HTML: network-first, cache solo come riserva.
   // Cosi' una build nuova arriva sempre quando c'e' rete e non si resta
   // bloccati su una versione vecchia.
+  //
+  // Ogni pagina si salva sotto il proprio indirizzo. Prima finivano tutte
+  // sotto /index.html: bastava aprire /installa.html una volta perche' la
+  // copia offline dell'app diventasse la pagina di installazione, e senza
+  // rete si apriva quella al posto del lavoro.
   if (e.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    const chiave = url.pathname === '/' ? '/index.html' : url.pathname;
     e.respondWith(
       fetch(e.request)
         .then(r => {
           const copy = r.clone();
-          caches.open(CACHE).then(cache => cache.put('/index.html', copy));
+          caches.open(CACHE).then(cache => cache.put(chiave, copy));
           return r;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match(chiave).then(c => c || caches.match('/index.html')))
     );
     return;
   }

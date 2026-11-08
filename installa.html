@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Installa Campobase</title>
+<meta name="theme-color" content="#0A0B0D">
+<link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
+<link rel="icon" href="/favicon-32.png" sizes="32x32">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0A0B0D;--sheet:#15181C;--sheet2:#1B1F24;--rule:#272D34;
+  --text:#EDEFF2;--text-2:#99A3AE;--text-3:#626C77;--amber:#F5C542}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);line-height:1.55;
+  font-family:'Space Grotesk',-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:480px;margin:0 auto;padding:34px 22px 80px}
+.logo{display:flex;align-items:center;gap:13px;margin-bottom:26px}
+.logo svg{width:52px;height:52px;border-radius:12px;display:block}
+.logo .n{font-size:25px;font-weight:700;letter-spacing:-.02em}
+.logo .n em{font-style:normal;color:var(--amber)}
+h1{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0 0 7px}
+.sub{color:var(--text-2);font-size:14.5px;margin:0 0 26px}
+ol{list-style:none;counter-reset:p;margin:0;padding:0}
+ol li{counter-increment:p;position:relative;padding:0 0 22px 46px}
+ol li::before{content:counter(p);position:absolute;left:0;top:-1px;width:30px;height:30px;
+  border-radius:50%;background:var(--sheet2);border:1px solid var(--rule);color:var(--amber);
+  display:grid;place-items:center;font-family:'DM Mono',monospace;font-size:14px}
+ol li .t{font-size:15px;font-weight:500;display:block;margin-bottom:3px}
+ol li .d{font-size:13.5px;color:var(--text-3);display:block}
+ol li .d b{color:var(--text-2);font-weight:500}
+.fig{margin-top:11px;background:var(--sheet);border:1px solid var(--rule);border-radius:11px;
+  padding:13px 15px;display:flex;align-items:center;gap:11px}
+.fig .ic{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;
+  border-radius:8px;background:var(--sheet2);border:1px solid var(--rule)}
+.fig .ic svg{width:17px;height:17px;display:block}
+.fig .lb{font-size:13.5px;color:var(--text-2)}
+.nota{margin-top:24px;border-top:1px solid var(--rule);padding-top:18px;
+  font-size:13.5px;color:var(--text-3)}
+.nota b{color:var(--text-2);font-weight:500}
+.vai{display:block;margin:28px 0 0;padding:15px;text-align:center;text-decoration:none;
+  background:var(--amber);color:#0A0B0D;border-radius:12px;font-size:15px;font-weight:600}
+.solo-altro{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo">
+    <svg viewBox="0 0 100 100" aria-label="Campobase">
+      <rect width="100" height="100" rx="22" fill="#0A0B0D"/>
+      <rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/>
+      <path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/>
+      <path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/>
+      <path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/>
+      <g transform="rotate(-17 18 54)">
+        <rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/>
+        <path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/>
+        <path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/>
+        <path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/>
+      </g>
+    </svg>
+    <span class="n">Campo<em>base</em></span>
+  </div>
+
+  <h1>Mettila sulla schermata home</h1>
+  <p class="sub">Trenta secondi. Da lì in poi si apre come un'app normale,
+  a tutto schermo, e funziona anche senza rete.</p>
+
+  <ol id="passi">
+    <li class="ios">
+      <span class="t">Apri questa pagina in Safari</span>
+      <span class="d">Se ci sei arrivato da WhatsApp o dalla mail, tocca
+      <b>Apri in Safari</b> in basso. Da altri browser il passaggio seguente non c'è.</span>
+    </li>
+    <li class="ios">
+      <span class="t">Tocca Condividi</span>
+      <span class="d">Il quadrato con la freccia in su, in fondo allo schermo.</span>
+      <div class="fig">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#F5C542" stroke-width="1.6"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4"/><path d="M8 8l4-4 4 4"/>
+          <path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5"/></svg></span>
+        <span class="lb">Condividi</span>
+      </div>
+    </li>
+    <li class="ios">
+      <span class="t">Scorri e scegli "Aggiungi a Home"</span>
+      <span class="d">È più in basso nell'elenco, sotto le icone delle app.</span>
+      <div class="fig">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#F5C542" stroke-width="1.6"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="4"/>
+          <path d="M12 9v6M9 12h6"/></svg></span>
+        <span class="lb">Aggiungi a Home</span>
+      </div>
+    </li>
+    <li class="ios">
+      <span class="t">Tocca Aggiungi</span>
+      <span class="d">In alto a destra. L'icona del ciak compare fra le tue app.</span>
+    </li>
+
+    <li class="android solo-altro">
+      <span class="t">Tocca il menu del browser</span>
+      <span class="d">I tre puntini in alto a destra in Chrome.</span>
+    </li>
+    <li class="android solo-altro">
+      <span class="t">Scegli "Installa app" o "Aggiungi a schermata Home"</span>
+      <span class="d">La voce cambia nome secondo la versione, ma fa la stessa cosa.</span>
+    </li>
+  </ol>
+
+  <div class="nota">
+    <b>Perché non si scarica dall'App Store.</b> Campobase per ora vive sul web:
+    si aggiorna da sola, non occupa spazio e non c'è niente da installare davvero.
+    L'icona sulla schermata home è l'app.
+  </div>
+
+  <a class="vai" href="/">Apri Campobase</a>
+</div>
+
+<script>
+/* iPhone e iPad mostrano i passaggi di Safari, tutto il resto quelli di Chrome.
+   Il controllo guarda la piattaforma, non il nome del browser: su iOS anche
+   Chrome e' Safari sotto, e i passaggi sono quelli. */
+(function(){
+  var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (iOS) return;
+  document.querySelectorAll('#passi .ios').forEach(function(e){ e.style.display='none'; });
+  document.querySelectorAll('#passi .android').forEach(function(e){ e.style.display='block'; });
+})();
+
+/* Gia' installata: non ha senso spiegare come installarla. */
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+  location.replace('/');
+}
+</script>
+</body>
+</html>
