@@ -7488,13 +7488,20 @@ let odgInCorso = false;
  */
 function odgTipoDoc(t){
   const u = t.toUpperCase().replace(/\s+/g,' ');
-  if (/GIRI\s?AUTO|TRANSPORT\s?LIST|LISTA\s?TRASPORT/.test(u)) return 'giri';
-  if (/O\s?D\s?G|ORDINE DEL GIORNO|CONVOCAZIONE TROUPE/.test(u)) return 'odg';
+
+  // Gli stralci sono sceneggiatura: hanno le intestazioni di scena, che
+  // nessun altro documento ha. Nel formato italiano il numero viene dopo
+  // ("EST. CAMPI STERMINATI, IN AUTO - GIORNO 32"), non prima.
+  const slug = (u.match(/\b(?:INT|EST|EXT|I\/E)\.?\s[^-]{3,70}-\s*(?:GIORNO|NOTTE|ALBA|TRAMONTO|SERA|MATTINA|CONTINUA)/g)||[]).length;
+  if (slug >= 2) return 'stralci';
   if (/STRALC/.test(u)) return 'stralci';
-  // Gli stralci non si annunciano: sono sceneggiatura, e si riconoscono
-  // dalle intestazioni di scena, che nessun altro documento ha.
-  if ((t.match(/\b\d{1,3}[A-Z]*\s+(INT|EST|EXT|I\/E)[\s.]/gi)||[]).length >= 2) return 'stralci';
-  return 'odg';
+
+  // I giri auto non si chiamano sempre cosi': a distinguerli sono le
+  // colonne, che l'OdG non ha.
+  if (/GIRI\s?AUTO|TRANSPORT\s?LIST|LISTA\s?TRASPORT|RUNNER|ORARIO ?PARTENZA|ORARIO ?ARRIVO/.test(u)) return 'giri';
+
+  if (/CONVOCAZIONE TROUPE|ORDINE DEL GIORNO|\bODG\b/.test(u)) return 'odg';
+  return null;   // non riconosciuto: decide la lunghezza, piu' avanti
 }
 
 async function odgScegliFile(input) {
@@ -7512,7 +7519,12 @@ async function odgScegliFile(input) {
       const t = await odgTestoDaPdf(f);
       letti.push({ nome: f.name, testo: t, tipo: odgTipoDoc(t) });
     }
-    const principale = letti.find(x => x.tipo === 'odg') || letti[0];
+    // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
+    // l'OdG e' sempre il documento piu' corposo dei tre. Prima si prendeva
+    // il primo della selezione, che su iPhone e' quello in ordine
+    // alfabetico — di solito i giri auto.
+    const principale = letti.find(x => x.tipo === 'odg')
+      || letti.slice().sort((a,b) => b.testo.length - a.testo.length)[0];
     const file = { name: principale.nome };
     const testo = principale.testo;
     const extra = letti.filter(x => x !== principale);
