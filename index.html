@@ -75,7 +75,10 @@ body { background: var(--bg); color: var(--white); font-family: 'Space Grotesk',
 .num, .mono { font-family: 'DM Mono', monospace; }
 
 /* ── AUTH PAGE ── */
-#authPage { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+/* Il contenitore non centra e non imbottisce: a tenere l'altezza e a
+   centrare ci pensa .acc. Quando lo facevano tutti e due, 100dvh dentro
+   un padding di 24 sforava lo schermo e i tasti finivano sotto il bordo. */
+#authPage { display: block; }
 .auth-wrap { width: 100%; max-width: 420px; }
 .auth-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; justify-content: center; }
 .auth-logo-icon { width: 80px; height: 80px; }
@@ -341,8 +344,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* Marchio, frase e tasti sono un blocco solo, centrato. Prima i tasti
    erano spinti in fondo allo schermo e fra la frase e il primo tocco
    restava mezzo telefono di vuoto. */
-.acc{min-height:100dvh;max-width:420px;margin:0 auto;display:flex;flex-direction:column;
-  justify-content:center;
+.acc{min-height:100dvh;box-sizing:border-box;max-width:420px;margin:0 auto;
+  display:flex;flex-direction:column;justify-content:center;
   padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 28px)}
 .acc-alto{display:flex;flex-direction:column}
 .acc-basso{margin-top:30px}
