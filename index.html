@@ -340,6 +340,14 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .ch{color:var(--muted);font-size:16px}
 /* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
    il modo di tornare alla scelta del progetto. */
+/* I reparti nello spoglio */
+.rep{margin-bottom:22px}
+.rep-t{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.rep-t span{padding:1px 7px;border-radius:5px;background:rgba(245,197,66,.14);
+  color:var(--yellow);letter-spacing:.06em}
+.rep-c{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:760px){.rep-c{grid-template-columns:1fr 1fr}}
 /* ── I tuoi progetti ─────────────────────────────────────────────── */
 #homePage{padding:14px 0 40px}
 .prog-tit{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;
@@ -1160,7 +1168,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
           <div class="chat-intro-icon"><svg viewBox="0 0 100 110" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#F5C542"/><ellipse cx="50" cy="68" rx="22" ry="24" fill="#F5C542"/><path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#F5C542"/><path d="M28 58 Q27 48 30 44 Q28 52 29 61z" fill="#000"/><path d="M72 58 Q73 48 70 44 Q72 52 71 61z" fill="#000"/><path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M31 50 Q32 34 46 28 Q54 25 62 28 Q58 26 50 28 Q39 30 34 42z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M33 46 Q40 36 54 32" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M32 50 Q40 41 55 37" stroke="#F5C542" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M32 60 Q38 57 44 58" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 58 Q62 57 68 60" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><path d="M47 67 Q50 65.5 53 67" stroke="#F5C542" stroke-width="1" fill="none"/><line x1="27" y1="67" x2="23" y2="66" stroke="#F5C542" stroke-width="1.2"/><line x1="73" y1="67" x2="77" y2="66" stroke="#F5C542" stroke-width="1.2"/><path d="M42 84 Q46 82.5 50 83 Q54 82.5 58 84" stroke="#F5C542" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M36 87 Q38 92 43 94 Q50 96 57 94 Q62 92 64 87" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M43 94 Q47 98 50 98.5 Q53 98 57 94" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M38 102 Q44 107 50 108 Q56 107 62 102" stroke="#F5C542" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2.5,1.5"/><circle cx="50" cy="110" r="4" stroke="#F5C542" stroke-width="1" fill="none"/><text x="50" y="113" font-size="4.5" text-anchor="middle" fill="#F5C542" font-weight="700" font-family="serif">N</text></svg></div>
           <div class="chat-intro-text">
             <div class="t">Chiedi a Gennaro</div>
-            <div class="s">Gennaro conosce l'intero spoglio — fai domande specifiche sul reparto suono</div>
+            <div class="s">Gennaro conosce l'intero spoglio — chiedigli del tuo reparto o di una scena</div>
           </div>
         </div>
         <div class="chat-messages" id="chatMessages"></div>
@@ -1968,24 +1976,15 @@ function renderShareResults(d) {
   const riaHtml = d.riassunto
     ? `<div id="riassuntoBox"><div class="ria-label">Sinossi</div><div>${d.riassunto}</div></div>` : '';
 
-  const CATS = [
-    { key:'camera_car',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><line x1="9.5" y1="12" x2="3" y2="12"/><line x1="14.5" y1="12" x2="21" y2="12"/><line x1="12" y1="14.5" x2="12" y2="21"/></svg>',name:'Camera Car',render:x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s}</span></div>`).join('')},
-    { key:'location_wild',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L6 10h4l-3 6h5v5h2v-5h5l-3-6h4z"/></svg>',name:'Location Wild',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.location}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'playback',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>',name:'Necessità Playback',render:x=>{let h='';if(x.esibizioni_live?.length)h+=`<div class="subsec"><div class="subsec-title">Esibizioni live</div>`+x.esibizioni_live.map(s=>`<div class="ci"><strong>${s.note||''}</strong><br><span class="ref">${s.scena}</span></div>`).join('')+'</div>';if(x.playback_puro?.length)h+=`<div class="subsec"><div class="subsec-title">Playback puro</div>`+x.playback_puro.map(s=>`<div class="ci"><strong>${s.note||''}</strong><br><span class="ref">${s.scena}</span></div>`).join('')+'</div>';if(x.musica_diegetica?.length)h+=`<div class="subsec"><div class="subsec-title">Musica diegetica</div>`+x.musica_diegetica.map(s=>`<div class="ci"><strong>${s.fonte||''}</strong>${s.note?' — '+s.note:''}<br><span class="ref">${s.scena}</span></div>`).join('')+'</div>';return h;}},
-    { key:'costume_critico',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2l-4 6h5v14h10V8h5l-4-6"/><path d="M9 2c0 1.657 1.343 3 3 3s3-1.343 3-3"/></svg>',name:'Costumi',render:x=>{let h=x.totale_attori_coinvolti?`<div class="ci" style="color:var(--yellow)"><strong>${x.totale_attori_coinvolti} attori coinvolti</strong></div>`:'';h+=x.scene?.map(s=>`<div class="ci"><strong>${s.personaggi}</strong> (${s.attori} att.)<br><span class="ref">${s.scena}</span></div>`).join('');return h;}},
-    { key:'mezzi_movimento',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="18" height="9" rx="2"/><path d="M20 11h2v4h-2"/><path d="M2 11H0v4h2"/><circle cx="6" cy="19" r="2"/><circle cx="15" cy="19" r="2"/><path d="M6 8V5l3-2h6l3 2v3"/></svg>',name:'Mezzi in Movimento',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.mezzo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'acqua_pioggia',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16.2A5 5 0 0016 7h-1.26A8 8 0 104 15.25"/><path d="M8 19v2M12 17v4M16 19v2"/></svg>',name:'Acqua / Pioggia',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'subacquee',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c2-4 5-4 7 0s5 4 7 0 4-4 6 0"/><path d="M2 17c2-4 5-4 7 0s5 4 7 0 4-4 6 0"/><circle cx="12" cy="7" r="3"/><path d="M10 6h4"/></svg>',name:'Scene Subacquee',render:x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s}</span></div>`).join('')},
-    { key:'ambienti_rumorosi',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>',name:'Ambienti Rumorosi',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'aerei_elicotteri',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.5L13 12V4.5a1 1 0 00-2 0V12L2 16.5v2l9-2.5V20l-2 1.5V23l3-1 3 1v-1.5L13 20v-4l9 2.5v-2z"/></svg>',name:'Aerei / Elicotteri',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'dialoghi_movimento',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="4" r="2" fill="currentColor" stroke="none"/><path d="M10 8l-2 4 2 2v6"/><path d="M10 12l3 2 2 5"/><path d="M8 20l1-4"/><path d="M15 19l-1-4"/></svg>',name:'Dialoghi in Movimento',render:x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'lingue_straniere',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2.5 3-4 5.5-4 9s1.5 6 4 9"/><path d="M12 3c2.5 3 4 5.5 4 9s-1.5 6-4 9"/><path d="M3 12h18"/></svg>',name:'Lingue Straniere',render:x=>{let h=x.lingue?.length?`<div class="ci" style="color:var(--yellow)"><strong>${x.lingue.join(', ')}</strong></div>`:'';h+=x.scene?.map(s=>`<div class="ci"><strong>${s.lingua}</strong><br><span class="ref">${s.scena}</span></div>`).join('');return h;}},
-    { key:'dialoghi_mediati',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/><circle cx="16" cy="17" r="3" fill="none" stroke="currentColor"/><path d="M15 17l1 1 2-2"/></svg>',name:'Dialoghi Mediati',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'voiceover',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="9" y1="21" x2="15" y2="21"/><path d="M2 10h2M20 10h2"/></svg>',name:'Voiceover / F.C.',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.personaggio||'—'}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'crowd_parlante',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="12" cy="5" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M2 19v-2a4 4 0 014-4h1"/><path d="M22 19v-2a4 4 0 00-4-4h-1"/><path d="M9 13a4 4 0 016 0v6H9v-6z"/></svg>',name:'Crowd Parlante',render:x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'animali',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7c0-1.5 1-3 2.5-3S9 5.5 9 7"/><path d="M15 7c0-1.5 1-3 2.5-3S20 5.5 20 7"/><path d="M3 13c0-3 2-5 4-5h10c2 0 4 2 4 5v2a5 5 0 01-5 5H8a5 5 0 01-5-5v-2z"/><path d="M9 17c1 1 5 1 6 0"/><circle cx="9.5" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="14" r="1" fill="currentColor" stroke="none"/></svg>',name:'Scene con Animali',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.animale}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-    { key:'stunt_effetti',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5z"/><path d="M8 16l-4 5M16 16l4 5"/><path d="M10 18l2 4"/></svg>',name:'Stunt / Effetti Sp.',render:x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('')},
-  ];
+  const datiSh = spoglioDati(d);
+  const CATS = SPOGLIO.filter(c => datiSh[c.key]?.scene?.length).map(c => ({
+    key: c.key, name: c.nome, ico: SPOGLIO_ICONE[c.key] || SPOGLIO_ICONE._,
+    render: () => datiSh[c.key].scene.map(x => {
+      const t = c.campi.map(k => x[k]).filter(Boolean).join(' \u00b7 ');
+      return `<div class="ci">${t?`<strong>${spoglioMaiuscola(t)}</strong><br>`:''}<span class="ref">${x.scena}</span></div>`;
+    }).join('')
+  }));
+
 
   const catsHtml = CATS.map(c => {
     const cd = d[c.key]||{};
@@ -2233,7 +2232,8 @@ async function showApp() {
   }
   document.getElementById('authPage').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('userEmail').textContent = currentUser.email;
+  const ue = document.getElementById('userEmail');
+  if (ue) ue.textContent = currentUser.email;
   document.getElementById('settingsEmail').textContent = currentUser.email;
   systemInit();
   // Upsert profile
@@ -2405,14 +2405,14 @@ function exportPdf() {
 
   doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
   doc.setTextColor(...C.white);
-  doc.text('Sound', ml + 15, 15.5);
-  const sw0 = doc.getTextWidth('Sound');
+  doc.text('Campo', ml + 15, 15.5);
+  const sw0 = doc.getTextWidth('Campo');
   doc.setTextColor(...C.yellow);
-  doc.text('Analyst', ml + 15 + sw0 + 1, 15.5);
+  doc.text('base', ml + 15 + sw0 + 1, 15.5);
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
   doc.setTextColor(160, 160, 160);
-  doc.text('SPOGLIO REPARTO SUONO', ml + 15, 22);
+  doc.text('SPOGLIO SCENEGGIATURA', ml + 15, 22);
 
   const dateStr = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
   doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
@@ -2503,30 +2503,20 @@ function exportPdf() {
   }
 
   // ── CATEGORIE CRITICHE ──
-  const CATS_DEF = [
-    { key: 'camera_car',        name: 'Camera Car',            fn: x => x.scene?.map(s => typeof s==='object'?s.scena:s) },
-    { key: 'location_wild',     name: 'Location Wild',         fn: x => x.scene?.map(s => s.scena + (s.location ? '  —  ' + s.location : '')) },
-    { key: 'playback',          name: 'Playback',              fn: x => [
-        ...(x.esibizioni_live||[]).map(s =>  '[LIVE] ' + s.scena + (s.note ? '  —  ' + s.note : '')),
-        ...(x.playback_puro||[]).map(s =>   '[PURO] ' + s.scena + (s.note ? '  —  ' + s.note : '')),
-        ...(x.musica_diegetica||[]).map(s => '[DIEG] ' + s.scena + (s.fonte ? '  —  ' + s.fonte : '') + (s.note ? '  —  ' + s.note : ''))
-    ]},
-    { key: 'costume_critico',   name: 'Costumi',               fn: x => x.scene?.map(s => s.scena + (s.personaggi ? '  —  ' + s.personaggi + (s.attori ? ' (' + s.attori + ' att.)' : '') : '')) },
-    { key: 'mezzi_movimento',   name: 'Mezzi in Movimento',    fn: x => x.scene?.map(s => s.scena + (s.mezzo ? '  —  ' + s.mezzo : '')) },
-    { key: 'acqua_pioggia',     name: 'Acqua / Pioggia',       fn: x => x.scene?.map(s => s.scena + (s.tipo ? '  —  ' + s.tipo : '')) },
-    { key: 'subacquee',         name: 'Scene Subacquee',       fn: x => x.scene?.map(s => typeof s==='object'?s.scena:s) },
-    { key: 'ambienti_rumorosi', name: 'Ambienti Rumorosi',     fn: x => x.scene?.map(s => s.scena + (s.tipo ? '  —  ' + s.tipo : '')) },
-    { key: 'aerei_elicotteri',  name: 'Aerei / Elicotteri',    fn: x => x.scene?.map(s => s.scena + (s.tipo ? '  —  ' + s.tipo : '')) },
-    { key: 'dialoghi_movimento',name: 'Dialoghi in Movimento', fn: x => x.scene?.map(s => s.scena + (s.note ? '  —  ' + s.note : '')) },
-    { key: 'lingue_straniere',  name: 'Lingue Straniere',      fn: x => x.scene?.map(s => s.scena + (s.lingua ? '  —  ' + s.lingua : '')) },
-    { key: 'dialoghi_mediati',  name: 'Dialoghi Mediati',      fn: x => x.scene?.map(s => s.scena + (s.tipo ? '  —  ' + s.tipo : '')) },
-    { key: 'voiceover',         name: 'Voiceover / F.C.',      fn: x => x.scene?.map(s => s.scena + (s.personaggio ? '  —  ' + s.personaggio : '')) },
-    { key: 'crowd_parlante',    name: 'Crowd Parlante',        fn: x => x.scene?.map(s => s.scena + (s.note ? '  —  ' + s.note : '')) },
-    { key: 'animali',           name: 'Scene con Animali',     fn: x => x.scene?.map(s => s.scena + (s.animale ? '  —  ' + s.animale : '')) },
-    { key: 'stunt_effetti',     name: 'Stunt / Effetti Sp.',   fn: x => x.scene?.map(s => s.scena + (s.tipo ? '  —  ' + s.tipo : '')) },
-  ];
+  // Le categorie del PDF vengono dalla stessa tabella della vista: prima
+  // erano un secondo elenco scritto a mano, e bastava aggiungerne una
+  // perche' il PDF restasse indietro senza che nessuno se ne accorgesse.
+  const datiPdf = spoglioDati(d);
+  const CATS_DEF = SPOGLIO.filter(c => datiPdf[c.key]?.scene?.length).map(c => ({
+    key: c.key, name: c.nome,
+    fn: () => datiPdf[c.key].scene.map(x => {
+      const t = c.campi.map(k => x[k]).filter(Boolean).join(' \u00b7 ');
+      return x.scena + (t ? '  \u2014  ' + spoglioMaiuscola(t) : '');
+    })
+  }));
 
-  const activeCats = CATS_DEF.filter(c => d[c.key]?.presente);
+
+  const activeCats = CATS_DEF;
 
   if (activeCats.length) {
     activeCats.forEach((cat, idx) => {
@@ -3001,27 +2991,280 @@ function showError(msg) {
   document.getElementById('errorBox').classList.add('show');
   document.getElementById('progressPanel').classList.remove('active');
   document.getElementById('homePage').style.display = '';
-  document.getElementById('mainNav').style.display = '';
   document.getElementById('analyzeBtn').disabled = false;
 }
 
-// ══ SYSPROMPT ══
-const SYSPROMPT = `Sei un analista di sceneggiature per il reparto suono cinematografico. Analizza e rispondi SOLO con JSON valido. Nessun testo. Nessun markdown.
+/* ══ LO SPOGLIO ═══════════════════════════════════════════════════════
+ *
+ * Una tabella sola. Prima le categorie stavano scritte in sette posti —
+ * schema JSON del prompt, descrizioni per il modello, mappa di validita',
+ * tre elenchi di chiavi, la vista e il PDF — e aggiungerne una voleva
+ * dire ricordarseli tutti. Da qui si genera tutto il resto.
+ *
+ * Le categorie non sono piu' quelle del solo reparto suono: l'app serve
+ * ogni reparto, e un microfonista e un costumista guardano la stessa
+ * sceneggiatura cercando cose diverse. Si estrae tutto per tutti, e poi
+ * ognuno vede per primo il suo reparto.
+ *
+ * `campi` dice cosa porta ogni scena oltre al numero: e' quello che
+ * finisce nello schema che il modello deve riempire e nella riga che si
+ * legge a schermo. `desc` e' l'istruzione al modello, e vale la pena
+ * scriverla precisa: quasi tutti gli errori di spoglio nascono da una
+ * definizione vaga, non dal modello.
+ */
+const REPARTI = [
+  ['stuntsfx', 'Stunt & SFX'],
+  ['regia',    'Regia'],
+  ['location', 'Location'],
+  ['foto',     'Fotografia'],
+  ['costumi',  'Costumi'],
+  ['trucco',   'Trucco'],
+  ['suono',    'Suono']
+];
 
-{"titolo":"string","scene_list":[{"n":"string","ie":"INT/EST/EXT/I-E","m":"D/N/M/E/T","p":0}],"riassunto":"string (10-12 righe: genere, trama, personaggi chiave, tono)","totale_scene":0,"scene_interno":0,"scene_esterno":0,"scene_interno_giorno":0,"scene_interno_notte":0,"scene_esterno_giorno":0,"scene_esterno_notte":0,"max_attori_parlanti":{"numero":0,"scena":"string"},"media_attori_parlanti":0,"camera_car":{"presente":false,"scene":[]},"location_wild":{"presente":false,"scene":[{"scena":"string","location":"string"}]},"playback":{"presente":false,"esibizioni_live":[{"scena":"string","note":"string"}],"playback_puro":[{"scena":"string","note":"string"}],"musica_diegetica":[{"scena":"string","fonte":"string","note":"string"}]},"costume_critico":{"presente":false,"scene":[{"scena":"string","attori":0,"personaggi":"string","note":"string"}],"totale_attori_coinvolti":0},"mezzi_movimento":{"presente":false,"scene":[{"scena":"string","mezzo":"string","note":"string"}]},"acqua_pioggia":{"presente":false,"scene":[{"scena":"string","tipo":"string"}]},"subacquee":{"presente":false,"scene":["string"]},"ambienti_rumorosi":{"presente":false,"scene":[{"scena":"string","tipo":"string"}]},"aerei_elicotteri":{"presente":false,"scene":[{"scena":"string","tipo":"string"}]},"dialoghi_movimento":{"presente":false,"scene":[{"scena":"string","note":"string"}]},"lingue_straniere":{"presente":false,"lingue":[],"scene":[{"scena":"string","lingua":"string"}]},"dialoghi_mediati":{"presente":false,"scene":[{"scena":"string","tipo":"string"}]},"voiceover":{"presente":false,"scene":[{"scena":"string","personaggio":"string"}]},"crowd_parlante":{"presente":false,"scene":[{"scena":"string","note":"string"}]},"animali":{"presente":false,"scene":[{"scena":"string","animale":"string"}]},"stunt_effetti":{"presente":false,"scene":[{"scena":"string","tipo":"string"}]},"cast_provvisorio":[{"character_id":1,"nome":"string","pose_stimate":0}],"personaggi_scene":{"NOME":["1","2"]}}
+const SPOGLIO = [
+  // ── Stunt & SFX ──────────────────────────────────────────────────
+  { key:'stunt', rep:'stuntsfx', nome:'Stunt', campi:['tipo'],
+    desc:'combattimenti, cadute, inseguimenti, incidenti, salti, qualunque azione fisica che richieda una controfigura o un coordinatore. tipo: cosa succede, in tre parole.' },
+  { key:'effetti_speciali', rep:'stuntsfx', nome:'Effetti speciali', campi:['tipo'],
+    desc:'effetti fisici sul set: esplosioni, fuoco, fumo, neve, vento, spari a salve, rotture, sangue meccanico. NON effetti digitali in post. tipo: quale effetto.' },
+  { key:'armi', rep:'stuntsfx', nome:'Armi', campi:['arma'],
+    desc:'armi presenti in scena, anche solo impugnate o visibili: da fuoco, bianche, storiche. arma: quale.' },
+  { key:'animali', rep:'stuntsfx', nome:'Animali', campi:['animale'],
+    desc:'animali in scena, anche solo presenti sullo sfondo se nominati. animale: quale e quanti.' },
+
+  // ── Regia ────────────────────────────────────────────────────────
+  { key:'mezzi_scena', rep:'regia', nome:'Mezzi di scena', campi:['mezzo'],
+    desc:'veicoli visibili in scena, fermi o in movimento: auto, moto, barche, treni, camion, apecar, aerei, elicotteri. Esclusi quelli usati come camera car. mezzo: quale.' },
+  { key:'minori', rep:'regia', nome:'Minori', campi:['chi'],
+    desc:'scene con personaggi minorenni, che hanno orari e permessi propri. chi: quali personaggi e che eta\' indicativa.' },
+  { key:'folla', rep:'regia', nome:'Folla', campi:['note'],
+    desc:'scene con molte comparse: feste, mercati, stadi, cortei, locali pieni. note: che tipo di folla, e indicativamente quanta.' },
+  { key:'lingue', rep:'regia', nome:'Lingue straniere', campi:['lingua'],
+    desc:'dialoghi in lingua diversa dall\'italiano, dialetti marcati compresi. lingua: quale.' },
+  { key:'voiceover', rep:'regia', nome:'Voce fuori campo', campi:['personaggio'],
+    desc:'voce fuori campo, pensieri, narrazione, voce che non proviene da chi si vede in scena. personaggio: chi parla.' },
+
+  // ── Location ─────────────────────────────────────────────────────
+  { key:'location_difficili', rep:'location', nome:'Location difficili', campi:['location'],
+    desc:'ambienti con difficolta\' logistiche vere: boschi, spiagge, montagne, tetti, gallerie, mare aperto, luoghi isolati o senza accesso per i mezzi. NON una finestra con vista. location: quale.' },
+  { key:'acqua', rep:'location', nome:'Acqua', campi:['tipo'],
+    desc:'acqua in scena: pioggia, mare, fiumi, piscine, fontane, allagamenti. Anche quando e\' solo evocata da ombrelli o impermeabili. tipo: quale acqua.' },
+  { key:'subacquee', rep:'location', nome:'Subacquee', campi:['note'],
+    desc:'riprese sott\'acqua, anche parziali. note: cosa succede.' },
+
+  // ── Fotografia ───────────────────────────────────────────────────
+  { key:'alba_tramonto', rep:'foto', nome:'Alba / tramonto', campi:['momento'],
+    desc:'scene che la sceneggiatura colloca all\'alba, al tramonto o nella mezz\'ora attorno: hanno una finestra di luce breve e condizionano la giornata. momento: alba o tramonto.' },
+  { key:'camera_car', rep:'foto', nome:'Camera car', campi:['note'],
+    desc:'scene girate da un veicolo in movimento, con la macchina da presa agganciata o a bordo. note: che mezzo e cosa succede.' },
+
+  // ── Costumi ──────────────────────────────────────────────────────
+  { key:'costumi_speciali', rep:'costumi', nome:'Costumi speciali', campi:['cosa'],
+    desc:'costumi fuori dal quotidiano: divise, abiti d\'epoca, uniformi, travestimenti, abiti da cerimonia, costumi di scena. cosa: quale costume e per chi.' },
+  { key:'costumi_criticita', rep:'costumi', nome:'Criticità costumi', campi:['cosa'],
+    desc:'costumi che si rovinano o vanno replicati: strappi, sangue, fango, bagnato, bruciature; e nudita\' o costume da bagno, che vanno concordati. cosa: quale problema.' },
+
+  // ── Trucco ───────────────────────────────────────────────────────
+  { key:'effetti_trucco', rep:'trucco', nome:'Effetti trucco', campi:['cosa'],
+    desc:'ferite, sangue, lividi, cicatrici, ustioni, invecchiamento, protesi. cosa: quale effetto e su chi.' },
+
+  // ── Suono ────────────────────────────────────────────────────────
+  { key:'ambienti_rumorosi', rep:'suono', nome:'Ambienti rumorosi', campi:['tipo'],
+    desc:'ambienti che coprono il dialogo: strade trafficate, cantieri, fabbriche, locali con musica alta, mercati, aeroporti. tipo: quale rumore.' },
+  { key:'dialoghi_mediati', rep:'suono', nome:'Dialoghi mediati', campi:['tipo'],
+    desc:'voce che passa da un apparecchio: telefono, videochiamata, walkie-talkie, interfono, altoparlante, radio. tipo: quale mezzo.' },
+  { key:'musica_diegetica', rep:'suono', nome:'Musica diegetica', campi:['fonte'],
+    desc:'musica che proviene da una fonte visibile o presente in scena: radio, TV, stereo, jukebox, altoparlanti, musicista che suona. fonte: quale.' },
+  { key:'playback', rep:'suono', nome:'Playback', campi:['tipo'],
+    desc:'esibizioni da girare in playback: band che suona, cantante, ballo su musica. tipo: live (suonano davvero) oppure playback su base.' }
+];
+
+/* Tutte le chiavi che possono comparire in un'analisi: quelle di adesso
+   e quelle di prima, perche' le analisi salvate non si riscrivono. */
+/* Per ogni categoria, come si conta se ha contenuto. Serve a rimettere
+   a posto il flag "presente" quando il modello lo dimentica: se ci sono
+   scene, la categoria c'e', qualunque cosa abbia risposto. */
+function spoglioConteggi(){
+  const m = {};
+  for (const k of spoglioChiavi()) m[k] = d => spoglioScene(k, d).length;
+  return m;
+}
+
+function spoglioChiavi(){
+  return [...SPOGLIO.map(c=>c.key), ...Object.keys(SPOGLIO_VECCHIE)];
+}
+
+/* Le analisi salvate prima di questa tabella hanno le vecchie chiavi.
+   Si leggono lo stesso: quelle che corrispondono si rinominano, quelle
+   che si sono divise in due finiscono nella piu' probabile, e
+   dialoghi_movimento sparisce perche' girare parlando mentre si cammina
+   e' la normalita', non una criticita'. */
+const SPOGLIO_VECCHIE = {
+  location_wild:      'location_difficili',
+  acqua_pioggia:      'acqua',
+  mezzi_movimento:    'mezzi_scena',
+  aerei_elicotteri:   'mezzi_scena',
+  lingue_straniere:   'lingue',
+  crowd_parlante:     'folla',
+  costume_critico:    'costumi_criticita',
+  stunt_effetti:      'stunt',
+  dialoghi_movimento: null
+};
+
+/* Dalla tabella: il pezzo di schema JSON che il modello deve riempire. */
+function spoglioSchema(){
+  return SPOGLIO.map(c=>{
+    const campi = c.campi.map(k=>`"${k}":"string"`).join(',');
+    return `"${c.key}":{"presente":false,"scene":[{"scena":"string"${campi?','+campi:''}}]}`;
+  }).join(',');
+}
+
+/* Dalla tabella: le istruzioni al modello, una riga per categoria. */
+function spoglioIstruzioni(){
+  return SPOGLIO.map(c=>`- ${c.key}: ${c.desc}`).join('\n');
+}
+
+/* La categoria, con le vecchie chiavi tradotte. */
+function spoglioCat(key){
+  const k = (key in SPOGLIO_VECCHIE) ? SPOGLIO_VECCHIE[key] : key;
+  return k ? SPOGLIO.find(c=>c.key===k) || null : null;
+}
+
+/* I dati di un'analisi, con le vecchie chiavi portate sulle nuove.
+   Due vecchie categorie possono finire nella stessa nuova (mezzi in
+   movimento e aerei diventano entrambi mezzi di scena): le scene si
+   uniscono invece di sovrascriversi. */
+function spoglioDati(d){
+  const out = {};
+  if (!d) return out;
+  const versa = (key, scene, presente) => {
+    if (!scene.length && !presente) return;
+    if (!out[key]) out[key] = { presente: false, scene: [] };
+    out[key].presente = out[key].presente || !!presente;
+    out[key].scene.push(...scene);
+  };
+  for (const [k, v] of Object.entries(d)) {
+    if (!v || typeof v !== 'object' || !('presente' in v)) continue;
+    // Il vecchio playback teneva la musica diegetica dentro di se': oggi
+    // sono due categorie, e quella annidata andrebbe persa.
+    if (k === 'playback' && Array.isArray(v.musica_diegetica)) {
+      versa('musica_diegetica',
+            v.musica_diegetica.map(s=>({scena:s.scena, fonte:s.fonte||s.note||''})),
+            v.musica_diegetica.length > 0);
+    }
+    const c = spoglioCat(k);
+    if (!c) continue;
+    versa(c.key, spoglioScene(k, v), v.presente);
+  }
+  return out;
+}
+
+/* Le scene di una categoria, in forma uniforme {scena, ...campi}.
+   Le vecchie strutture non erano tutte uguali: subacquee era un elenco
+   di stringhe, playback teneva tre elenchi separati dentro di se'. */
+function spoglioScene(key, v){
+  if (!v) return [];
+  if (key === 'playback') {
+    return [
+      ...(v.esibizioni_live||[]).map(s=>({scena:s.scena, tipo:'live'+(s.note?' — '+s.note:'')})),
+      ...(v.playback_puro||[]).map(s=>({scena:s.scena, tipo:'playback'+(s.note?' — '+s.note:'')}))
+    ];
+  }
+  if (key === 'musica_diegetica' && Array.isArray(v.musica_diegetica)) {
+    return v.musica_diegetica.map(s=>({scena:s.scena, fonte:s.fonte||s.note||''}));
+  }
+  const c = spoglioCat(key);
+  return (v.scene||[]).map(s => typeof s === 'string' ? {scena:s} : s)
+    .filter(s => s && s.scena)
+    .map(s => c ? spoglioAllinea(s, c) : s);
+}
+
+/* Le vecchie categorie chiamavano il loro campo come volevano: aerei
+   aveva "tipo", mezzi aveva "mezzo", e confluendo nella stessa categoria
+   una delle due descrizioni sparirebbe dalla riga. Se una scena non ha
+   nessuno dei campi previsti ma ne ha uno descrittivo suo, lo si
+   rinomina nel primo campo della categoria. */
+function spoglioAllinea(s, c){
+  if (!c.campi.length) return s;
+  if (c.campi.some(k => s[k])) return s;
+  const altro = Object.keys(s).find(k => k !== 'scena' && typeof s[k] === 'string' && s[k]);
+  if (!altro) return s;
+  const r = { scena: s.scena }; r[c.campi[0]] = s[altro];
+  return r;
+}
+
+
+
+/* Il reparto dell'utente, dal profilo. I nomi dei reparti in crew list
+   non coincidono con le nostre chiavi, quindi si cerca per parola. */
+function spoglioMioReparto(){
+  const r = (profilo().reparto||'').toLowerCase();
+  if (!r) return null;
+  const m = {suono:'suono', fonic:'suono', microfon:'suono',
+             regia:'regia', aiuto:'regia',
+             fotograf:'foto', operat:'foto', elettric:'foto', macchin:'foto',
+             costum:'costumi', sarto:'costumi',
+             trucco:'trucco', parrucc:'trucco',
+             location:'location', scenograf:'location',
+             stunt:'stuntsfx', sfx:'stuntsfx', effett:'stuntsfx', armi:'stuntsfx'};
+  for (const [k,v] of Object.entries(m)) if (r.includes(k)) return v;
+  return null;
+}
+
+/* "eco forte, volta a botte" -> "Eco forte, volta a botte".
+   Il modello scrive in minuscolo quello che gli si chiede in minuscolo,
+   ma in una riga stampata una maiuscola iniziale ci vuole. */
+function spoglioMaiuscola(t){
+  const s = String(t||'').trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
+/* Un segno per categoria. Dove non c'e', il cerchietto generico. */
+const SPOGLIO_ICONE = (() => {
+  const sv = d => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  return {
+    _:                   sv('<circle cx="12" cy="12" r="8"/>'),
+    stunt:               sv('<path d="M13 3l-2 7h5l-4 11"/><path d="M5 9l4-2M19 9l-4-2"/>'),
+    effetti_speciali:    sv('<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z"/>'),
+    armi:                sv('<path d="M3 8h12l3 3h3v3h-4l-2 3h-4l-1-3H3z"/><path d="M8 14v3h4"/>'),
+    animali:             sv('<path d="M4.5 8c0-1.7 1-3 2.3-3S9 6.3 9 8"/><path d="M15 8c0-1.7 1-3 2.3-3S19.5 6.3 19.5 8"/><path d="M4 14c0-3 2-5 4-5h8c2 0 4 2 4 5v1a5 5 0 01-5 5H9a5 5 0 01-5-5z"/><circle cx="10" cy="14.5" r=".9" fill="currentColor" stroke="none"/><circle cx="14" cy="14.5" r=".9" fill="currentColor" stroke="none"/>'),
+    mezzi_scena:         sv('<rect x="2" y="9" width="17" height="7" rx="2"/><circle cx="6.5" cy="18" r="2"/><circle cx="15" cy="18" r="2"/><path d="M6 9V6l3-2h5l3 2v3"/>'),
+    minori:              sv('<circle cx="12" cy="7" r="3"/><path d="M6 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M9 4.5C9 3 10.3 2 12 2s3 1 3 2.5"/>'),
+    folla:               sv('<circle cx="6" cy="7" r="2.3"/><circle cx="12" cy="6" r="2.3"/><circle cx="18" cy="7" r="2.3"/><path d="M2 19v-2a4 4 0 014-4"/><path d="M22 19v-2a4 4 0 00-4-4"/><path d="M8.5 19v-3a3.5 3.5 0 017 0v3"/>'),
+    lingues:             '',
+    lingue:              sv('<circle cx="12" cy="12" r="9"/><path d="M12 3c-2.4 2.9-3.8 5.4-3.8 9s1.4 6.1 3.8 9"/><path d="M12 3c2.4 2.9 3.8 5.4 3.8 9s-1.4 6.1-3.8 9"/><path d="M3 12h18"/>'),
+    voiceover:           sv('<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><path d="M12 17v4M9 21h6"/>'),
+    location_difficili:  sv('<path d="M3 18l5-9 4 6 3-4 6 7z"/><path d="M8 7.5a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0"/>'),
+    acqua:               sv('<path d="M12 3s6 6.5 6 10.5A6 6 0 016 13.5C6 9.5 12 3 12 3z"/>'),
+    subacquee:           sv('<path d="M2 11c2-3.5 5-3.5 7 0s5 3.5 7 0 4-3.5 6 0"/><path d="M2 17c2-3.5 5-3.5 7 0s5 3.5 7 0 4-3.5 6 0"/><circle cx="12" cy="5" r="2.5"/>'),
+    alba_tramonto:       sv('<circle cx="12" cy="13" r="3.6"/><path d="M12 5v2M5.6 9.6l1.4 1.4M18.4 9.6L17 11"/><path d="M2 18h20"/><path d="M6 21h12"/>'),
+    camera_car:          sv('<rect x="2" y="7" width="13" height="8" rx="2"/><path d="M15 10l5-2.5v9L15 14"/><circle cx="6" cy="18" r="1.8"/><circle cx="12" cy="18" r="1.8"/>'),
+    costumi_speciali:    sv('<path d="M6 2L2 8h4v14h12V8h4l-4-6"/><path d="M9 2c0 1.7 1.3 3 3 3s3-1.3 3-3"/>'),
+    costumi_criticita:   sv('<path d="M6 2L2 8h4v14h12V8h4l-4-6"/><path d="M9 2c0 1.7 1.3 3 3 3s3-1.3 3-3"/><path d="M9 12l6 7M15 12l-6 7"/>'),
+    effetti_trucco:      sv('<path d="M12 3c4 4 6 6.5 6 9a6 6 0 01-12 0c0-2.5 2-5 6-9z"/><path d="M9.5 13.5c0 1.4 1.1 2.5 2.5 2.5"/>'),
+    ambienti_rumorosi:   sv('<polygon points="11 5 6 9 2 9 2 15 6 15 11 19"/><path d="M19.1 4.9a10 10 0 010 14.2"/><path d="M15.5 8.5a5 5 0 010 7"/>'),
+    dialoghi_mediati:    sv('<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10 18h4"/><path d="M9 6h6M9 9h6"/>'),
+    musica_diegetica:    sv('<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'),
+    playback:            sv('<circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/>')
+  };
+})();
+
+// ══ SYSPROMPT ══
+const SYSPROMPT = `Sei un analista di sceneggiature per il cinema. Fai lo spoglio per tutta la troupe, non per un reparto solo. Analizza e rispondi SOLO con JSON valido. Nessun testo. Nessun markdown.
+
+{"titolo":"string","scene_list":[{"n":"string","ie":"INT/EST/EXT/I-E","m":"D/N/M/E/T","p":0}],"riassunto":"string (10-12 righe: genere, trama, personaggi chiave, tono)","totale_scene":0,"scene_interno":0,"scene_esterno":0,"scene_interno_giorno":0,"scene_interno_notte":0,"scene_esterno_giorno":0,"scene_esterno_notte":0,"max_attori_parlanti":{"numero":0,"scena":"string"},"media_attori_parlanti":0,${spoglioSchema()},"cast_provvisorio":[{"character_id":1,"nome":"string","pose_stimate":0}],"personaggi_scene":{"NOME":["1","2"]}}
 
 Regole:
 - scene_list: TUTTE le scene con n=numero, ie=INT/EST/EXT/I-E, m=D(giorno)N(notte)M(mattino)E(sera)T(tramonto), p=numero pagina della sceneggiatura (obbligatorio)
 - scena format: "SC.N - TIPO. LOCATION - MOMENTO (p.X)"
-- camera_car: scene con dialogo o azione girate su veicolo in movimento — auto, moto, furgone, camion. Includi scene dove i personaggi parlano mentre guidano o sono passeggeri in movimento.
-- location_wild: ambienti naturali con difficoltà logistiche (boschi, spiagge, fiumi, montagne, mare aperto). NON finestre con vista natura.
-- costume_critico: petto nudo, bikini, costume bagno, body
-- mezzi_movimento: veicoli in movimento visibili in scena — moto, barca, camion, apecar, treno. Escludi camera car.
-- acqua_pioggia: scene con pioggia, mare, fiumi, piscine, acqua in scena — anche riferimenti diretti (mantellina antipioggia, ombrello) o acqua usata come elemento narrativo
-- playback: live=esibizione dal vivo in scena (band, artista che suona fisicamente), puro=playback su base preregistrata, diegetica=musica da fonte passiva visibile (radio/TV/stereo/altoparlanti/jukebox). Se una band suona dal vivo classificala SOLO come live, mai anche come diegetica.
-- dialoghi_movimento: dialogo mentre ci si sposta fisicamente (a piedi, in moto, in auto in movimento)
-- dialoghi_mediati: telefono, videochiamata, walkie-talkie, interfono
-- lingue_straniere: scene con dialoghi in lingua diversa dall'italiano — includi anche dialetti marcati (veneziano, tedesco, inglese, svedese ecc.)
+- presente: true solo se la categoria ha almeno una scena. Se non c'e', presente false e scene vuoto.
+- una scena puo' stare in piu' categorie: una sparatoria sotto la pioggia va in armi, effetti_speciali e acqua.
+- segnala solo cio' che e' scritto o implicato chiaramente nella sceneggiatura. Non dedurre per abitudine di genere.
+
+Categorie:
+${spoglioIstruzioni()}
+
 - cast_provvisorio: tutti i personaggi con dialogo, ordinati per pose_stimate desc, character_id progressivo
 - personaggi_scene: solo personaggi con 2+ scene, solo numero scena senza SC.
 - media_attori_parlanti: intero per eccesso
@@ -3037,7 +3280,6 @@ async function startAnalysis() {
   document.getElementById('errorBox').classList.remove('show');
   document.getElementById('analyzeBtn').disabled = true;
   document.getElementById('homePage').style.display = 'none';
-  document.getElementById('mainNav').style.display = 'none';
   document.getElementById('progressPanel').classList.add('active');
   document.getElementById('resultsPage').classList.remove('on');
 
@@ -3110,24 +3352,7 @@ async function startAnalysis() {
     const data = JSON.parse(raw.replace(/```json|```/g,'').trim());
 
     // Normalize: if a category has scene data, force presente=true
-    const arrayKeys = {
-      camera_car:        d => d.scene?.length,
-      location_wild:     d => d.scene?.length,
-      playback:          d => (d.esibizioni_live?.length||0) + (d.playback_puro?.length||0) + (d.musica_diegetica?.length||0),
-      costume_critico:   d => d.scene?.length,
-      mezzi_movimento:   d => d.scene?.length,
-      acqua_pioggia:     d => d.scene?.length,
-      subacquee:         d => d.scene?.length,
-      ambienti_rumorosi: d => d.scene?.length,
-      aerei_elicotteri:  d => d.scene?.length,
-      dialoghi_movimento:d => d.scene?.length,
-      lingue_straniere:  d => d.scene?.length,
-      dialoghi_mediati:  d => d.scene?.length,
-      voiceover:         d => d.scene?.length,
-      crowd_parlante:    d => d.scene?.length,
-      animali:           d => d.scene?.length,
-      stunt_effetti:     d => d.scene?.length,
-    };
+    const arrayKeys = spoglioConteggi();
     Object.entries(arrayKeys).forEach(([key, hasData]) => {
       if (data[key] && hasData(data[key])) data[key].presente = true;
     });
@@ -3163,9 +3388,7 @@ async function startAnalysis() {
     } else {
       // Fallback: parse from category scene strings
       const allSceneStrs = [];
-      ['camera_car','location_wild','costume_critico','mezzi_movimento','acqua_pioggia',
-       'subacquee','ambienti_rumorosi','aerei_elicotteri','dialoghi_movimento','lingue_straniere',
-       'dialoghi_mediati','voiceover','crowd_parlante','animali','stunt_effetti'].forEach(k => {
+      spoglioChiavi().forEach(k => {
         (data[k]?.scene||[]).forEach(s => allSceneStrs.push(typeof s==='string'?s:s.scena||''));
       });
       ['esibizioni_live','playback_puro','musica_diegetica'].forEach(k => {
@@ -3230,12 +3453,13 @@ function hideHomeShowResults() {
   document.getElementById('progressPanel').classList.remove('active');
   document.getElementById('homePage').style.display = 'none';
   document.getElementById('settingsPage').style.display = 'none';
-  document.getElementById('mainNav').style.display = 'none';
 }
 
 // ══ RENDER RESULTS ══
 function renderResults(d) {
-  document.getElementById('resTitle').innerHTML = `${d.titolo || 'Analisi'}`;
+  // Il titolo del film sta nell'intestazione, non piu' in cima alla pagina.
+  try { if (d.titolo) { const f=document.getElementById('tt-film');
+        if (f && !f.dataset.manuallyEdited) f.value = d.titolo; } cbTestata(); } catch(_) {}
 
   // Stats
   const intDetail = (d.scene_interno_giorno != null && d.scene_interno_notte != null)
@@ -3265,56 +3489,49 @@ function renderResults(d) {
   }
 
   // Categories
-  const CATS = [
-    { key:'camera_car',        ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><line x1="9.5" y1="12" x2="3" y2="12"/><line x1="14.5" y1="12" x2="21" y2="12"/><line x1="12" y1="14.5" x2="12" y2="21"/></svg>', name:'Camera Car',           render: x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s}</span></div>`).join('') },
-    { key:'location_wild',     ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L6 10h4l-3 6h5v5h2v-5h5l-3-6h4z"/></svg>', name:'Location Wild',        render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.location}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'playback',          ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>', name:'Necessità Playback',   render: x=>{ let h=''; if(x.esibizioni_live?.length) h+=`<div class="subsec"><div class="subsec-title">Esibizioni live</div>`+x.esibizioni_live.map(s=>`<div class="ci"><strong>${s.note||''}</strong><br><span class="ref">${s.scena}</span></div>`).join('')+'</div>'; if(x.playback_puro?.length) h+=`<div class="subsec"><div class="subsec-title">Playback puro</div>`+x.playback_puro.map(s=>`<div class="ci"><strong>${s.note||''}</strong><br><span class="ref">${s.scena}</span></div>`).join('')+'</div>'; if(x.musica_diegetica?.length) h+=`<div class="subsec"><div class="subsec-title">Musica diegetica</div>`+x.musica_diegetica.map(s=>`<div class="ci"><strong>${s.fonte||''}</strong>${s.note?' — '+s.note:''}<br><span class="ref">${s.scena}</span></div>`).join('')+'</div>'; return h; }},
-    { key:'costume_critico',   ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2l-4 6h5v14h10V8h5l-4-6"/><path d="M9 2c0 1.657 1.343 3 3 3s3-1.343 3-3"/></svg>', name:'Costumi',            render: x=>{ let h=x.totale_attori_coinvolti?`<div class="ci" style="color:var(--yellow)"><strong>${x.totale_attori_coinvolti} attori coinvolti</strong></div>`:''; h+=x.scene?.map(s=>`<div class="ci"><strong>${s.personaggi}</strong> (${s.attori} att.)<br><span class="ref">${s.scena}</span></div>`).join(''); return h; }},
-    { key:'mezzi_movimento',   ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="18" height="9" rx="2"/><path d="M20 11h2v4h-2"/><path d="M2 11H0v4h2"/><circle cx="6" cy="19" r="2"/><circle cx="15" cy="19" r="2"/><path d="M6 8V5l3-2h6l3 2v3"/></svg>', name:'Mezzi in Movimento',   render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.mezzo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'acqua_pioggia',     ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16.2A5 5 0 0016 7h-1.26A8 8 0 104 15.25"/><path d="M8 19v2M12 17v4M16 19v2"/></svg>', name:'Acqua / Pioggia',      render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'subacquee',         ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c2-4 5-4 7 0s5 4 7 0 4-4 6 0"/><path d="M2 17c2-4 5-4 7 0s5 4 7 0 4-4 6 0"/><circle cx="12" cy="7" r="3"/><path d="M10 6h4"/></svg>', name:'Scene Subacquee',      render: x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s}</span></div>`).join('') },
-    { key:'ambienti_rumorosi', ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>', name:'Ambienti Rumorosi',    render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'aerei_elicotteri',  ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.5L13 12V4.5a1 1 0 00-2 0V12L2 16.5v2l9-2.5V20l-2 1.5V23l3-1 3 1v-1.5L13 20v-4l9 2.5v-2z"/></svg>', name:'Aerei / Elicotteri',   render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'dialoghi_movimento',ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="4" r="2" fill="currentColor" stroke="none"/><path d="M10 8l-2 4 2 2v6"/><path d="M10 12l3 2 2 5"/><path d="M8 20l1-4"/><path d="M15 19l-1-4"/></svg>', name:'Dialoghi in Movimento',render: x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s.scena}</span>${s.note?`<br>${s.note}`:''}</div>`).join('') },
-    { key:'lingue_straniere',  ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3c-2.5 3-4 5.5-4 9s1.5 6 4 9"/><path d="M12 3c2.5 3 4 5.5 4 9s-1.5 6-4 9"/><path d="M3 12h18"/></svg>', name:'Lingue Straniere',     render: x=>{ let h=x.lingue?.length?`<div class="ci" style="color:var(--yellow)"><strong>${x.lingue.join(', ')}</strong></div>`:''; h+=x.scene?.map(s=>`<div class="ci"><strong>${s.lingua}</strong><br><span class="ref">${s.scena}</span></div>`).join(''); return h; }},
-    { key:'dialoghi_mediati',  ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/><circle cx="16" cy="17" r="3" fill="none" stroke="currentColor"/><path d="M15 17l1 1 2-2"/></svg>', name:'Dialoghi Mediati',     render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'voiceover',         ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="9" y1="21" x2="15" y2="21"/><path d="M2 10h2M20 10h2"/></svg>', name:'Voiceover / F.C.',     render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.personaggio||'—'}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'crowd_parlante',    ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="12" cy="5" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M2 19v-2a4 4 0 014-4h1"/><path d="M22 19v-2a4 4 0 00-4-4h-1"/><path d="M9 13a4 4 0 016 0v6H9v-6z"/></svg>', name:'Crowd Parlante',       render: x=>x.scene?.map(s=>`<div class="ci"><span class="ref">${s.scena}</span>${s.note?`<br>${s.note}`:''}</div>`).join('') },
-    { key:'animali',           ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7c0-1.5 1-3 2.5-3S9 5.5 9 7"/><path d="M15 7c0-1.5 1-3 2.5-3S20 5.5 20 7"/><path d="M3 13c0-3 2-5 4-5h10c2 0 4 2 4 5v2a5 5 0 01-5 5H8a5 5 0 01-5-5v-2z"/><path d="M9 17c1 1 5 1 6 0"/><circle cx="9.5" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="14" r="1" fill="currentColor" stroke="none"/></svg>', name:'Scene con Animali',    render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.animale}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-    { key:'stunt_effetti',     ico:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2 5h5l-4 3 1.5 5L12 12l-4.5 3L9 10 5 7h5z"/><path d="M8 16l-4 5M16 16l4 5"/><path d="M10 18l2 4"/></svg>', name:'Stunt / Effetti Sp.',  render: x=>x.scene?.map(s=>`<div class="ci"><strong>${s.tipo}</strong><br><span class="ref">${s.scena}</span></div>`).join('') },
-  ];
+  /* Le categorie si disegnano dalla tabella, raggruppate per reparto e
+     con il proprio in cima: un microfonista e un costumista guardano la
+     stessa sceneggiatura cercando cose diverse, e scorrere sei reparti
+     altrui prima del proprio e' il modo piu' veloce per smettere di
+     aprire la scheda. Si mostrano solo i reparti che hanno qualcosa. */
+  const dati = spoglioDati(d);
+  const mioRep = spoglioMioReparto();
+  const ordine = REPARTI.slice().sort((a,b) =>
+    (a[0]===mioRep?-1:0) - (b[0]===mioRep?-1:0));
 
-  const activeCats = CATS.map(c => {
-    const cd = d[c.key] || {};
-    if (!cd.presente) return null;
-    const cnt = cd.scene?.length || (cd.esibizioni_live?.length||0)+(cd.playback_puro?.length||0)+(cd.musica_diegetica?.length||0);
-    const inner = c.render(cd)||'';
-    const existingNote = (catNotesData[c.key] || '').trim();
-    const hasNote = !!existingNote;
-    return `<div class="cat active" id="cat-card-${c.key}">
-      <div class="cat-top">
-        <span class="cat-ico">${c.ico}</span>
-        <span class="cat-name">${c.name}</span>
-        <span class="badge-count">${cnt>0?cnt+' sc.':'sì'}</span>
-      </div>
-      ${inner?`<div class="cat-items">${inner}</div>`:''}
-      <div class="cat-note-toggle" onclick="toggleCatNote('${c.key}')">
-        <span class="cat-note-label${hasNote?' has-content':''}">Note${hasNote?' ·':''}</span>
-        <span class="cat-note-arrow${hasNote?' open':''}" id="cat-note-arrow-${c.key}">▼</span>
-      </div>
-      <div class="cat-note-body${hasNote?' open':''}" id="cat-note-body-${c.key}">
-        <textarea class="cat-note-ta" id="cat-note-ta-${c.key}" placeholder="Note per questa categoria..." oninput="scheduleCatNotesSave('${c.key}')">${existingNote}</textarea>
-        <div class="cat-note-save" id="cat-note-save-${c.key}"></div>
-      </div>
-    </div>`;
-  }).filter(Boolean);
+  const blocchi = ordine.map(([rk, rnome]) => {
+    const cats = SPOGLIO.filter(c => c.rep===rk && dati[c.key]?.scene?.length);
+    if (!cats.length) return '';
+    const schede = cats.map(c => {
+      const sc = dati[c.key].scene;
+      const nota = (catNotesData[c.key] || '').trim();
+      const voci = sc.map(x => {
+        const testo = c.campi.map(k => x[k]).filter(Boolean).join(' · ');
+        return `<div class="ci">${testo?`<strong>${esc(spoglioMaiuscola(testo))}</strong><br>`:''}<span class="ref">${esc(x.scena)}</span></div>`;
+      }).join('');
+      return `<div class="cat active" id="cat-card-${c.key}">
+        <div class="cat-top">
+          <span class="cat-ico">${SPOGLIO_ICONE[c.key]||SPOGLIO_ICONE._}</span>
+          <span class="cat-name">${esc(c.nome)}</span>
+          <span class="badge-count">${sc.length} sc.</span>
+        </div>
+        <div class="cat-items">${voci}</div>
+        <div class="cat-note-toggle" onclick="toggleCatNote('${c.key}')">
+          <span class="cat-note-label${nota?' has-content':''}">Note${nota?' ·':''}</span>
+          <span class="cat-note-arrow${nota?' open':''}" id="cat-note-arrow-${c.key}">▼</span>
+        </div>
+        <div class="cat-note-body${nota?' open':''}" id="cat-note-body-${c.key}">
+          <textarea class="cat-note-ta" id="cat-note-ta-${c.key}" placeholder="Note per questa categoria..." oninput="scheduleCatNotesSave('${c.key}')">${esc(nota)}</textarea>
+          <div class="cat-note-save" id="cat-note-save-${c.key}"></div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="rep"><div class="rep-t">${esc(rnome)}${rk===mioRep?' <span>il tuo</span>':''}</div>
+      <div class="rep-c">${schede}</div></div>`;
+  }).filter(Boolean).join('');
 
-  // Split into two balanced columns
-  const half = Math.ceil(activeCats.length / 2);
-  const col1 = activeCats.slice(0, half);
-  const col2 = activeCats.slice(half);
-  document.getElementById('catsGrid').innerHTML =
-    `<div class="cats-col">${col1.join('')}</div><div class="cats-col">${col2.join('')}</div>`;
+  document.getElementById('catsGrid').innerHTML = blocchi ||
+    '<div class="prog-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>';
 
   document.getElementById('resultsPage').classList.add('on');
   setTimeout(activateRefs, 50);
@@ -3331,7 +3548,6 @@ function resetApp() {
   document.getElementById('chatSection').classList.remove('on');
   document.getElementById('chatMessages').innerHTML = '';
   document.getElementById('homePage').style.display = '';
-  document.getElementById('mainNav').style.display = '';
   document.getElementById('errorBox').classList.remove('show');
   document.getElementById('riassuntoBox').style.display = 'none';
   document.getElementById('maxInfo').style.display = 'none';
@@ -3570,7 +3786,6 @@ async function startSerieAnalysis() {
   document.getElementById('errorBox').classList.remove('show');
   document.getElementById('analyzeBtn').disabled = true;
   document.getElementById('homePage').style.display = 'none';
-  document.getElementById('mainNav').style.display = 'none';
   document.getElementById('progressPanel').classList.add('active');
   document.getElementById('resultsPage').classList.remove('on');
   setStep(1);
@@ -3611,9 +3826,7 @@ async function startSerieAnalysis() {
     const merged = mergeSerieResults(results);
 
     // Normalize presente flags
-    const catKeys = ['camera_car','location_wild','playback','costume_critico','mezzi_movimento',
-      'acqua_pioggia','subacquee','ambienti_rumorosi','aerei_elicotteri','dialoghi_movimento',
-      'lingue_straniere','dialoghi_mediati','voiceover','crowd_parlante','animali','stunt_effetti'];
+    const catKeys = spoglioChiavi();
     catKeys.forEach(k => {
       const cat = merged[k]; if (!cat) return;
       if (cat.scene?.length || cat.esibizioni_live?.length || cat.playback_puro?.length || cat.musica_diegetica?.length) cat.presente = true;
@@ -3659,7 +3872,6 @@ async function startSerieAnalysis() {
   } catch(e) {
     document.getElementById('progressPanel').classList.remove('active');
     document.getElementById('homePage').style.display = '';
-    document.getElementById('mainNav').style.display = '';
     document.getElementById('analyzeBtn').disabled = false;
     const eb = document.getElementById('errorBox');
     eb.textContent = 'Errore analisi: ' + e.message;
@@ -3676,9 +3888,7 @@ function mergeSerieResults(results) {
   merged.totale_scene = results.reduce((s,r) => s + (r.data.totale_scene||0), 0);
   merged.scene_list = results.flatMap(r => r.data.scene_list || []);
 
-  const catKeys = ['camera_car','location_wild','costume_critico','mezzi_movimento',
-    'acqua_pioggia','subacquee','ambienti_rumorosi','aerei_elicotteri','dialoghi_movimento',
-    'lingue_straniere','dialoghi_mediati','voiceover','crowd_parlante','animali','stunt_effetti'];
+  const catKeys = spoglioChiavi();
   catKeys.forEach(k => {
     merged[k] = { presente: results.some(r => r.data[k]?.presente), scene: results.flatMap(r => r.data[k]?.scene || []) };
     if (k === 'lingue_straniere') merged[k].lingue = [...new Set(results.flatMap(r => r.data[k]?.lingue || []))];
@@ -3970,9 +4180,7 @@ async function runComparison(oldText, newText, newB64) {
   subtitle.textContent = `${analysisData?.titolo || 'Sceneggiatura'} — confronto versioni`;
 
   // Build critical scenes list from current analysis
-  const criticalKeys = ['camera_car','location_wild','playback','costume_critico','mezzi_movimento',
-    'acqua_pioggia','subacquee','ambienti_rumorosi','aerei_elicotteri','dialoghi_movimento',
-    'lingue_straniere','dialoghi_mediati','voiceover','crowd_parlante','animali','stunt_effetti'];
+  const criticalKeys = spoglioChiavi();
   const criticalScenes = new Set();
   if (analysisData) {
     criticalKeys.forEach(k => {
@@ -3997,13 +4205,13 @@ ${oldText.slice(0, 60000)}
 NUOVA VERSIONE:
 ${newText.slice(0, 60000)}
 
-Scene critiche per il reparto suono (numeri scena): ${[...criticalScenes].join(', ') || 'nessuna'}
+Scene segnalate nello spoglio (numeri scena): ${[...criticalScenes].join(', ') || 'nessuna'}
 
 Regole TASSATIVE:
 - Ignora COMPLETAMENTE le rinumerazioni — se il contenuto è identico la scena NON va segnalata
 - Non menzionare mai doppiaggio, ADR, post-produzione — i film sono sempre in presa diretta
 - Nessun commento soggettivo o interpretativo — solo descrizione oggettiva di cosa è cambiato
-- scene_da_segnalare: SOLO scene con modifiche reali (non rinumerazioni) che appartengono alle categorie critiche del suono (playback, stunt, camera car, lingue straniere, crowd parlante, mezzi in movimento, acqua/pioggia, subacquee, aerei/elicotteri). Non segnalare scene con semplici variazioni di dialogo normale.
+- scene_da_segnalare: SOLO scene con modifiche reali (non rinumerazioni) che appartengono a una categoria dello spoglio (stunt, effetti speciali, armi, animali, mezzi di scena, minori, folla, lingue, acqua, subacquee, location difficili, alba/tramonto, camera car, costumi, trucco, ambienti rumorosi, dialoghi mediati, musica, playback). Non segnalare scene con semplici variazioni di dialogo normale.
 - Il campo "riassunto" descrive oggettivamente cosa è cambiato (es: "Rimossa battuta di MATTIA", "Aggiunta sequenza musicale dal vivo")
 - Il campo "motivo" indica solo la categoria critica coinvolta (es: "playback", "stunt", "camera car")
 
@@ -4133,16 +4341,7 @@ async function importNewAnalysis() {
 
   // Normalize
   const data = pendingNewAnalysis;
-  const arrayKeys = {
-    camera_car: d=>d.scene?.length, location_wild: d=>d.scene?.length,
-    playback: d=>(d.esibizioni_live?.length||0)+(d.playback_puro?.length||0)+(d.musica_diegetica?.length||0),
-    costume_critico: d=>d.scene?.length, mezzi_movimento: d=>d.scene?.length,
-    acqua_pioggia: d=>d.scene?.length, subacquee: d=>d.scene?.length,
-    ambienti_rumorosi: d=>d.scene?.length, aerei_elicotteri: d=>d.scene?.length,
-    dialoghi_movimento: d=>d.scene?.length, lingue_straniere: d=>d.scene?.length,
-    dialoghi_mediati: d=>d.scene?.length, voiceover: d=>d.scene?.length,
-    crowd_parlante: d=>d.scene?.length, animali: d=>d.scene?.length, stunt_effetti: d=>d.scene?.length,
-  };
+  const arrayKeys = spoglioConteggi();
   Object.entries(arrayKeys).forEach(([key, hasData]) => {
     if (data[key] && hasData(data[key])) data[key].presente = true;
   });
@@ -4409,26 +4608,14 @@ function buildTimetableContext() {
 
 function buildChatContext(d) {
   const lines = [`FILM: ${d.titolo} | Scene: ${d.totale_scene} (INT:${d.scene_interno} EXT:${d.scene_esterno}) | Max att: ${d.max_attori_parlanti?.numero} | Media: ${d.media_attori_parlanti}`];
-  const cats = [
-    ['Camera car',d.camera_car,x=>x.scene?.join('; ')],
-    ['Location wild',d.location_wild,x=>x.scene?.map(s=>`${s.location}:${s.scena}`).join('; ')],
-    ['Playback live',d.playback,x=>x.esibizioni_live?.map(s=>s.scena).join('; ')],
-    ['Playback puro',d.playback,x=>x.playback_puro?.map(s=>s.scena).join('; ')],
-    ['Musica dieg.',d.playback,x=>x.musica_diegetica?.map(s=>`${s.fonte||''}:${s.scena}`).join('; ')],
-    ['Costume critico',d.costume_critico,x=>x.scene?.map(s=>`${s.personaggi}(${s.attori}att):${s.scena}`).join('; ')],
-    ['Mezzi',d.mezzi_movimento,x=>x.scene?.map(s=>`${s.mezzo}:${s.scena}`).join('; ')],
-    ['Acqua/pioggia',d.acqua_pioggia,x=>x.scene?.map(s=>`${s.tipo}:${s.scena}`).join('; ')],
-    ['Subacquee',d.subacquee,x=>x.scene?.join('; ')],
-    ['Rumorosi',d.ambienti_rumorosi,x=>x.scene?.map(s=>`${s.tipo}:${s.scena}`).join('; ')],
-    ['Aerei',d.aerei_elicotteri,x=>x.scene?.map(s=>`${s.tipo}:${s.scena}`).join('; ')],
-    ['Dial.mov.',d.dialoghi_movimento,x=>x.scene?.map(s=>s.scena).join('; ')],
-    ['Lingue',d.lingue_straniere,x=>`${x.lingue?.join(',')}:${x.scene?.map(s=>`${s.lingua}:${s.scena}`).join('; ')}`],
-    ['Dial.mediati',d.dialoghi_mediati,x=>x.scene?.map(s=>`${s.tipo}:${s.scena}`).join('; ')],
-    ['Voiceover',d.voiceover,x=>x.scene?.map(s=>`${s.personaggio}:${s.scena}`).join('; ')],
-    ['Crowd',d.crowd_parlante,x=>x.scene?.map(s=>s.scena).join('; ')],
-    ['Animali',d.animali,x=>x.scene?.map(s=>`${s.animale}:${s.scena}`).join('; ')],
-    ['Stunt',d.stunt_effetti,x=>x.scene?.map(s=>`${s.tipo}:${s.scena}`).join('; ')],
-  ];
+  // Le categorie per Gennaro: dalla tabella, cosi' quando se ne aggiunge
+  // una la chat la conosce senza che nessuno se ne ricordi.
+  const dd = spoglioDati(d);
+  const cats = SPOGLIO.filter(c => dd[c.key]?.scene?.length).map(c => [
+    c.nome, dd[c.key],
+    x => x.scene.map(sx => (c.campi.map(k=>sx[k]).filter(Boolean).join(' ')||'') + ':' + sx.scena).join('; ')
+  ]);
+
   cats.forEach(([l,obj,fn]) => { if(obj?.presente){const v=fn(obj);if(v)lines.push(`${l}: ${v}`);}});
 
   // Tutte le scene (scene_list)
@@ -4461,7 +4648,7 @@ function initChat(d) {
   rotateChatPlaceholder();
   document.getElementById('chatMessages').innerHTML = '';
   document.getElementById('chatSection').classList.add('on');
-  addMsg('assistant', `Ciao! Sono Gennaro. Ho analizzato <em>${escapeHtml(d.titolo||'la sceneggiatura')}</em>. Sono pronto per qualsiasi domanda sul reparto suono — criticità, attrezzatura, scene specifiche. Come posso aiutarti?`);
+  addMsg('assistant', `Ciao! Sono Gennaro. Ho analizzato <em>${escapeHtml(d.titolo||'la sceneggiatura')}</em>. Chiedimi quello che ti serve — criticit\u00e0, scene, attrezzatura, qualunque reparto.`);
 }
 
 // Converte il testo del modello in HTML da mostrare.
@@ -5635,9 +5822,7 @@ function buildSceneIndex() {
   // Build scene → page map from category scene strings (p.X format)
   const idx = {};
   if (!analysisData) return idx;
-  const catKeys = ['camera_car','location_wild','costume_critico','mezzi_movimento','acqua_pioggia',
-    'subacquee','ambienti_rumorosi','aerei_elicotteri','dialoghi_movimento','lingue_straniere',
-    'dialoghi_mediati','voiceover','crowd_parlante','animali','stunt_effetti'];
+  const catKeys = spoglioChiavi();
   const allStrs = [];
   catKeys.forEach(k => {
     (analysisData[k]?.scene||[]).forEach(s => allStrs.push(typeof s==='string'?s:s.scena||''));
@@ -6898,7 +7083,7 @@ async function loadPdlFromSupabase(analysisId) {
 // Check if a scene number is critical for sound (from analysisData)
 function isSceneCritical(scNum) {
   if (!analysisData) return false;
-  const criticalCategories = ['camera_car','playback','costume_critico','mezzi_movimento','acqua_pioggia','subacquee','ambienti_rumorosi','aerei_elicotteri','location_wild'];
+  const criticalCategories = spoglioChiavi();
   const scStr = String(scNum);
   for (const cat of criticalCategories) {
     const d = analysisData[cat];
@@ -8295,7 +8480,7 @@ async function sendGennaroDrawer() {
     gennaroDrawerAddMsg('assistant', reply);
     // Se il drawer è chiuso, mostra badge
     if (!gennaroDrawerOpen) {
-      const badge = document.getElementById('gennaroFabBadge');
+      const badge = document.getElementById('gennaroFabBadge');  // tolto: resta nullo
       if (badge) badge.style.display = 'flex';
     }
   } catch(e) {
