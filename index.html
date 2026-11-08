@@ -340,6 +340,26 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .ch{color:var(--muted);font-size:16px}
 /* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
    il modo di tornare alla scelta del progetto. */
+/* ── I tuoi progetti ─────────────────────────────────────────────── */
+#homePage{padding:14px 0 40px}
+.prog-tit{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;
+  letter-spacing:-.02em;margin:6px 0 14px}
+.prog{display:flex;align-items:center;gap:10px;padding:14px 16px;min-height:62px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:9px;cursor:pointer}
+.prog .c{flex:1;min-width:0}
+.prog .t{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:500;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog .s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.prog .x{width:30px;height:30px;flex:0 0 30px;background:none;border:none;border-radius:7px;
+  color:var(--muted);font-size:13px;cursor:pointer;opacity:.45}
+.prog .x:hover{opacity:1;color:var(--danger)}
+.prog .ch{color:var(--muted);font-size:16px}
+.prog-vuoto{padding:28px 16px;text-align:center;font-size:13px;color:var(--muted);line-height:1.6}
+.prog-nuovo{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  min-height:52px;margin-top:4px;background:none;border:1px dashed var(--border-l);
+  border-radius:12px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;
+  font-size:14.5px;font-weight:500;cursor:pointer}
 /* ── Accesso ───────────────────────────────────────────────────────── */
 /* Marchio, frase e tasti sono un blocco solo, centrato. Prima i tasti
    erano spinti in fondo allo schermo e fra la frase e il primo tocco
@@ -925,13 +945,15 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div>
     </div>
     <div id="homePage">
-      <div class="panel">
-        <div class="panel-label">Analisi Precedenti</div>
-        <div class="history-grid" id="historyGrid">
-          <div class="hist-loading">Caricamento...</div>
-        </div>
+      <h2 class="prog-tit">I tuoi progetti</h2>
+      <div id="historyGrid">
+        <div class="prog-vuoto">Caricamento…</div>
       </div>
-      <div class="panel" id="uploadPanel">
+      <!-- Il caricamento di una sceneggiatura sta dietro un tasto: si fa una
+           volta per film, mentre la lista si guarda tutti i giorni. -->
+      <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
+        ＋ Nuovo progetto da sceneggiatura</button>
+      <div class="panel" id="uploadPanel" style="display:none;margin-top:12px">
         <div class="panel-label">Nuova Analisi</div>
 
         <!-- Selettore Film / Serie TV -->
@@ -2696,26 +2718,43 @@ async function loadHistory() {
   }
 }
 
+/*
+ * I progetti.
+ *
+ * Sono le analisi salvate, ma per chi le usa sono i film su cui ha
+ * lavorato: una riga per film, con quello che serve a riconoscerlo — il
+ * titolo, quante scene, quando e' stato analizzato. Le schede affiancate
+ * di prima mostravano meno informazione e ne facevano stare tre per
+ * schermata invece di otto.
+ */
+/* Apre e chiude il pannello della nuova analisi. */
+function homeNuovo(){
+  const p=document.getElementById('uploadPanel'); if(!p)return;
+  const aperto=p.style.display!=='none';
+  p.style.display=aperto?'none':'block';
+  const b=document.getElementById('progNuovo');
+  if(b)b.textContent=aperto?'＋ Nuovo progetto da sceneggiatura':'✕ Annulla';
+  if(!aperto)setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),60);
+}
+
 function renderHistoryGrid(items) {
   const grid = document.getElementById('historyGrid');
   if (!items.length) {
-    grid.innerHTML = '<div class="hist-empty">Nessuna analisi salvata — apparirà qui dopo la prima analisi.</div>';
+    grid.innerHTML = '<div class="prog-vuoto">Nessun progetto. Il primo nasce caricando una sceneggiatura.</div>';
     return;
   }
   grid.innerHTML = items.map(h => {
     const d = new Date(h.created_at);
-    const ds = d.toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric' });
-    const ts = d.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+    const quando = d.toLocaleDateString('it-IT', { day:'numeric', month:'short', year:
+      d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
     const titolo = h.data?.titolo || 'Senza titolo';
     const sc = h.data?.totale_scene || 0;
-    const si = h.data?.scene_interno || 0;
-    const se = h.data?.scene_esterno || 0;
-    return `<div class="hist-card" onclick="loadFromHistory('${h.id}')">
-      <button class="hist-delete" onclick="deleteAnalysis('${h.id}',event)">✕</button>
-      <div class="hist-version">${h.version_label || 'v1'}</div>
-      <div class="hist-title">${titolo}</div>
-      <div class="hist-meta"><span>${sc}</span> scene · INT <span>${si}</span> · EXT <span>${se}</span></div>
-      <div class="hist-date">${ds} · ${ts}</div>
+    const righe = [sc ? sc + ' scene' : '', h.version_label && h.version_label !== 'v1' ? h.version_label : '', quando]
+      .filter(Boolean).join(' · ');
+    return `<div class="prog" onclick="loadFromHistory('${h.id}')">
+      <span class="c"><span class="t">${esc(titolo)}</span><span class="s num">${esc(righe)}</span></span>
+      <button class="x" onclick="deleteAnalysis('${h.id}',event)" title="Elimina">✕</button>
+      <span class="ch">›</span>
     </div>`;
   }).join('');
 }
