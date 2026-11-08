@@ -1,5 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Il nome del Worker resta quello d'origine anche dopo il cambio nome
+  // dell'app: e' lui a generare l'indirizzo soundanalyst.<account>.workers.dev.
+  // Cambiarlo non rinomina niente — crea un Worker nuovo a un altro
+  // indirizzo, lascia acceso il vecchio e invalida i redirect di Supabase
+  // e la PWA gia' installata. Si cambia insieme al dominio proprio.
   "name": "soundanalyst",
   "compatibility_date": "2026-11-05",
   "main": "worker/index.js",

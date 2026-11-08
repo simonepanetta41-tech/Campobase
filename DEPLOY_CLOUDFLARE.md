@@ -1,6 +1,6 @@
 # Deploy su Cloudflare Workers
 
-SoundAnalyst era su Vercel. Questo branch lo porta su Cloudflare, dove il piano
+Campobase era su Vercel. Questo branch lo porta su Cloudflare, dove il piano
 gratuito regge l'app senza limiti di durata sulle richieste HTTP e senza il
 divieto di uso commerciale che ha il piano Hobby di Vercel.
 
@@ -62,7 +62,7 @@ l'icona che hai gia' sulla home continuerebbe a puntare al vecchio indirizzo.
 
 Sull'iPhone:
 
-1. Tieni premuta l'icona di SoundAnalyst sulla home → **Rimuovi app**
+1. Tieni premuta l'icona di Campobase sulla home → **Rimuovi app**
 2. Apri Safari sul nuovo indirizzo `.pages.dev`
 3. Entra con il tuo account, cosi' la sessione si ricrea
 4. Condividi → **Aggiungi alla schermata Home**

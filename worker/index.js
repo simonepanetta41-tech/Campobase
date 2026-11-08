@@ -1,5 +1,5 @@
 /*
- * SoundAnalyst — Worker.
+ * Campobase — Worker.
  *
  * Grazie a run_worker_first in wrangler.jsonc, questo codice gira solo per
  * /api/*. Tutto il resto lo serve direttamente il livello degli asset

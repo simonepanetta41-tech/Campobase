@@ -1,29 +1,15 @@
 {
-  "name": "SoundAnalyst",
-  "short_name": "SoundAnalyst",
-  "description": "Analisi sceneggiatura per il reparto suono",
+  "name": "Campobase",
+  "short_name": "Campobase",
+  "description": "Ore e maggiorazioni CCNL, piano di lavorazione e spoglio per la troupe",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111111",
   "theme_color": "#111111",
   "orientation": "any",
   "icons": [
-    {
-      "src": "/soundanalyst_favicon_32.png",
-      "sizes": "32x32",
-      "type": "image/png"
-    },
-    {
-      "src": "/soundanalyst_favicon_192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/soundanalyst_favicon_512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
