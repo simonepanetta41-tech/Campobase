@@ -356,6 +356,13 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-prev .n>div:last-child{border-right:none}
 .odg-prev .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .odg-prev .v{display:block;font-size:14px;color:var(--white-dim);margin-top:3px}
+.odg-pick .r.min{padding:9px 16px}
+.odg-pick .r.min .k{font-size:12px;color:var(--muted)}
+.odg-pick .v2{font-family:'DM Mono',monospace;font-size:14px;color:var(--white-dim)}
+.odg-pick .conme{padding:11px 16px;border-top:1px solid var(--border)}
+.odg-pick .conme .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.odg-pick .conme .v{display:block;font-size:13px;color:var(--white-dim);margin-top:3px;line-height:1.5}
+.odg-osp{margin-top:9px}
 /* Il passaggio e la scena */
 .odg-pick .r{display:flex;align-items:center;justify-content:space-between;
   padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -7502,80 +7509,125 @@ async function odgEstrai(testo, onPasso) {
  * Il tuo pick-up, dalla lista dei trasporti.
  *
  * pdf.js appiattisce la tabella in una riga sola, ma le colonne restano
- * separate da due o piu' spazi, e l'ordine e' sempre quello: autista e
- * mezzo, telefono, orario di partenza, i passeggeri, il luogo di
- * ritrovo, l'ora, la destinazione. Trovato il proprio cognome, il resto
- * si legge andando avanti e indietro da li'.
+ * separate da due o piu' spazi e l'intestazione dice l'ordine:
  *
- * Niente modello: su una tabella cosi' regolare le regole bastano, e un
- * pick-up sbagliato e' peggio di nessun pick-up.
+ *   RUNNER | ORARIO PARTENZA | NOME | INDIRIZZO | ORARIO ARRIVO | INDIRIZZO
+ *
+ * Quindi l'orario del pick-up e' quello PRIMA dei nomi, non quello dopo:
+ * quello dopo e' l'arrivo. Un furgone fa piu' tratte di seguito, e ogni
+ * tratta ha il suo gruppo di persone.
+ *
+ * Niente modello: la tabella e' regolare e le regole bastano. Un pick-up
+ * sbagliato e' peggio di nessun pick-up.
  */
-const LUOGHI = /^(Via|Viale|Piazza|P\.zza|Corso|C\.so|Largo|Vicolo|Strada|Str\.|Contrada|S\.S\.|SS)\b/i;
-const ORA_RE = /^\d{1,2}\s*[.:]\s*\d{2}$/;
+const LUOGHI = /^(Via|Viale|Piazza|P\.zza|Corso|C\.so|Largo|Vicolo|Strada|Str\.|Contrada|S\.S\.|SS|Localit)/i;
+const DEST_BREVE = /^(CB|SET|HQ|--|–|—)$/i;
 const TEL_RE = /^[+\d][\d\s./-]{6,}$/;
+const MEZZO_RE = /^(.{3,34}?)\s+(Van|Auto|Minibus|Pulmino|Bus|Navetta|Camper)$/i;
+const PARTICELLE = /\b(De|Di|Da|Del|Della|Dei|Lo|La|Le|Mc|Van|Von)$/;
 
-function pezzi(t) {
-  return t.replace(/ /g, ' ').split(/\s{2,}|\n/)
-          .map(x => x.trim()).filter(Boolean);
+function senzaAccenti(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function eOra(s){ return /^\d{1,2}\s*[.:]\s*\d{2}$/.test(String(s).replace(/\s+/g,'')); }
+function normOra(s){
+  const m = String(s).replace(/\s+/g,'').match(/^(\d{1,2})[.:](\d{2})$/);
+  return m ? String(+m[1]).padStart(2,'0') + '.' + m[2] : String(s);
 }
-function senzaAccenti(s) {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-function eOra(s) { return ORA_RE.test(s.replace(/\s+/g, '')); }
-function normOra(s) {
-  const m = s.replace(/\s+/g, '').match(/^(\d{1,2})[.:](\d{2})$/);
-  return m ? String(+m[1]).padStart(2, '0') + '.' + m[2] : s;
-}
-function eLuogo(s) {
+function eLuogo(s){
   if (LUOGHI.test(s)) return true;
-  const p = s.split(/\s+/);
+  const p = String(s).split(/\s+/);
   return p.length >= 2 && p.every(w => w === w.toUpperCase() && /[A-Z]/.test(w));
 }
+function eMezzo(s){ return MEZZO_RE.exec(s); }
 
-function odgPickUp(testo, prof) {
-  if (!testo || !prof || !prof.cognome) return null;
-  const P = pezzi(testo);
-  /* Il cognome dev'essere una parola intera, non la coda di un'altra:
-     "INDIRIZZO" finisce per "rizzo", e senza questo vincolo diventava
-     A. Rizzo. E i cognomi in due parole a volte finiscono spezzati fra
-     due colonne ("D.De" e "Angelis"), quindi si prova anche la coppia. */
-  const cog = senzaAccenti(prof.cognome).trim().replace(/\s+/g, '\\s*');
-  const re = new RegExp('(^|[\\s.])' + cog + '$', 'i');
-  const passeggero = x => x.length < 44 && x.split(/\s+/).length <= 4 && re.test(senzaAccenti(x));
-  let io = P.findIndex(passeggero);
-  if (io < 0) {
-    for (let i = 0; i < P.length - 1; i++)
-      if (passeggero(P[i] + ' ' + P[i + 1])) { io = i + 1; break; }
+/* I nomi dei passeggeri. pdf.js spezza "D.De Angelis" in due colonne
+   quando il cognome ha una particella, e vanno riuniti. */
+function unisciNomi(nomi){
+  const out = [];
+  for (let i = 0; i < nomi.length; i++) {
+    if (PARTICELLE.test(nomi[i]) && i + 1 < nomi.length) { out.push(nomi[i] + ' ' + nomi[++i]); }
+    else out.push(nomi[i]);
   }
-  if (io < 0) return null;
+  return out;
+}
 
-  // Avanti: i luoghi fino al primo orario, poi la destinazione.
-  let luogo = [], ora = null, dove = null;
-  for (let i = io + 1; i < P.length && i < io + 14; i++) {
-    if (eOra(P[i])) { ora = normOra(P[i]); dove = P[i + 1] || null; break; }
-    if (eLuogo(P[i])) luogo.push(P[i]);
-  }
-  if (!ora) return null;
-
-  // Indietro: l'autista e' l'ultimo "<Nome Cognome> Van/Auto/Minibus",
-  // e il telefono quello che lo segue.
-  let autista = null, tel = null;
-  for (let i = io; i >= 0 && i > io - 30; i--) {
-    const m = P[i].match(/^(.{3,32}?)\s+(Van|Auto|Minibus|Pulmino|Bus|Navetta)$/i);
-    if (m) {
-      autista = m[1].trim();
-      for (let j = i + 1; j < i + 4 && j < P.length; j++)
-        if (TEL_RE.test(P[j])) { tel = P[j].replace(/[^\d+]/g, ''); break; }
-      break;
+/* Le tratte della giornata, una per gruppo di persone. */
+function odgTratte(testo){
+  const P = String(testo||'').replace(/ /g,' ').split(/\s{2,}|\n/)
+            .map(x=>x.trim()).filter(Boolean);
+  const tratte = [];
+  let autista = null, tel = null, i = 0;
+  // le intestazioni di colonna, che non sono dati
+  const testata = /^(RUNNER|ORARIO|PARTENZA|ARRIVO|NOME|INDIRIZZO)$/i;
+  while (i < P.length) {
+    const mz = eMezzo(P[i]);
+    if (mz) {
+      autista = mz[1].trim(); tel = null;
+      if (i+1 < P.length && TEL_RE.test(P[i+1])) tel = P[++i].replace(/[^\d+]/g,'');
+      i++; continue;
     }
-  }
+    if (!eOra(P[i])) { i++; continue; }
 
+    const partenza = normOra(P[i]); i++;
+    const nomi = [];
+    while (i < P.length && !eOra(P[i]) && !eLuogo(P[i]) && !eMezzo(P[i]) && !testata.test(P[i]))
+      nomi.push(P[i++]);
+    const luoghi = [];
+    while (i < P.length && eLuogo(P[i])) luoghi.push(P[i++]);
+    const arrivo = (i < P.length && eOra(P[i])) ? normOra(P[i++]) : null;
+    const dest = [];
+    while (i < P.length && !eOra(P[i]) && !eMezzo(P[i]) &&
+           (eLuogo(P[i]) || DEST_BREVE.test(P[i])) && dest.length < 3)
+      dest.push(P[i++]);
+
+    if (nomi.length || luoghi.length)
+      tratte.push({ autista, tel, partenza, arrivo,
+        nomi: unisciNomi(nomi),
+        luogo: luoghi[0] || null,
+        indirizzo: luoghi.find(x=>LUOGHI.test(x)) || null,
+        destinazione: dest.join(' ').trim() || null });
+  }
+  return tratte;
+}
+
+/* Lo stesso posto scritto in due modi.
+ *
+ * Nel PDF capita che manchi una lettera — "URSPORT HOTEL RESIDENCE" al
+ * posto di "TURSPORT HOTEL RESIDENCE" — perche' la prima lettera finisce
+ * in una cella accanto. Se un nome e' la coda di un altro nome dello
+ * stesso documento, vince quello intero.
+ */
+function correggiLuogo(nome, tutti){
+  if (!nome) return nome;
+  const n = senzaAccenti(nome).toUpperCase();
+  let best = nome;
+  for (const a of tutti) {
+    const t = senzaAccenti(a).toUpperCase();
+    if (t.length > n.length && t.endsWith(n) && t.length - n.length <= 3) best = a;
+  }
+  return best;
+}
+
+function odgPickUp(testo, prof){
+  if (!testo || !prof || !prof.cognome) return null;
+  const tratte = odgTratte(testo);
+  if (!tratte.length) return null;
+
+  const cog = senzaAccenti(prof.cognome).trim().replace(/\s+/g,'\\s*');
+  const re = new RegExp('(^|[\\s.])' + cog + '$', 'i');
+  const mia = tratte.find(t => t.nomi.some(n => re.test(senzaAccenti(n))));
+  if (!mia) return null;
+
+  const tuttiLuoghi = tratte.map(t=>t.luogo).concat(tratte.map(t=>t.destinazione)).filter(Boolean);
+  const io = mia.nomi.find(n => re.test(senzaAccenti(n)));
   return {
-    ora,
-    luogo: luogo.length ? luogo[0] : null,
-    indirizzo: luogo.find(x => LUOGHI.test(x)) || null,
-    destinazione: dove && !eOra(dove) ? dove : null,
-    autista, tel
+    ora: mia.partenza,
+    arrivo: mia.arrivo,
+    luogo: correggiLuogo(mia.luogo, tuttiLuoghi),
+    indirizzo: mia.indirizzo,
+    destinazione: correggiLuogo(mia.destinazione, tuttiLuoghi),
+    autista: mia.autista,
+    tel: mia.tel,
+    conMe: mia.nomi.filter(n => n !== io)
   };
 }
 
@@ -8107,14 +8159,17 @@ function odgPienoHtml(d) {
   ${d.pickup ? `<div class="odg-sez">IL TUO PASSAGGIO</div>
   <div class="card odg-pick">
     <div class="r"><span class="k">Pick-up</span><span class="v num">${esc(d.pickup.ora||'')}</span></div>
+    ${d.pickup.arrivo?`<div class="r min"><span class="k">Arrivo${d.pickup.destinazione?' a '+esc(d.pickup.destinazione):''}</span><span class="v2 num">${esc(d.pickup.arrivo)}</span></div>`:''}
     ${d.pickup.luogo ? `<a class="odg-posto" href="${odgMaps(d.pickup.indirizzo||d.pickup.luogo)}" target="_blank" rel="noopener">
       <span class="i">${ODG_SEGNI.luogo}</span>
       <span class="c"><span class="t">${esc(d.pickup.luogo)}</span>
-      ${d.pickup.destinazione?`<span class="s">verso ${esc(d.pickup.destinazione)}</span>`:''}</span>
+      ${d.pickup.indirizzo?`<span class="s">${esc(d.pickup.indirizzo)}</span>`:''}</span>
       <span class="go">Mappa ›</span></a>` : ''}
     ${d.pickup.autista ? `<a class="odg-tel" href="tel:${esc((d.pickup.tel||'').replace(/\D/g,''))}">
       <span class="c"><span class="t">${esc(d.pickup.autista)}</span><span class="s">Autista</span></span>
       ${d.pickup.tel?`<span class="b">${ODG_SEGNI.tel}</span>`:''}</a>` : ''}
+    ${(d.pickup.conMe||[]).length?`<div class="conme"><span class="k">Con te</span>
+      <span class="v">${d.pickup.conMe.map(esc).join(' · ')}</span></div>`:''}
   </div>` : ''}
 
   ${d.location ? `<div class="odg-sez">DOVE</div>
@@ -8140,14 +8195,17 @@ function odgPienoHtml(d) {
     <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
     <span class="o num">${esc(a.set || '')}</span></div>`).join('')}</div>` : ''}
 
-  ${(d.contatti || []).length || d.ospedale ? `<div class="odg-sez">NUMERI UTILI</div>
+  ${(d.contatti || []).length ? `<div class="odg-sez">NUMERI UTILI</div>
   <div class="card">${(d.contatti || []).map(p => `<a class="odg-tel" href="tel:${esc((p.tel || '').replace(/\D/g, ''))}">
     <span class="c"><span class="t">${esc(p.nome || '')}</span><span class="s">${esc(p.ruolo || '')}</span></span>
     <span class="b">${ODG_SEGNI.tel}</span></a>`).join('')}
-    ${d.ospedale ? `<a class="odg-posto" href="${odgMaps(d.ospedale)}" target="_blank" rel="noopener">
+</div>` : ''}
+
+  ${d.ospedale ? `<div class="card odg-osp">
+    <a class="odg-posto" href="${odgMaps(d.ospedale)}" target="_blank" rel="noopener">
       <span class="i">${ODG_SEGNI.croce}</span>
       <span class="c"><span class="t">${esc(odgPrimaRiga(d.ospedale))}</span><span class="s">Ospedale più vicino</span></span>
-      <span class="go">Mappa ›</span></a>` : ''}</div>` : ''}
+      <span class="go">Mappa ›</span></a></div>` : ''}
 
   ${d.domani ? `<div class="odg-sez">AVANZAMENTO</div>
   <div class="card"><div class="odg-domani">
