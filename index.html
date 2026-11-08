@@ -313,6 +313,27 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .t{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:500;color:var(--white)}
 .altro-el .s{flex:1;min-width:0;font-size:12px;color:var(--muted)}
 .altro-el .ch{color:var(--muted);font-size:16px}
+/* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
+   il modo di tornare alla scelta del progetto. */
+.cb-testa{position:sticky;top:0;z-index:120;display:flex;align-items:center;gap:8px;
+  padding:9px 0;background:var(--bg);border-bottom:1px solid var(--border)}
+.cb-ident{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;
+  border:none;padding:4px 0;cursor:pointer;color:inherit;text-align:left;font-family:inherit}
+.cb-mark{width:26px;height:26px;flex:0 0 26px}
+.cb-mark svg{display:block;border-radius:6px}
+.cb-nome{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:16px;
+  font-weight:600;letter-spacing:-.01em;color:var(--white);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-nome em{font-style:normal;color:var(--yellow)}
+.cb-giu{color:var(--muted);font-size:11px;flex:0 0 auto}
+.cb-ing{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;background:none;
+  border:none;border-radius:9px;color:var(--muted);cursor:pointer}
+.cb-ing:active{background:var(--surface2)}
+.res-header{margin:0;padding:0}
+/* La riga delle azioni appartiene allo Spoglio. Sulle altre schede sparisce
+   insieme al suo contenuto, invece di lasciare una banda vuota sotto
+   l'intestazione: a nasconderla e' switchResultTab, che gia' decide. */
+.res-header>*{margin:12px 0 10px}
 #odgSection{padding:14px 16px 96px}
 .odg-vuoto{display:flex;flex-direction:column;align-items:center;text-align:center;
   padding:58px 22px;gap:9px}
@@ -772,28 +793,25 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 <!-- ══ MAIN APP ══ -->
 <div id="app">
   <div class="container">
-    <header>
-      <div class="brand">
-        <div class="brand-mark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="80" height="80"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></div>
-        <div class="brand-text">
-          <h1>Campo<em>base</em></h1>
-          <div class="tag">Ore, piano di lavorazione e spoglio per la troupe</div>
-        </div>
-      </div>
-      <div class="user-bar">
-        <div class="user-avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="#F5C542" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8.5"/><circle cx="10" cy="8" r="3"/><path d="M4.5 17c0-2.761 2.462-5 5.5-5s5.5 2.239 5.5 5"/></svg></div>
-        <div class="user-email" id="userEmail"></div>
-        <button class="btn-logout" onclick="logout()">Esci</button>
-      </div>
+    <!-- Intestazione compatta.
+         Prima occupava 80 pixel di logo piu' una riga di navigazione: su un
+         telefono erano due centimetri di schermo spesi per dire un nome che
+         si sa gia'. Ora dice a cosa stai lavorando, che e' l'unica cosa che
+         cambia. Il titolo riporta alla scelta del progetto, l'ingranaggio
+         alle impostazioni. -->
+    <header class="cb-testa">
+      <button class="cb-ident" onclick="showPage('home')" title="Cambia progetto">
+        <span class="cb-mark"><svg viewBox="0 0 100 100" width="26" height="26"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></span>
+        <span class="cb-nome" id="cbNome">Campo<em>base</em></span>
+        <span class="cb-giu">▾</span>
+      </button>
+      <button class="cb-ing" onclick="showPage('settings')" title="Impostazioni">
+        <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l6.5 3.75v7.5L10 17 3.5 13.25V5.75L10 2z"/><circle cx="10" cy="9.5" r="2.5"/></svg>
+      </button>
+      <button class="cb-ing" id="navSystem" style="display:none" onclick="showPage('system')" title="System">
+        <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="12" rx="2"/><path d="M6 17h8M10 15v2"/><path d="M5 7h2M5 10h6"/></svg>
+      </button>
     </header>
-
-    <!-- NAV -->
-    <nav class="nav-tabs" id="mainNav">
-      <button class="nav-tab active" onclick="showPage('home')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9L10 3l7 6v8a1 1 0 01-1 1H4a1 1 0 01-1-1V9z"/><path d="M7 20v-7h6v7"/></svg> Home</button>
-      <button class="nav-tab" onclick="showPage('settings')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l6.5 3.75v7.5L10 17 3.5 13.25V5.75L10 2z"/><circle cx="10" cy="9.5" r="2.5"/></svg> Impostazioni</button>
-      <button class="nav-tab" id="navSystem" style="display:none" onclick="showPage('system')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="12" rx="2"/><path d="M6 17h8M10 15v2"/><path d="M5 7h2M5 10h6"/></svg> System</button>
-      <button class="nav-tab" id="navSystem" onclick="showPage('system')" style="display:none"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="12" rx="2"/><path d="M6 7h8M6 10h5M2 15h16"/><circle cx="15" cy="10" r="1.5" fill="currentColor" stroke="none"/></svg> System</button>
-    </nav>
 
     <!-- SYSTEM PAGE (admin only) -->
     <div id="systemPage" style="display:none;padding:20px;max-width:700px;margin:0 auto">
@@ -975,16 +993,11 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
     <!-- RESULTS -->
     <div id="resultsPage">
       <div class="res-header">
-        <div class="res-title" id="resTitle">Analisi <span>Completata</span></div>
         <div class="res-actions">
           <div id="spoglioActions" style="display:flex;gap:6px">
             <button class="btn-share" id="btnShare" onclick="openShareModal()">🔗 Condividi</button>
             <button class="btn-export" onclick="exportPdf()">⬇ Esporta PDF</button>
           </div>
-          <button class="btn-reset" onclick="resetApp()" title="Home" style="display:flex;align-items:center;gap:5px">
-            <svg viewBox="0 0 20 20" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L10 3l7 6.5"/><path d="M5 8v8a1 1 0 001 1h3v-4h2v4h3a1 1 0 001-1V8"/></svg>
-            Home
-          </button>
         </div>
       </div>
 
@@ -2156,7 +2169,25 @@ sb.auth.getSession().then(({ data: { session } }) => {
 });
 
 // ══ PAGE NAV ══
+/* Il nome in testa: il film su cui stai lavorando, o Campobase quando non
+   c'e' niente di aperto. E' anche il tasto per tornare a scegliere. */
+function cbTestata() {
+  const el = document.getElementById('cbNome'); if (!el) return;
+  const dentro = document.getElementById('resultsPage')?.style.display !== 'none'
+              && document.getElementById('homePage')?.style.display === 'none';
+  let nome = '';
+  if (dentro) {
+    nome = (document.getElementById('tt-film')?.value || '').trim();
+    if (!nome) { try { nome = (analysisData?.titolo || '').trim(); } catch (_) {} }
+    if (!nome && odgCorrente) nome = 'Ordine del giorno';
+  }
+  el.innerHTML = nome ? esc(nome) : 'Campo<em>base</em>';
+  const g = el.parentElement?.querySelector('.cb-giu');
+  if (g) g.style.visibility = nome ? 'visible' : 'hidden';
+}
+
 function showPage(page) {
+  setTimeout(cbTestata, 0);
   if (page === 'settings') try { profiloRenderImpostazioni(); } catch(_) {}
   document.getElementById('homePage').style.display    = page === 'home' ? '' : 'none';
   document.getElementById('settingsPage').style.display = page === 'settings' ? '' : 'none';
@@ -4828,8 +4859,11 @@ function switchResultTab(tab) {
   const el = acceso && document.getElementById(acceso);
   if (el) el.classList.add('active');
 
+  try { cbTestata(); } catch(_) {}
   const az = document.getElementById('spoglioActions');
   if (az) az.style.display = tab === 'spoglio' ? 'flex' : 'none';
+  const rh = document.querySelector('.res-header');
+  if (rh) rh.style.display = tab === 'spoglio' ? 'flex' : 'none';
 }
 
 // ══ WRAP ══
