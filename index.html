@@ -393,6 +393,18 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   color:var(--yellow);letter-spacing:.06em}
 .rep-c{display:grid;grid-template-columns:1fr;gap:10px}
 @media (min-width:760px){.rep-c{grid-template-columns:1fr 1fr}}
+/* Analisi in corso ed errore */
+.an-centro{max-width:420px;margin:0 auto;padding:60px 24px;text-align:center}
+.an-tit{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;
+  color:var(--white);margin-bottom:8px}
+.an-nota{margin-top:26px;font-size:12px;color:var(--muted);line-height:1.5}
+.err-ico{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;
+  font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
+  background:rgba(255,107,90,.12);border:1px solid var(--danger);color:var(--danger);
+  margin:0 auto 6px}
+.err-dett{margin-top:14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:12px 14px;font-family:'DM Mono',monospace;font-size:11.5px;
+  color:var(--muted);line-height:1.6;white-space:pre-wrap;text-align:left;max-width:340px}
 /* ── I tuoi progetti ─────────────────────────────────────────────── */
 #homePage{padding:14px 0 40px}
 .prog-tit{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;
@@ -1117,15 +1129,33 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div>
     </div>
 
-    <!-- PROGRESS -->
-    <div class="panel progress-panel" id="progressPanel">
-      <div class="prog-label" id="progLabel">Inizializzazione...</div>
-      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-      <div class="prog-steps">
-        <div class="prog-step" id="s1"><div class="prog-dot"></div>Lettura PDF</div>
-        <div class="prog-step" id="s2"><div class="prog-dot"></div>Invio a Gennaro</div>
-        <div class="prog-step" id="s3"><div class="prog-dot"></div>Gennaro sta analizzando...</div>
-        <div class="prog-step" id="s4"><div class="prog-dot"></div>Salvataggio e rendering</div>
+    <!-- Analisi in corso.
+         Dura qualche minuto e nel frattempo non c'e' niente da fare: la
+         schermata dice solo a che punto siamo, senza chiedere attenzione. -->
+    <div class="progress-panel" id="progressPanel">
+      <div class="an-centro">
+        <div class="an-tit">Sto leggendo la sceneggiatura</div>
+        <div class="prog-label" id="progLabel">Inizializzazione…</div>
+        <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+        <div class="prog-steps">
+          <div class="prog-step" id="s1"><div class="prog-dot"></div>Lettura del PDF</div>
+          <div class="prog-step" id="s2"><div class="prog-dot"></div>Estrazione del testo</div>
+          <div class="prog-step" id="s3"><div class="prog-dot"></div>Spoglio delle scene</div>
+          <div class="prog-step" id="s4"><div class="prog-dot"></div>Salvataggio</div>
+        </div>
+        <div class="an-nota">Puoi chiudere l'app: quando torni l'analisi è qui.</div>
+      </div>
+    </div>
+
+    <!-- Errore di lettura: si dice cosa non ha funzionato e cosa fare,
+         invece di un avviso che sparisce. -->
+    <div id="errorePagina" style="display:none">
+      <div class="odg-vuoto">
+        <div class="err-ico">!</div>
+        <div class="odg-t" id="erroreTit">Non sono riuscito a leggerlo</div>
+        <div class="odg-s" id="erroreTesto"></div>
+        <div class="err-dett" id="erroreDett" style="display:none"></div>
+        <button class="odg-btn" onclick="chiudiErrore()">Riprova con un altro file</button>
       </div>
     </div>
 
@@ -1252,33 +1282,23 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <!-- PDL TAB -->
       <div id="pdlSection">
         <div id="pdlUploadArea">
-          <div class="panel" style="text-align:center;padding:40px 24px">
-            <div style="margin-bottom:12px;display:flex;justify-content:center">
-              <svg width="56" height="56" viewBox="0 0 56 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="0" y="8" width="56" height="56" rx="4" stroke="currentColor" stroke-width="2"/>
-                <rect x="0" y="8" width="56" height="14" rx="4" fill="currentColor"/>
-                <rect x="0" y="16" width="56" height="6" fill="currentColor"/>
-                <circle cx="8" cy="15" r="3" fill="#f0e040"/>
-                <circle cx="48" cy="15" r="3" fill="#f0e040"/>
-                <line x1="18" y1="22" x2="18" y2="64" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-                <line x1="32" y1="22" x2="32" y2="64" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-                <line x1="46" y1="22" x2="46" y2="64" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-                <line x1="0" y1="34" x2="56" y2="34" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-                <line x1="0" y1="46" x2="56" y2="46" stroke="currentColor" stroke-width="1" opacity="0.25"/>
-                <rect x="19" y="23" width="12" height="10" rx="1" fill="#f0e040" opacity="0.9"/>
-                <rect x="33" y="35" width="12" height="10" rx="1" fill="#f0e040" opacity="0.9"/>
-                <rect x="1" y="47" width="16" height="10" rx="1" fill="currentColor" opacity="0.15"/>
-              </svg>
-            </div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px">Carica il PDL</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:20px"></div>
-            <label style="display:inline-flex;align-items:center;gap:8px;background:var(--yellow);color:#000;padding:12px 24px;border-radius:10px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='#fff'" onmouseout="this.style.background='var(--yellow)'">
-              <svg width="14" height="14" viewBox="0 0 56 64" fill="none" style="vertical-align:middle;margin-right:6px"><rect x="0" y="8" width="56" height="56" rx="4" stroke="currentColor" stroke-width="4"/><rect x="0" y="8" width="56" height="14" rx="4" fill="currentColor"/><rect x="0" y="16" width="56" height="6" fill="currentColor"/><circle cx="8" cy="15" r="4" fill="#000"/><circle cx="48" cy="15" r="4" fill="#000"/><line x1="18" y1="22" x2="18" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="32" y1="22" x2="32" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="34" x2="56" y2="34" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="46" x2="56" y2="46" stroke="currentColor" stroke-width="2" opacity="0.3"/><rect x="19" y="23" width="12" height="10" rx="1" fill="#000" opacity="0.5"/><rect x="33" y="35" width="12" height="10" rx="1" fill="#000" opacity="0.5"/></svg> Seleziona PDF
+          <!-- Lo stato vuoto parla come quello dell'ordine del giorno:
+               stessa forma, stesso tono, perche' sono la stessa cosa —
+               un documento che non c'e' ancora. -->
+          <div class="odg-vuoto">
+            <div class="odg-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2.5" y="4.5" width="19" height="16" rx="2.5"/><path d="M2.5 9.5h19"/>
+              <path d="M7.5 2.5v4M16.5 2.5v4"/>
+              <path d="M6.5 13h3M11 13h3M15.5 13h2M6.5 16.5h3M11 16.5h3"/></svg></div>
+            <div class="odg-t">Nessun piano di lavorazione</div>
+            <div class="odg-s">Caricalo e il calendario si riempie: giornate, scene,
+              trasferimenti e avanzamento delle riprese.</div>
+            <label class="odg-btn">Carica il PdL
               <input type="file" accept=".pdf" style="display:none" onchange="loadPdlFile(this)">
             </label>
           </div>
         </div>
-
         <div id="pdlDashboard" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
             <div>
@@ -2772,7 +2792,7 @@ async function callApi(endpoint, body) {
 // ══ HISTORY (Supabase) ══
 async function loadHistory() {
   const grid = document.getElementById('historyGrid');
-  grid.innerHTML = '<div class="hist-loading">Caricamento...</div>';
+  grid.innerHTML = '<div class="prog-vuoto">Caricamento\u2026</div>';
   try {
     const { data, error } = await sb
       .from('analyses')
@@ -2782,9 +2802,34 @@ async function loadHistory() {
       .limit(30);
     if (error) throw error;
     renderHistoryGrid(data || []);
+    // Quante giornate ha il film e a che punto e': sta nel piano di
+    // lavorazione, non nell'analisi. Si chiede dopo aver disegnato, in
+    // una query sola per tutti i progetti, e la lista si completa da se'.
+    caricaPiani(data || []);
   } catch(e) {
-    grid.innerHTML = '<div class="hist-empty">Errore caricamento: ' + e.message + '</div>';
+    grid.innerHTML = '<div class="prog-vuoto">Non sono riuscito a caricare i progetti: ' + esc(e.message) + '</div>';
   }
+}
+
+/* I piani di lavorazione di tutti i progetti, in una volta sola. */
+async function caricaPiani(items){
+  if (!items.length || !currentUser) return;
+  try {
+    const { data } = await sb.from('pdl_versions')
+      .select('analysis_id, data, shooting_data')
+      .in('analysis_id', items.map(x => x.id));
+    (data || []).forEach(p => {
+      const el = document.querySelector(`.prog[data-id="${p.analysis_id}"] .s`);
+      if (!el || !p.data) return;
+      const girate = Object.values(p.shooting_data || {}).filter(x => x && x.status === 'complete').length;
+      const righe = [
+        p.data.totale_giorni ? p.data.totale_giorni + ' giorni' : '',
+        girate ? girate + ' girati' : '',
+        p.data.produzione || p.data.regista || ''
+      ].filter(Boolean);
+      if (righe.length) el.textContent = righe.join(' \u00b7 ');
+    });
+  } catch(e) { console.log('[progetti] piani non caricati:', e.message); }
 }
 
 /*
@@ -2820,7 +2865,7 @@ function renderHistoryGrid(items) {
     const sc = h.data?.totale_scene || 0;
     const righe = [sc ? sc + ' scene' : '', h.version_label && h.version_label !== 'v1' ? h.version_label : '', quando]
       .filter(Boolean).join(' · ');
-    return `<div class="prog" onclick="loadFromHistory('${h.id}')">
+    return `<div class="prog" data-id="${h.id}" onclick="loadFromHistory('${h.id}')">
       <span class="c"><span class="t">${esc(titolo)}</span><span class="s num">${esc(righe)}</span></span>
       <button class="x" onclick="deleteAnalysis('${h.id}',event)" title="Elimina">✕</button>
       <span class="ch">›</span>
@@ -3030,6 +3075,30 @@ async function fileToB64(file) {
 }
 
 // ══ PROGRESS ══
+/* La pagina di errore. `dettaglio` e' la riga tecnica — nome del file,
+   pagine, caratteri estratti — che serve a capire se e' colpa del PDF o
+   nostra, e che l'utente puo' leggere a noi al telefono. */
+function mostraErrore(testo, dettaglio, titolo){
+  const g = id => document.getElementById(id);
+  if (!g('errorePagina')) return false;
+  g('erroreTit').textContent = titolo || 'Non sono riuscito a leggerlo';
+  g('erroreTesto').textContent = testo || '';
+  const d = g('erroreDett');
+  d.style.display = dettaglio ? 'block' : 'none';
+  d.textContent = dettaglio || '';
+  ['homePage','resultsPage','settingsPage','progressPanel','benvenuto'].forEach(i => {
+    const e = g(i); if (!e) return;
+    if (i === 'resultsPage') e.classList.remove('on'); else e.style.display = 'none';
+  });
+  g('errorePagina').style.display = 'block';
+  return true;
+}
+function chiudiErrore(){
+  const e = document.getElementById('errorePagina');
+  if (e) e.style.display = 'none';
+  showPage('home');
+}
+
 function setStep(n) {
   [1,2,3,4].forEach(i => {
     const el = document.getElementById('s'+i);
@@ -3393,9 +3462,22 @@ async function startAnalysis() {
       textsArray.length > 1 ? `### ${t.name}\n${t.text}` : t.text
     ).join('\n\n');
 
+    /* Un PDF di sole immagini — una scansione, o una foto delle pagine —
+       si apre ma non contiene testo. Mandarlo al modello costa e non
+       produce niente: meglio fermarsi qui e dirlo, con i numeri che
+       fanno capire di che file si tratta. */
+    const caratteri = fullText.replace(/\s+/g, '').length;
+    if (caratteri < totalPages * 60) {
+      throw Object.assign(new Error('senza testo'), { pagina: true,
+        testo: 'Il file si apre, ma dentro non c\'è testo: è un PDF fatto di immagini, '
+             + 'come una scansione o una foto delle pagine. Chiedi il file originale.',
+        dettaglio: textsArray.map(t => t.name).join('\n')
+             + `\n${totalPages} pagine · ${caratteri} caratteri estratti` });
+    }
+
     setStep(3);
     const estimatedSeconds = Math.round(totalPages / 50 * 60);
-    document.getElementById('progLabel').textContent = `Gennaro sta analizzando... (~${Math.round(estimatedSeconds/60)} min)`;
+    document.getElementById('progLabel').textContent = `Spoglio in corso… (~${Math.round(estimatedSeconds/60)} min)`;
     startProgressSimulation(estimatedSeconds);
 
     const blocks = [
@@ -3525,7 +3607,12 @@ async function startAnalysis() {
       }
     }
 
-  } catch(err) { showError(err.message); }
+  } catch(err) {
+    document.getElementById('progressPanel').classList.remove('active');
+    if (err.pagina && mostraErrore(err.testo, err.dettaglio)) return;
+    if (!mostraErrore('L\'analisi non è andata a buon fine.', err.message,
+                      'Qualcosa è andato storto')) showError(err.message);
+  }
 }
 
 function hideHomeShowResults() {
@@ -7751,7 +7838,10 @@ async function odgScegliFile(input) {
     // Un OdG sono due o tre pagine di testo. Molto meno vuol dire che il
     // PDF e' una scansione senza testo, e il modello leggerebbe il vuoto.
     if (testo.replace(/\s+/g, '').length < 400) {
-      throw new Error('Questo PDF non contiene testo: sembra la scansione di una pagina stampata. Chiedi il file originale.');
+      throw Object.assign(new Error('senza testo'), { pagina: true,
+        testo: 'Il file si apre, ma dentro non c\'è testo: è un PDF fatto di immagini, '
+             + 'come una scansione o una foto. Chiedi il file originale.',
+        dettaglio: file.name + '\n' + testo.replace(/\s+/g,'').length + ' caratteri estratti' });
     }
     const dati = await odgEstrai(testo, p => odgPasso(p));
     if (!dati.numero && !dati.convocazione && !(dati.scene || []).length) {
@@ -7775,6 +7865,7 @@ async function odgScegliFile(input) {
     await odgSalva(dati);
     showToast('Ordine del giorno caricato.');
   } catch (e) {
+    if (e.pagina && mostraErrore(e.testo, e.dettaglio)) { odgInCorso = false; return; }
     odgErrore = e.message;
     showToast(e.message, 'red', 5000);
   } finally {
