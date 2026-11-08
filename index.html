@@ -346,6 +346,16 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .ch{color:var(--muted);font-size:16px}
 /* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
    il modo di tornare alla scelta del progetto. */
+.odg-prev .g{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.odg-prev .s{font-size:22px;line-height:1}
+.odg-prev .c{flex:1;min-width:0}
+.odg-prev .t{display:block;font-size:14.5px;color:var(--white)}
+.odg-prev .u{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-prev .n{display:flex}
+.odg-prev .n>div{flex:1;min-width:0;padding:10px 6px;text-align:center;border-right:1px solid var(--border)}
+.odg-prev .n>div:last-child{border-right:none}
+.odg-prev .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.odg-prev .v{display:block;font-size:14px;color:var(--white-dim);margin-top:3px}
 /* Il passaggio e la scena */
 .odg-pick .r{display:flex;align-items:center;justify-content:space-between;
   padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -363,6 +373,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .sc-n{font-size:16px;color:var(--yellow)}
 .sc-h{flex:1;min-width:0;font-size:12px;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-corpo.mono{font-family:'DM Mono',monospace;font-size:12px;line-height:1.75}
 .sc-corpo{padding:18px 20px;font-size:15px;line-height:1.65;color:var(--white-dim);
   white-space:pre-wrap;word-break:break-word}
 .sc-id{margin:0 20px;padding:10px 14px;border-top:1px solid var(--border);
@@ -534,7 +545,9 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-domani{padding:13px 16px}
 .odg-domani .t{display:block;font-size:14px;color:var(--white)}
 .odg-domani .s{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.odg-file{display:flex;align-items:center;gap:12px;padding:13px 16px}
+.odg-file{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;border-bottom:1px solid var(--border)}
+.odg-file:last-child{border-bottom:none}
+.odg-file .chev{color:var(--muted);font-size:16px}
 .odg-file .t{display:block;font-size:13.5px;color:var(--white);word-break:break-all}
 .odg-file .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
 .odg-togli{display:block;width:100%;margin-top:14px;min-height:46px;
@@ -7869,6 +7882,25 @@ function odgDataEstesa(iso) {
 
 /* La scena del giorno, aperta dallo stralcio. A schermo pieno perche'
    su un telefono una colonna di sceneggiatura non sta in un riquadro. */
+/* Apre un documento caricato. Si mostra il testo estratto, non il PDF:
+   e' quello che l'app ha davvero in mano, si legge anche senza rete e
+   non occupa spazio. */
+function odgApriFile(i){
+  const d = odgCorrente; if (!d) return;
+  const f = i < 0
+    ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo }
+    : (d.allegati||[])[i];
+  if (!f || !f.testo) { showToast('Di questo file non ho il testo.'); return; }
+  const el = document.getElementById('odgScena'); if (!el) return;
+  el.innerHTML = `<div class="sc-top">
+      <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
+      <span class="sc-h">${esc(f.nome)}</span>
+    </div>
+    <div class="sc-corpo mono">${esc(f.testo)}</div>`;
+  el.style.display='block';
+  document.body.style.overflow='hidden';
+}
+
 function odgApriScena(n){
   const st = odgStralcioDi(odgCorrente?.stralci, n);
   if (!st) return;
@@ -7890,11 +7922,124 @@ function odgChiudiScena(){
   document.body.style.overflow='';
 }
 
+/* ── Il meteo del set ──────────────────────────────────────────────────
+ *
+ * L'OdG una previsione ce l'ha gia' ("Soleggiato"), ma e' quella del
+ * giorno prima, scritta a mano da chi compila, e dice una parola sola.
+ * Sul set serve sapere se piove alle sette del mattino, non com'era il
+ * cielo ieri.
+ *
+ * Open-Meteo: niente chiave, niente registrazione, CORS aperto. Dalla
+ * location dell'OdG si ricava il comune — l'indirizzo finisce quasi
+ * sempre con "CAP Citta' PROV" — e da li' le coordinate. Per il meteo
+ * bastano: un paio di chilometri di scarto non cambiano se piove.
+ *
+ * Se qualcosa non va non si dice niente e resta la riga dell'OdG: una
+ * previsione mancante non e' un errore che valga un avviso.
+ */
+function odgComune(indirizzo){
+  if (!indirizzo) return null;
+  const t = String(indirizzo).replace(/\s+/g,' ').trim();
+  // "Via del Faro, 58, 74122 Taranto TA" -> Taranto
+  let m = t.match(/\b\d{5}\s+([A-Za-z\u00c0-\u017f' ]{2,30}?)(?:\s+[A-Z]{2})?\s*$/);
+  if (m) return m[1].trim();
+  // "Masseria Lamie Strada Vicinale Citrezze - Monteiasi" -> Monteiasi
+  m = t.match(/[-–,]\s*([A-Za-z\u00c0-\u017f' ]{3,30})\s*$/);
+  if (m) return m[1].trim();
+  const p = t.split(/\s+/);
+  return p.length ? p[p.length-1] : null;
+}
+
+async function odgCoordinate(comune){
+  const u = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&format=json&country=IT&name='
+          + encodeURIComponent(comune);
+  const r = await fetch(u);
+  if (!r.ok) throw new Error('geocoding ' + r.status);
+  const j = await r.json();
+  const p = j && j.results && j.results[0];
+  if (!p) throw new Error('comune non trovato');
+  return { lat: p.latitude, lon: p.longitude, nome: p.name };
+}
+
+/* Il codice meteo di Open-Meteo in parole e in un segno. */
+function odgCielo(c){
+  if (c == null) return ['', ''];
+  if (c === 0) return ['Sereno','\u2600'];
+  if (c <= 2)  return ['Poco nuvoloso','\u26c5'];
+  if (c === 3) return ['Coperto','\u2601'];
+  if (c <= 48) return ['Nebbia','\u2601'];
+  if (c <= 57) return ['Pioviggine','\u2614'];
+  if (c <= 67) return ['Pioggia','\u2614'];
+  if (c <= 77) return ['Neve','\u2744'];
+  if (c <= 82) return ['Rovesci','\u2614'];
+  if (c <= 86) return ['Rovesci di neve','\u2744'];
+  return ['Temporale','\u26a1'];
+}
+
+async function odgPrevisione(d){
+  if (!d || !d.data) return null;
+  const comune = odgComune(d.location);
+  if (!comune) return null;
+  const c = await odgCoordinate(comune);
+  const u = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + c.lat + '&longitude=' + c.lon
+    + '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m'
+    + '&timezone=Europe%2FRome&start_date=' + d.data + '&end_date=' + d.data;
+  const r = await fetch(u);
+  if (!r.ok) throw new Error('meteo ' + r.status);
+  const j = await r.json();
+  const h = j && j.hourly;
+  if (!h || !h.time || !h.time.length) throw new Error('niente ore');
+
+  // Solo le ore della giornata di lavoro: dalla convocazione alla fine,
+  // perche' il resto non riguarda nessuno.
+  const ora = x => { const m = String(x||'').match(/^(\d{1,2})/); return m ? +m[1] : null; };
+  const da = ora(d.convocazione) ?? 7;
+  const a  = ora(d.fineLavorazione) ?? ora(d.fineRiprese) ?? 20;
+  const idx = h.time.map((t,i)=>({t,i}))
+    .filter(x => { const o = +x.t.slice(11,13); return o >= da && o <= Math.max(da+1, a); })
+    .map(x => x.i);
+  if (!idx.length) return null;
+
+  const val = (arr) => idx.map(i => arr && arr[i]).filter(v => v != null);
+  const temp = val(h.temperature_2m), pio = val(h.precipitation_probability),
+        ven  = val(h.wind_speed_10m), cod = val(h.weather_code);
+  // Il codice che conta e' il peggiore della giornata: se alle 15 piove,
+  // lo si vuole sapere la mattina.
+  const peggio = cod.length ? cod.reduce((a,b)=>Math.max(a,b)) : null;
+  const [parola, segno] = odgCielo(peggio);
+  return {
+    comune: c.nome, cielo: parola, segno,
+    min: temp.length ? Math.round(Math.min(...temp)) : null,
+    max: temp.length ? Math.round(Math.max(...temp)) : null,
+    pioggia: pio.length ? Math.max(...pio) : null,
+    vento: ven.length ? Math.round(Math.max(...ven)) : null,
+    da, a: Math.max(da+1, a)
+  };
+}
+
+/* Si chiede dopo aver disegnato: la scheda non deve aspettare la rete. */
+async function odgCaricaMeteo(){
+  const d = odgCorrente;
+  if (!d || d.previsione || d.previsioneFallita) return;
+  try {
+    const p = await odgPrevisione(d);
+    if (!p) { d.previsioneFallita = true; return; }
+    d.previsione = p;
+    odgRender();
+    odgSalva(d);
+  } catch (e) {
+    d.previsioneFallita = true;
+    console.log('[odg] meteo non disponibile:', e.message);
+  }
+}
+
 function odgRender() {
   const c = document.getElementById('odgCorpo'); if (!c) return;
   if (odgInCorso) { c.innerHTML = odgCaricamentoHtml(); return; }
   if (!odgCorrente) { c.innerHTML = odgVuotoHtml(); return; }
   c.innerHTML = odgPienoHtml(odgCorrente);
+  if (navigator.onLine) setTimeout(odgCaricaMeteo, 60);
 }
 
 function odgCaricamentoHtml() {
@@ -7948,7 +8093,16 @@ function odgPienoHtml(d) {
       .filter(x => x[1]).map(([k, v]) => `<div><span class="k">${k}</span><span class="v num">${esc(v)}</span></div>`).join('')}
   </div>` : ''}
 
-  ${d.meteo ? `<div class="card odg-meteo">${esc(d.meteo)}</div>` : ''}
+  ${d.previsione ? `<div class="card odg-prev">
+    <div class="g"><span class="s">${d.previsione.segno}</span>
+      <span class="c"><span class="t">${esc(d.previsione.cielo)}</span>
+      <span class="u">${esc(d.previsione.comune)} · dalle ${d.previsione.da} alle ${d.previsione.a}</span></span></div>
+    <div class="n">
+      ${d.previsione.max!=null?`<div><span class="k">temp</span><span class="v num">${d.previsione.min}–${d.previsione.max}°</span></div>`:''}
+      ${d.previsione.pioggia!=null?`<div><span class="k">pioggia</span><span class="v num">${d.previsione.pioggia}%</span></div>`:''}
+      ${d.previsione.vento!=null?`<div><span class="k">vento</span><span class="v num">${d.previsione.vento} km/h</span></div>`:''}
+    </div></div>`
+   : d.meteo ? `<div class="card odg-meteo">${esc(d.meteo)}</div>` : ''}
 
   ${d.pickup ? `<div class="odg-sez">IL TUO PASSAGGIO</div>
   <div class="card odg-pick">
@@ -7995,16 +8149,24 @@ function odgPienoHtml(d) {
       <span class="c"><span class="t">${esc(odgPrimaRiga(d.ospedale))}</span><span class="s">Ospedale più vicino</span></span>
       <span class="go">Mappa ›</span></a>` : ''}</div>` : ''}
 
-  ${d.domani ? `<div class="odg-sez">DOMANI</div>
+  ${d.domani ? `<div class="odg-sez">AVANZAMENTO</div>
   <div class="card"><div class="odg-domani">
     <span class="t">${esc(d.domani.etichetta || '')}</span>
     ${(d.domani.scene || []).length ? `<span class="s">Scene ${d.domani.scene.map(s => esc(s.n)).join(', ')}</span>` : ''}
   </div></div>` : ''}
 
-  <div class="card" style="margin-top:14px"><div class="odg-file">
-    <span class="c"><span class="t">${esc(d.nomeFile || 'Ordine del giorno')}</span>
-    <span class="s">Caricato ${odgQuando(d.caricatoIl)}</span></span>
-  </div></div>
+  <div class="odg-sez">FILE</div>
+  <div class="card">
+    <div class="odg-file" onclick="odgApriFile(-1)">
+      <span class="c"><span class="t">${esc(d.nomeFile || 'Ordine del giorno')}</span>
+      <span class="s">Caricato ${odgQuando(d.caricatoIl)}</span></span>
+      <span class="chev">›</span>
+    </div>
+    ${(d.allegati||[]).map((a,i)=>`<div class="odg-file" onclick="odgApriFile(${i})">
+      <span class="c"><span class="t">${esc(a.nome)}</span>
+      <span class="s">${esc({giri:'Giri auto',stralci:'Stralci'}[a.tipo]||'Allegato')}</span></span>
+      <span class="chev">›</span></div>`).join('')}
+  </div>
   <button class="odg-togli" onclick="odgRimuovi()">Rimuovi OdG</button>
   <label class="odg-btn" style="margin-top:9px">Carica un altro OdG
     <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
