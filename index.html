@@ -71,6 +71,12 @@ body.light {
    una sinossi di scena o la spiegazione di un'impostazione, in monospazio,
    si leggono a fatica e occupano una riga in piu'. Dove contano le cifre
    (orari, totali, conteggi) il monospazio resta, dichiarato dove serve. */
+/* Niente rimbalzo agli estremi.
+   Scorrendo oltre l'inizio della pagina, iOS trascina giu' tutto il
+   documento — e con lui l'intestazione fissa in alto e la barra delle
+   schede fissa in basso, che sparivano sotto il bordo finche' non si
+   lasciava la presa. */
+html, body { overscroll-behavior-y: none; }
 body { background: var(--bg); color: var(--white); font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; min-height: 100vh; }
 .num, .mono { font-family: 'DM Mono', monospace; }
 
@@ -340,6 +346,27 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .altro-el .ch{color:var(--muted);font-size:16px}
 /* Intestazione fissa: resta visibile mentre si scorre, perche' e' anche
    il modo di tornare alla scelta del progetto. */
+/* Il passaggio e la scena */
+.odg-pick .r{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border)}
+.odg-pick .k{font-size:13.5px;color:var(--white-dim)}
+.odg-pick .v{font-size:20px;color:var(--yellow)}
+.odg-scene li.apre{cursor:pointer}
+.odg-scene .chev{color:var(--muted);font-size:16px;align-self:center}
+#odgScena{position:fixed;inset:0;z-index:300;background:var(--bg);overflow-y:auto;
+  padding:0 0 calc(env(safe-area-inset-bottom) + 30px)}
+.sc-top{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:
+  calc(env(safe-area-inset-top) + 10px) 16px 12px;background:var(--bg);
+  border-bottom:1px solid var(--border)}
+.sc-x{width:38px;height:38px;flex:0 0 38px;background:none;border:none;color:var(--yellow);
+  font-size:26px;line-height:1;cursor:pointer}
+.sc-n{font-size:16px;color:var(--yellow)}
+.sc-h{flex:1;min-width:0;font-size:12px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-corpo{padding:18px 20px;font-size:15px;line-height:1.65;color:var(--white-dim);
+  white-space:pre-wrap;word-break:break-word}
+.sc-id{margin:0 20px;padding:10px 14px;border-top:1px solid var(--border);
+  font-size:12px;color:var(--muted)}
 /* I reparti nello spoglio */
 .rep{margin-bottom:22px}
 .rep-t{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
@@ -1021,7 +1048,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
       <div class="settings-section">
-        <div class="settings-title">Chi sei</div>
+        <div class="settings-title">Account</div>
         <div class="settings-row" id="profRigaBox" onclick="profiloApri()" style="cursor:pointer">
           <div class="settings-row-info" id="profRiga"></div>
           <span style="color:var(--muted);font-size:16px">›</span>
@@ -1627,6 +1654,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
       <!-- ORDINE DEL GIORNO -->
       <div id="odgSection" style="display:none"><div id="odgCorpo"></div></div>
+      <div id="odgScena" style="display:none"></div>
 
       <!-- ALTRO — quello che si apre una volta ogni tanto -->
       <div id="altroSection" style="display:none">
@@ -7339,8 +7367,7 @@ function profiloChiediHtml() {
   const p = profilo();
   return `<div class="prof-chiedi">
     <div class="t">Come ti chiami?</div>
-    <div class="s">Serve a trovarti nei documenti della produzione — convocazioni,
-      giri auto, crew list — e mostrarti il tuo orario invece di quello generale.</div>
+    <div class="s">Serve a trovarti nei documenti della produzione.</div>
     <div class="campi">
       <input id="profNome"    type="text" placeholder="Nome"    value="${esc(p.nome || '')}" autocomplete="given-name">
       <input id="profCognome" type="text" placeholder="Cognome" value="${esc(p.cognome || '')}" autocomplete="family-name">
@@ -7458,6 +7485,134 @@ async function odgEstrai(testo, onPasso) {
   return Object.assign({}, testa, tab);
 }
 
+/*
+ * Il tuo pick-up, dalla lista dei trasporti.
+ *
+ * pdf.js appiattisce la tabella in una riga sola, ma le colonne restano
+ * separate da due o piu' spazi, e l'ordine e' sempre quello: autista e
+ * mezzo, telefono, orario di partenza, i passeggeri, il luogo di
+ * ritrovo, l'ora, la destinazione. Trovato il proprio cognome, il resto
+ * si legge andando avanti e indietro da li'.
+ *
+ * Niente modello: su una tabella cosi' regolare le regole bastano, e un
+ * pick-up sbagliato e' peggio di nessun pick-up.
+ */
+const LUOGHI = /^(Via|Viale|Piazza|P\.zza|Corso|C\.so|Largo|Vicolo|Strada|Str\.|Contrada|S\.S\.|SS)\b/i;
+const ORA_RE = /^\d{1,2}\s*[.:]\s*\d{2}$/;
+const TEL_RE = /^[+\d][\d\s./-]{6,}$/;
+
+function pezzi(t) {
+  return t.replace(/ /g, ' ').split(/\s{2,}|\n/)
+          .map(x => x.trim()).filter(Boolean);
+}
+function senzaAccenti(s) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function eOra(s) { return ORA_RE.test(s.replace(/\s+/g, '')); }
+function normOra(s) {
+  const m = s.replace(/\s+/g, '').match(/^(\d{1,2})[.:](\d{2})$/);
+  return m ? String(+m[1]).padStart(2, '0') + '.' + m[2] : s;
+}
+function eLuogo(s) {
+  if (LUOGHI.test(s)) return true;
+  const p = s.split(/\s+/);
+  return p.length >= 2 && p.every(w => w === w.toUpperCase() && /[A-Z]/.test(w));
+}
+
+function odgPickUp(testo, prof) {
+  if (!testo || !prof || !prof.cognome) return null;
+  const P = pezzi(testo);
+  /* Il cognome dev'essere una parola intera, non la coda di un'altra:
+     "INDIRIZZO" finisce per "rizzo", e senza questo vincolo diventava
+     A. Rizzo. E i cognomi in due parole a volte finiscono spezzati fra
+     due colonne ("D.De" e "Angelis"), quindi si prova anche la coppia. */
+  const cog = senzaAccenti(prof.cognome).trim().replace(/\s+/g, '\\s*');
+  const re = new RegExp('(^|[\\s.])' + cog + '$', 'i');
+  const passeggero = x => x.length < 44 && x.split(/\s+/).length <= 4 && re.test(senzaAccenti(x));
+  let io = P.findIndex(passeggero);
+  if (io < 0) {
+    for (let i = 0; i < P.length - 1; i++)
+      if (passeggero(P[i] + ' ' + P[i + 1])) { io = i + 1; break; }
+  }
+  if (io < 0) return null;
+
+  // Avanti: i luoghi fino al primo orario, poi la destinazione.
+  let luogo = [], ora = null, dove = null;
+  for (let i = io + 1; i < P.length && i < io + 14; i++) {
+    if (eOra(P[i])) { ora = normOra(P[i]); dove = P[i + 1] || null; break; }
+    if (eLuogo(P[i])) luogo.push(P[i]);
+  }
+  if (!ora) return null;
+
+  // Indietro: l'autista e' l'ultimo "<Nome Cognome> Van/Auto/Minibus",
+  // e il telefono quello che lo segue.
+  let autista = null, tel = null;
+  for (let i = io; i >= 0 && i > io - 30; i--) {
+    const m = P[i].match(/^(.{3,32}?)\s+(Van|Auto|Minibus|Pulmino|Bus|Navetta)$/i);
+    if (m) {
+      autista = m[1].trim();
+      for (let j = i + 1; j < i + 4 && j < P.length; j++)
+        if (TEL_RE.test(P[j])) { tel = P[j].replace(/[^\d+]/g, ''); break; }
+      break;
+    }
+  }
+
+  return {
+    ora,
+    luogo: luogo.length ? luogo[0] : null,
+    indirizzo: luogo.find(x => LUOGHI.test(x)) || null,
+    destinazione: dove && !eOra(dove) ? dove : null,
+    autista, tel
+  };
+}
+
+
+/*
+ * Gli stralci: la sceneggiatura delle scene del giorno.
+ *
+ * Si tagliano alle intestazioni di scena. Nel formato italiano il numero
+ * sta dopo la riga di testa, non prima — "EST. CAMPI STERMINATI, IN AUTO
+ * - GIORNO 32" — e spesso compare due volte, a sinistra e a destra del
+ * foglio. Niente modello: l'intestazione di scena e' una forma fissa.
+ */
+function odgStralci(testo) {
+  if (!testo) return {};
+  const re = /\b((?:INT|EST|EXT|I\/E)\.?\s[^]{3,90}?-\s*(?:GIORNO|NOTTE|ALBA|TRAMONTO|SERA|MATTINA|CONTINUA)[^]{0,8}?)\s+(\d{1,3}[A-Za-z]*)\s+(?:\d{1,3}[A-Za-z]*\s+)?\*?/g;
+  const tagli = [];
+  let m;
+  while ((m = re.exec(testo)) !== null)
+    tagli.push({ n: m[2], testa: m[1].replace(/\s+/g, ' ').trim(), da: m.index, corpo: re.lastIndex });
+  const out = {};
+  tagli.forEach((t, i) => {
+    const fine = i + 1 < tagli.length ? tagli[i + 1].da : testo.length;
+    out[t.n.toUpperCase()] = {
+      testa: t.testa,
+      testo: testo.slice(t.corpo, fine).replace(/[ \t]+/g, ' ').trim()
+    };
+  });
+  return out;
+}
+
+/*
+ * Lo stralcio di una scena.
+ *
+ * I numeri non coincidono sempre: l'ordine del giorno dice 32END o 32PT
+ * perche' quel giorno si gira solo la coda o l'inizio, mentre negli
+ * stralci la scena e' la 32. Si prova prima il numero esatto, poi quello
+ * senza il suffisso — ma 65C resta 65C, perche' li' la lettera fa parte
+ * del numero di scena, non dice che pezzo si gira.
+ */
+const CODE_PARZIALI = /(END|PT|PTE|INIZIO|FINE|BIS)$/i;
+function odgStralcioDi(stralci, n) {
+  if (!stralci || !n) return null;
+  const k = String(n).toUpperCase().replace(/\s+/g, '');
+  if (stralci[k]) return stralci[k];
+  const base = k.replace(CODE_PARZIALI, '');
+  return (base && base !== k && stralci[base]) ? stralci[base] : null;
+}
+
+
+
 /* ── Il PDF ───────────────────────────────────────────────────────────
  * Su iOS non si puo' condividere un allegato verso una pagina web: il
  * giro e' salvarlo su File dall'app Mail e poi sceglierlo qui. Quindi
@@ -7544,7 +7699,13 @@ async function odgScegliFile(input) {
     // scheda scena: gli stralci sono la sceneggiatura del giorno, e i giri
     // auto hanno il pick-up di ognuno.
     dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo }));
-    if (extra.length) dati.conAllegati = extra.map(x => x.tipo);
+    const giri = extra.find(x => x.tipo === 'giri');
+    if (giri) {
+      dati.giriTesto = giri.testo;
+      dati.pickup = odgPickUp(giri.testo, profilo());
+    }
+    const str = extra.find(x => x.tipo === 'stralci');
+    if (str) dati.stralci = odgStralci(str.testo);
     odgCorrente = dati;
     await odgSalva(dati);
     showToast('Ordine del giorno caricato.');
@@ -7706,6 +7867,29 @@ function odgDataEstesa(iso) {
   return `${g[d.getDay()]} ${d.getDate()} ${m[d.getMonth()]}`;
 }
 
+/* La scena del giorno, aperta dallo stralcio. A schermo pieno perche'
+   su un telefono una colonna di sceneggiatura non sta in un riquadro. */
+function odgApriScena(n){
+  const st = odgStralcioDi(odgCorrente?.stralci, n);
+  if (!st) return;
+  const sc = (odgCorrente.scene||[]).find(x => String(x.n) === String(n)) || {};
+  const el = document.getElementById('odgScena'); if (!el) return;
+  el.innerHTML = `<div class="sc-top">
+      <button class="sc-x" onclick="odgChiudiScena()">‹</button>
+      <span class="sc-n num">${esc(String(n))}</span>
+      <span class="sc-h">${esc(st.testa||'')}</span>
+    </div>
+    <div class="sc-corpo">${esc(st.testo||'').replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>')}</div>
+    ${sc.ids?`<div class="sc-id">Cast in scena: ${esc(sc.ids)}</div>`:''}`;
+  el.style.display='block';
+  document.body.style.overflow='hidden';
+}
+function odgChiudiScena(){
+  const el=document.getElementById('odgScena');
+  if(el){el.style.display='none';el.innerHTML='';}
+  document.body.style.overflow='';
+}
+
 function odgRender() {
   const c = document.getElementById('odgCorpo'); if (!c) return;
   if (odgInCorso) { c.innerHTML = odgCaricamentoHtml(); return; }
@@ -7766,24 +7950,34 @@ function odgPienoHtml(d) {
 
   ${d.meteo ? `<div class="card odg-meteo">${esc(d.meteo)}</div>` : ''}
 
+  ${d.pickup ? `<div class="odg-sez">IL TUO PASSAGGIO</div>
+  <div class="card odg-pick">
+    <div class="r"><span class="k">Pick-up</span><span class="v num">${esc(d.pickup.ora||'')}</span></div>
+    ${d.pickup.luogo ? `<a class="odg-posto" href="${odgMaps(d.pickup.indirizzo||d.pickup.luogo)}" target="_blank" rel="noopener">
+      <span class="i">${ODG_SEGNI.luogo}</span>
+      <span class="c"><span class="t">${esc(d.pickup.luogo)}</span>
+      ${d.pickup.destinazione?`<span class="s">verso ${esc(d.pickup.destinazione)}</span>`:''}</span>
+      <span class="go">Mappa ›</span></a>` : ''}
+    ${d.pickup.autista ? `<a class="odg-tel" href="tel:${esc((d.pickup.tel||'').replace(/\D/g,''))}">
+      <span class="c"><span class="t">${esc(d.pickup.autista)}</span><span class="s">Autista</span></span>
+      ${d.pickup.tel?`<span class="b">${ODG_SEGNI.tel}</span>`:''}</a>` : ''}
+  </div>` : ''}
+
   ${d.location ? `<div class="odg-sez">DOVE</div>
   <div class="card"><a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
     <span class="i">${ODG_SEGNI.luogo}</span>
     <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
     <span class="go">Mappa ›</span></a></div>` : ''}
 
-  ${d.ospedale ? `<div class="card" style="margin-top:8px">
-    <a class="odg-posto" href="${odgMaps(d.ospedale)}" target="_blank" rel="noopener">
-    <span class="i">${ODG_SEGNI.croce}</span>
-    <span class="c"><span class="t">${esc(odgPrimaRiga(d.ospedale))}</span><span class="s">Ospedale più vicino</span></span>
-    <span class="go">Mappa ›</span></a></div>` : ''}
+
 
   ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
-  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li>
+  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li${odgStralcioDi(d.stralci, s.n) ? ` class="apre" onclick="odgApriScena('${esc(String(s.n))}')"` : ''}>
     <span class="n num">${esc(s.n || '')}</span>
     <span class="c"><span class="t">${esc(s.sinossi || '')}</span>
     <span class="s">${[s.ie, s.m, odgCap(s.ambiente || ''), s.pag ? s.pag + ' pag' : ''].filter(Boolean).map(esc).join(' · ')}</span>
-    ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}</span></li>`).join('')}</ul></div>` : ''}
+    ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}</span>
+    ${odgStralcioDi(d.stralci, s.n) ? '<span class="chev">›</span>' : ''}</li>`).join('')}</ul></div>` : ''}
 
   ${(d.cast || []).length ? `<div class="odg-sez">CAST</div>
   <div class="card">${d.cast.map(a => `<div class="odg-att">
@@ -7792,10 +7986,14 @@ function odgPienoHtml(d) {
     <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
     <span class="o num">${esc(a.set || '')}</span></div>`).join('')}</div>` : ''}
 
-  ${(d.contatti || []).length ? `<div class="odg-sez">NUMERI UTILI</div>
-  <div class="card">${d.contatti.map(p => `<a class="odg-tel" href="tel:${esc((p.tel || '').replace(/\D/g, ''))}">
+  ${(d.contatti || []).length || d.ospedale ? `<div class="odg-sez">NUMERI UTILI</div>
+  <div class="card">${(d.contatti || []).map(p => `<a class="odg-tel" href="tel:${esc((p.tel || '').replace(/\D/g, ''))}">
     <span class="c"><span class="t">${esc(p.nome || '')}</span><span class="s">${esc(p.ruolo || '')}</span></span>
-    <span class="b">${ODG_SEGNI.tel}</span></a>`).join('')}</div>` : ''}
+    <span class="b">${ODG_SEGNI.tel}</span></a>`).join('')}
+    ${d.ospedale ? `<a class="odg-posto" href="${odgMaps(d.ospedale)}" target="_blank" rel="noopener">
+      <span class="i">${ODG_SEGNI.croce}</span>
+      <span class="c"><span class="t">${esc(odgPrimaRiga(d.ospedale))}</span><span class="s">Ospedale più vicino</span></span>
+      <span class="go">Mappa ›</span></a>` : ''}</div>` : ''}
 
   ${d.domani ? `<div class="odg-sez">DOMANI</div>
   <div class="card"><div class="odg-domani">
@@ -7841,7 +8039,6 @@ function odgBadgeHtml(d, io) {
       const p = t[i];
       return `<div class="odg-chi uno">
         <div class="t">Sei tu?</div>
-        <div class="s">Confermo una volta sola, poi ti riconosco in tutti i documenti di questa produzione.</div>
         <div class="el"><button onclick="odgSceltoIo(${i})">
           <span class="n">${esc(p.nome || '')}</span>
           <span class="r">${[p.ruolo, p.reparto, p.set ? 'set ' + p.set : ''].filter(Boolean).map(esc).join(' · ')}</span>
