@@ -292,6 +292,20 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
  * Si legge sul set, in piedi, spesso al sole. Testo grande, poche righe
  * per schermata, e l'informazione che serve davvero — a che ora tocca a
  * te — in cima e in ambra, non persa in mezzo agli orari di tutti. */
+.prof-chiedi{margin-top:13px;border:1px solid var(--border);border-radius:13px;padding:16px}
+.prof-chiedi .t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--white)}
+.prof-chiedi .s{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:3px}
+.prof-chiedi .campi{display:flex;flex-direction:column;gap:8px;margin-top:13px}
+.prof-chiedi input,.prof-chiedi select{width:100%;min-height:46px;padding:11px 13px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  color:var(--white);font-family:'Space Grotesk',sans-serif;font-size:15px}
+.prof-chiedi input::placeholder{color:var(--muted)}
+.prof-chiedi .ok{width:100%;min-height:46px;margin-top:11px;background:var(--yellow);
+  color:#0A0B0D;border:none;border-radius:11px;font-family:'Space Grotesk',sans-serif;
+  font-size:14px;font-weight:600;cursor:pointer}
+.odg-chi.uno .el{max-height:none}
+.odg-chi .alt{display:block;width:100%;background:none;border:none;border-top:1px solid var(--border);
+  padding:12px;min-height:46px;color:var(--muted);font-family:inherit;font-size:12.5px;cursor:pointer}
 .altro-el{padding:14px 16px;display:flex;flex-direction:column}
 .altro-el button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:9px;
@@ -895,6 +909,14 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
             <button id="btnThemeLight" onclick="setTheme('light')" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--white);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.15s">☀️ Chiaro</button>
           </div>
         </div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-title">Chi sei</div>
+        <div class="settings-row" id="profRigaBox" onclick="profiloApri()" style="cursor:pointer">
+          <div class="settings-row-info" id="profRiga"></div>
+          <span style="color:var(--muted);font-size:16px">›</span>
+        </div>
+        <div id="profForm" style="display:none;margin-top:10px"></div>
       </div>
       <div class="settings-section">
         <div class="settings-title">Account</div>
@@ -2135,6 +2157,7 @@ sb.auth.getSession().then(({ data: { session } }) => {
 
 // ══ PAGE NAV ══
 function showPage(page) {
+  if (page === 'settings') try { profiloRenderImpostazioni(); } catch(_) {}
   document.getElementById('homePage').style.display    = page === 'home' ? '' : 'none';
   document.getElementById('settingsPage').style.display = page === 'settings' ? '' : 'none';
   document.getElementById('systemPage').style.display = page === 'system' ? '' : 'none';
@@ -6869,6 +6892,134 @@ function odgIntestazione(testo) {
 
 
 
+/* ── Chi sei ──────────────────────────────────────────────────────────
+ *
+ * Nome, cognome e reparto si chiedono una volta, al primo avvio. Servono
+ * a TROVARTI nei documenti della produzione, non a sostituirli: quello
+ * che scrivi ("Simone Panetta") non e' quasi mai come lo stampa la
+ * produzione ("S. Panetta", "Panetta Simone - Microfonista"), e prendere
+ * per buono il confronto quando sbaglia significa attaccarti il pick-up
+ * di un altro.
+ *
+ * Quindi: il nome digitato e' l'ipotesi, il documento e' la conferma.
+ * Nella convocazione troupe l'app trova la riga che ti somiglia e ti
+ * chiede solo di confermarla; se non la trova, o se ne trova piu' di
+ * una, torna a mostrare l'elenco. Quello che si memorizza e' sempre la
+ * grafia del documento, per quella produzione, cosi' tutti i documenti
+ * successivi ti riconoscono senza piu' approssimazioni.
+ */
+const CB_PROFILO = 'cb_profilo';
+const REPARTI_CREW = ['Suono','Regia','Fotografia','Elettricisti','Macchinisti',
+  'Scenografia','Costumi','Trucco','Parrucco','Produzione','Location','Montaggio',
+  'SFX','VFX','Stunt','Autisti','Casting','Altro'];
+
+function profilo() {
+  try { return JSON.parse(localStorage.getItem(CB_PROFILO) || 'null') || {}; }
+  catch (_) { return {}; }
+}
+function profiloCompleto() {
+  const p = profilo();
+  return !!(p.nome && p.cognome);
+}
+async function profiloSalva(p) {
+  try { localStorage.setItem(CB_PROFILO, JSON.stringify(p)); } catch (_) {}
+  if (!currentUser) return;
+  try {
+    await sb.from('profiles').upsert({
+      id: currentUser.id, email: currentUser.email,
+      nome: p.nome || null, cognome: p.cognome || null, reparto: p.reparto || null,
+      last_seen: new Date().toISOString()
+    }, { onConflict: 'id' });
+  } catch (e) { console.log('[profilo] non salvato sul cloud:', e.message); }
+}
+
+/* Confronto fra il nome digitato e quello stampato.
+ *
+ * "PANETTA Simone", "Panetta Simone", "S. Panetta" e "Simone Panetta"
+ * sono la stessa persona: si confrontano insiemi di parole, senza ordine,
+ * senza accenti e senza maiuscole. Il cognome deve esserci tutto — i
+ * doppi cognomi come "De Angelis" sono due parole e vanno trovate
+ * entrambe — mentre del nome basta l'iniziale, perche' nelle convocazioni
+ * quasi sempre e' abbreviato.
+ */
+function nomeParole(s) {
+  return String(s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[.'`]/g, ' ')
+    .split(/[^a-z0-9]+/).filter(Boolean);
+}
+function nomeCorrisponde(stampato, p) {
+  const t = nomeParole(stampato);
+  if (!t.length) return false;
+  const cog = nomeParole(p.cognome), nom = nomeParole(p.nome);
+  if (!cog.length) return false;
+  if (!cog.every(c => t.includes(c))) return false;
+  if (!nom.length) return true;
+  const n = nom[0];
+  return t.includes(n) || t.includes(n[0]);
+}
+
+/* La riga della troupe che sei tu, se se ne trova una sola.
+   Due righe che corrispondono vogliono dire due omonimi: meglio
+   l'elenco di una scelta fatta al posto tuo. */
+function profiloTrovaInTroupe(troupe) {
+  const p = profilo();
+  if (!p.cognome) return -1;
+  const q = [];
+  (troupe || []).forEach((r, i) => { if (nomeCorrisponde(r.nome, p)) q.push(i); });
+  return q.length === 1 ? q[0] : -1;
+}
+
+/* Il riquadro del primo avvio. Non blocca niente: si puo' chiudere e
+   rifarlo dalle impostazioni, ma finche' manca l'OdG non sa chi sei. */
+function profiloChiediHtml() {
+  const p = profilo();
+  return `<div class="prof-chiedi">
+    <div class="t">Come ti chiami?</div>
+    <div class="s">Serve a trovarti nei documenti della produzione — convocazioni,
+      giri auto, crew list — e mostrarti il tuo orario invece di quello generale.</div>
+    <div class="campi">
+      <input id="profNome"    type="text" placeholder="Nome"    value="${esc(p.nome || '')}" autocomplete="given-name">
+      <input id="profCognome" type="text" placeholder="Cognome" value="${esc(p.cognome || '')}" autocomplete="family-name">
+      <select id="profReparto">
+        <option value="">Reparto…</option>
+        ${REPARTI_CREW.map(r => `<option value="${r}"${p.reparto === r ? ' selected' : ''}>${r}</option>`).join('')}
+      </select>
+    </div>
+    <button class="ok" onclick="profiloConferma()">Salva</button>
+  </div>`;
+}
+
+async function profiloConferma() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const p = { nome: v('profNome'), cognome: v('profCognome'), reparto: v('profReparto') };
+  if (!p.nome || !p.cognome) { showToast('Servono nome e cognome.'); return; }
+  await profiloSalva(p);
+  if (typeof odgRender === 'function') odgRender();
+  if (typeof profiloRenderImpostazioni === 'function') profiloRenderImpostazioni();
+  showToast('Fatto.');
+}
+
+/* Nelle impostazioni la riga si apre nello stesso riquadro usato al primo
+   avvio, cosi' c'e' un solo posto dove quei tre campi sono definiti. */
+function profiloApri(){
+  const f=document.getElementById('profForm'); if(!f)return;
+  const aperto=f.style.display!=='none';
+  f.style.display=aperto?'none':'block';
+  f.innerHTML=aperto?'':profiloChiediHtml();
+}
+
+function profiloRenderImpostazioni() {
+  const el = document.getElementById('profRiga'); if (!el) return;
+  const p = profilo();
+  el.innerHTML = profiloCompleto()
+    ? `<div class="settings-row-label">${esc(p.nome)} ${esc(p.cognome)}</div>
+       <div class="settings-row-desc">${esc(p.reparto || 'reparto non indicato')} · tocca per cambiare</div>`
+    : `<div class="settings-row-label">Nome e reparto</div>
+       <div class="settings-row-desc">Non ancora indicati. Servono a trovarti nei documenti della produzione.</div>`;
+}
+
+
 /* ── Tabelle dell'OdG: qui serve il modello ───────────────────────────
  *
  * Scene, cast e troupe stanno in tabelle a piu' colonne, e pdf.js le
@@ -7065,7 +7216,9 @@ function odgSceltoIo(i) {
   try { localStorage.setItem(ODG_IO, JSON.stringify({ nome: t.nome, ruolo: t.ruolo, reparto: t.reparto })); } catch (_) {}
   odgRender();
 }
-function odgCambiaIo() { try { localStorage.removeItem(ODG_IO); } catch (_) {} odgRender(); }
+let odgForzaElenco=false;
+function odgElencoIntero(){ odgForzaElenco=true; odgRender(); }
+function odgCambiaIo() { odgForzaElenco=false; try { localStorage.removeItem(ODG_IO); } catch (_) {} odgRender(); }
 
 /* La riga della troupe che corrisponde a chi siamo, cercata per nome
    esatto: e' quello che abbiamo memorizzato scegliendola. */
@@ -7202,14 +7355,40 @@ function odgPienoHtml(d) {
 function odgBadgeHtml(d, io) {
   if (!io) {
     const t = (d.troupe || []);
+    // Niente convocazione troupe nel documento: resta l'orario generale.
     if (!t.length) return d.convocazione
       ? `<div class="odg-badge"><span class="r">Convocazione</span><span class="o num">${esc(d.convocazione)}</span></div>` : '';
+
+    // Senza nome in profilo non c'e' niente con cui cercare: prima si
+    // chiede come ti chiami, che e' una domanda sola invece di una lista.
+    if (!profiloCompleto()) return profiloChiediHtml();
+
+    // Con il nome, la riga si trova da sola e resta solo da confermare.
+    const i = odgForzaElenco ? -1 : profiloTrovaInTroupe(t);
+    if (i >= 0) {
+      const p = t[i];
+      return `<div class="odg-chi uno">
+        <div class="t">Sei tu?</div>
+        <div class="s">Confermo una volta sola, poi ti riconosco in tutti i documenti di questa produzione.</div>
+        <div class="el"><button onclick="odgSceltoIo(${i})">
+          <span class="n">${esc(p.nome || '')}</span>
+          <span class="r">${[p.ruolo, p.reparto, p.set ? 'set ' + p.set : ''].filter(Boolean).map(esc).join(' · ')}</span>
+        </button></div>
+        <button class="alt" onclick="odgElencoIntero()">Non sono io, mostrami tutti</button>
+      </div>`;
+    }
+
+    // Nessuna corrispondenza, oppure due omonimi: l'elenco intero.
+    const p = profilo();
+    const spiega = odgForzaElenco
+      ? 'Tocca la tua riga: da l\u00ec in poi ti riconosco in tutti i documenti di questa produzione.'
+      : esc(p.nome + ' ' + p.cognome) + ' non compare nella convocazione con questa grafia. Tocca la tua riga.';
     return `<div class="odg-chi">
       <div class="t">Quale sei tu?</div>
-      <div class="s">Lo chiedo una volta sola. Serve a mostrarti il tuo orario invece di quello generale.</div>
-      <div class="el">${t.map((p, i) => `<button onclick="odgSceltoIo(${i})">
-        <span class="n">${esc(p.nome || '')}</span>
-        <span class="r">${[p.ruolo, p.reparto].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div>
+      <div class="s">${spiega}</div>
+      <div class="el">${t.map((q, j) => `<button onclick="odgSceltoIo(${j})">
+        <span class="n">${esc(q.nome || '')}</span>
+        <span class="r">${[q.ruolo, q.reparto].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div>
     </div>`;
   }
   const ora = io.set || d.convocazione || '';

@@ -37,3 +37,12 @@ create policy "odg propri" on public.odg
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Nome, cognome e reparto dell'utente.
+--
+-- Non sostituiscono quello che scrive la produzione: servono a cercarlo.
+-- Quello che la convocazione stampa ("S. Panetta") resta la grafia buona
+-- per quella produzione e vive accanto all'OdG, non qui.
+alter table public.profiles add column if not exists nome    text;
+alter table public.profiles add column if not exists cognome text;
+alter table public.profiles add column if not exists reparto text;
