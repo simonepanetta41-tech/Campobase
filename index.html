@@ -7525,6 +7525,7 @@ async function odgScegliFile(input) {
     if (!dati.numero && !dati.convocazione && !(dati.scene || []).length) {
       throw new Error('Non ho riconosciuto un ordine del giorno in questo file.');
     }
+    dati.testo = testo;
     dati.nomeFile = file.name;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
@@ -7618,6 +7619,56 @@ function odgSceltoIo(i) {
 let odgForzaElenco=false;
 function odgElencoIntero(){ odgForzaElenco=true; odgRender(); }
 function odgCambiaIo() { odgForzaElenco=false; try { localStorage.removeItem(ODG_IO); } catch (_) {} odgRender(); }
+
+/*
+ * Trovarsi nella convocazione troupe senza passare dal modello.
+ *
+ * La tabella ha tre gruppi di colonne affiancati e pdf.js la restituisce
+ * intrecciata riga per riga: il modello a volte ne salta dei pezzi, e chi
+ * viene saltato si ritrova davanti l'elenco di sessanta persone. Qui si
+ * cerca il cognome nel testo grezzo e si legge quello che gli sta
+ * attorno — il ruolo prima, l'orario dopo. Non e' un'alternativa al
+ * modello: e' la rete sotto.
+ *
+ * Si accetta il risultato solo se il cognome compare una volta sola con
+ * un orario accanto. Due omonimi, o un cognome che e' anche una parola
+ * comune, e si torna a chiedere.
+ */
+function odgTrovamiNelTesto(testo, prof) {
+  if (!testo || !prof || !prof.cognome) return null;
+  const via = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const t = via(testo);
+  const re = new RegExp(via(prof.cognome).replace(/\s+/g, '\\s*'), 'ig');
+  const esiti = [];
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    const prima = t.slice(Math.max(0, m.index - 90), m.index);
+    const dopo  = t.slice(m.index + m[0].length, m.index + m[0].length + 26);
+
+    // Deve seguire un orario, o uno dei modi in cui la convocazione dice
+    // che un orario non c'e'. Senza, non e' una riga della tabella: e' il
+    // cognome capitato in mezzo a una frase.
+    const mo = dopo.match(/^\s*((?:\d{1,2}\s*[.:]\s*\d{2})|O\s*\.?\s*C\s*\.?|--|—|Vedi\s*GA)/i);
+    if (!mo) continue;
+
+    // Il nome di battesimo, o la sua iniziale puntata, sta subito prima.
+    const mn = prima.match(/([A-Z]\s*\.\s*|[A-Z][a-z]{2,}\s+)$/);
+    const nome = ((mn ? mn[1].trim() + ' ' : '') + testo.substr(m.index, m[0].length))
+                 .replace(/\s+/g, ' ').trim();
+
+    // Il ruolo: le colonne sono separate da due o piu' spazi, quindi e'
+    // l'ultimo pezzo. Prendendo tutto si porterebbe dietro la coda della
+    // colonna precedente — "SFX  Microfonista".
+    const resto = mn ? prima.slice(0, prima.length - mn[1].length) : prima;
+    const pezzi = resto.split(/\s{2,}/).map(x => x.trim()).filter(Boolean);
+    let ruolo = pezzi.length ? pezzi[pezzi.length - 1] : '';
+    if (/^(\d{1,2}[.:]\d{2}|O\.?C\.?|--|Partenza|SET)$/i.test(ruolo)) ruolo = '';
+
+    esiti.push({ nome, ruolo, set: mo[1].replace(/\s+/g, ''), partenza: '' });
+  }
+  return esiti.length === 1 ? esiti[0] : null;
+}
+
 
 /* La riga della troupe che corrisponde a chi siamo, cercata per nome
    esatto: e' quello che abbiamo memorizzato scegliendola. */
@@ -7760,7 +7811,20 @@ function odgBadgeHtml(d, io) {
       ? `<div class="odg-badge"><span class="r">Convocazione</span><span class="o num">${esc(d.convocazione)}</span></div>` : '';
 
     // Con il nome, la riga si trova da sola e resta solo da confermare.
-    const i = odgForzaElenco ? -1 : profiloTrovaInTroupe(t);
+    let i = odgForzaElenco ? -1 : profiloTrovaInTroupe(t);
+
+    // Se nella troupe estratta non ci sei, puoi esserci lo stesso nel
+    // documento: la tabella a tre colonne e' quella su cui il modello
+    // sbaglia piu' spesso. Si cerca nel testo originale e, se si trova
+    // una riga sola, la si propone come le altre.
+    if (i < 0 && !odgForzaElenco && d.testo) {
+      const dal = odgTrovamiNelTesto(d.testo, profilo());
+      if (dal) {
+        t.push(dal);
+        i = t.length - 1;
+      }
+    }
+
     if (i >= 0) {
       const p = t[i];
       return `<div class="odg-chi uno">
