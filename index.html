@@ -370,7 +370,27 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-pick .v{font-size:20px;color:var(--yellow)}
 .odg-scene li.apre{cursor:pointer}
 .odg-scene .chev{color:var(--muted);font-size:16px;align-self:center}
-#odgScena{position:fixed;inset:0;z-index:300;background:var(--bg);overflow-y:auto;
+.sc-cap{display:flex;gap:10px;align-items:baseline;margin:0 0 16px;padding-bottom:9px;
+  border-bottom:1px solid var(--border)}
+.sc-sez{padding:22px 0 8px}
+.sc-sez+.sc-sez{border-top:1px solid var(--border)}
+.sc-tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;border-bottom:1px solid var(--border);
+  background:var(--bg);position:sticky;top:0;z-index:2}
+.sc-tab{flex:0 0 auto;min-height:34px;padding:6px 14px;border-radius:9px;cursor:pointer;
+  background:none;border:1px solid var(--border-l);color:var(--muted);
+  font-family:'DM Mono',monospace;font-size:12px}
+.sc-tab.on{border-color:var(--yellow);color:var(--yellow)}
+.sc-foglio{padding:0 20px 40px;overflow-y:auto;height:100%}
+/* La forma della sceneggiatura: azione al margine, battuta rientrata,
+   nome di chi parla piu' dentro ancora. */
+.b-azione{font-size:14.5px;line-height:1.6;color:var(--white-dim);margin:0 0 13px}
+.b-chi{font-family:'DM Mono',monospace;font-size:13px;letter-spacing:.04em;color:var(--yellow);
+  margin:16px 0 2px 14%}
+.b-battuta{font-size:14.5px;line-height:1.55;color:var(--white);
+  margin:0 6% 4px 9%}
+.b-didascalia{font-size:13px;font-style:italic;color:var(--muted);margin:1px 0 3px 12%}
+#odgScena{position:fixed;inset:0;z-index:300;background:var(--bg);display:none;
+  flex-direction:column;overflow:hidden;
   padding:0 0 calc(env(safe-area-inset-bottom) + 30px)}
 .sc-top{position:sticky;top:0;display:flex;align-items:center;gap:10px;padding:
   calc(env(safe-area-inset-top) + 10px) 16px 12px;background:var(--bg);
@@ -383,8 +403,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .sc-corpo.mono{font-family:'DM Mono',monospace;font-size:12px;line-height:1.75}
 .sc-corpo{padding:18px 20px;font-size:15px;line-height:1.65;color:var(--white-dim);
   white-space:pre-wrap;word-break:break-word}
-.sc-id{margin:0 20px;padding:10px 14px;border-top:1px solid var(--border);
-  font-size:12px;color:var(--muted)}
+.sc-id{margin:0 0 14px;padding:8px 12px;border-radius:9px;background:var(--surface);
+  font-family:'DM Mono',monospace;font-size:11.5px;color:var(--white-dim)}
 /* I reparti nello spoglio */
 .rep{margin-bottom:22px}
 .rep-t{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
@@ -2315,6 +2335,10 @@ async function showApp() {
   }, { onConflict: 'id' });
   if (!profiloBenvenuto()) loadHistory();
   else loadHistory();
+  // L'ordine del giorno di ieri sera deve esserci stamattina: la bozza
+  // sta sul telefono, il cloud la conferma. Prima questa non la chiamava
+  // nessuno e a ogni chiusura dell'app l'OdG spariva.
+  odgRipristina();
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -7720,6 +7744,90 @@ function odgPickUp(testo, prof){
 
 
 /*
+ * Gli stralci, letti come sceneggiatura.
+ *
+ * In una sceneggiatura il rientro dice che cos'e' una riga, e nel PDF
+ * degli stralci i valori sono netti: 96 l'azione, 168 la battuta, 197 la
+ * didascalia fra parentesi, 240 il nome di chi parla, 42 il numero di
+ * scena nel margine, 539 l'asterisco della revisione. Le soglie non si
+ * scrivono a mano — cambiano da produzione a produzione — ma si
+ * ricavano dalle intestazioni di scena, che stanno al margine
+ * dell'azione, e tutto si misura da li'.
+ */
+function stralciDaRighe(righe){
+  if (!righe || !righe.length) return [];
+
+  const maxX = Math.max(...righe.map(r => r.x));
+  const SLUG = /^(INT|EST|EXT|I\/E)\b[^]*-\s*(GIORNO|NOTTE|ALBA|TRAMONTO|SERA|MATTINA|CONTINUA)/i;
+
+  /* Il rientro dell'azione lo danno le intestazioni di scena, che per
+     definizione stanno a quel margine. Prendere il rientro piu' frequente
+     non funziona: in una scena parlata le righe di battuta sono piu'
+     numerose di quelle d'azione, e il riferimento finiva spostato di una
+     tacca, con l'azione classificata come battuta e la battuta come nome.
+     Senza intestazioni si ripiega sul piu' piccolo fra i rientri usati
+     davvero, scartando i margini. */
+  const slug = righe.filter(r => SLUG.test(r.t));
+  let azione;
+  if (slug.length) {
+    azione = Math.min(...slug.map(r => r.x));
+  } else {
+    const conta = new Map();
+    righe.filter(r => r.x < maxX * 0.6)
+         .forEach(r => conta.set(r.x, (conta.get(r.x)||0) + 1));
+    const usati = [...conta.entries()].filter(([,n]) => n >= righe.length * 0.08);
+    azione = usati.length ? Math.min(...usati.map(([x]) => x)) : 0;
+  }
+
+  const tipo = r => {
+    if (r.x > maxX * 0.8) return 'segno';        // asterisco di revisione
+    if (r.x < azione - 20) return 'numero';      // numero di scena a margine
+    const d = r.x - azione;
+    if (d > 120) return 'chi';
+    if (d > 85)  return 'didascalia';
+    if (d > 45)  return 'battuta';
+    return 'azione';
+  };
+
+  // "3232" e' "32" stampato a sinistra e a destra sulla stessa riga.
+  const numero = t => {
+    const s = String(t).replace(/\s+/g,'');
+    const m = s.match(/^([0-9]{1,3}[A-Za-z]{0,3})\1$/);
+    return (m ? m[1] : s).toUpperCase();
+  };
+
+  const scene = [];
+  let corrente = null, ultimoNumero = null;
+  for (const r of righe) {
+    const k = tipo(r);
+    if (k === 'segno') continue;
+    if (k === 'numero') { ultimoNumero = numero(r.t); continue; }
+    if (k === 'azione' && SLUG.test(r.t)) {
+      corrente = { n: ultimoNumero || String(scene.length+1), testa: r.t, righe: [] };
+      scene.push(corrente);
+      continue;
+    }
+    if (!corrente) continue;
+    corrente.righe.push({ k, t: r.t });
+  }
+
+  // Le righe consecutive dello stesso tipo sono una cosa sola: nel PDF
+  // una frase va a capo per larghezza di colonna, non perche' finisce.
+  scene.forEach(s => {
+    const b = [];
+    for (const r of s.righe) {
+      const u = b[b.length-1];
+      if (u && u.k === r.k && r.k !== 'chi') u.t += ' ' + r.t;
+      else b.push({ k: r.k, t: r.t });
+    }
+    s.blocchi = b;
+    delete s.righe;
+  });
+  return scene;
+}
+
+
+/*
  * Gli stralci: la sceneggiatura delle scene del giorno.
  *
  * Si tagliano alle intestazioni di scena. Nel formato italiano il numero
@@ -7770,16 +7878,55 @@ function odgStralcioDi(stralci, n) {
  * giro e' salvarlo su File dall'app Mail e poi sceglierlo qui. Quindi
  * l'ingresso e' un <input type="file"> e basta, senza trascinamenti.
  */
-async function odgTestoDaPdf(file) {
+/*
+ * Il testo di un PDF, con le righe e il loro rientro.
+ *
+ * In una sceneggiatura il rientro E' l'informazione: a sinistra l'azione,
+ * piu' dentro la battuta, ancora piu' dentro il nome di chi parla.
+ * Appiattendo tutto in una stringa — come si fa per l'ordine del giorno,
+ * dove non serve — quella distinzione si perde e la scena diventa un
+ * blocco unico illeggibile. Qui si tengono le coordinate.
+ */
+async function odgTestoDaPdf(file, conRighe) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const pagine = [];
+  const pagine = [], righe = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const p = await pdf.getPage(i);
     const c = await p.getTextContent();
     pagine.push(c.items.map(x => x.str).join(' '));
+    if (!conRighe) continue;
+    // Gli elementi arrivano sparsi: si raggruppano per riga guardando la
+    // coordinata verticale, arrotondata perche' non e' mai identica.
+    const per = new Map();
+    for (const it of c.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = Math.round(it.transform[5]);
+      const k = y;
+      if (!per.has(k)) per.set(k, { y, x: it.transform[4], parti: [] });
+      const r = per.get(k);
+      r.x = Math.min(r.x, it.transform[4]);
+      r.parti.push(it);
+    }
+    [...per.values()].sort((a,b) => b.y - a.y).forEach(r => {
+      // Unendo i pezzi senza guardare dove stanno, "INGEGNER RANIERI"
+      // diventa "INGEGNERRANIERI": lo spazio fra due parole nel PDF e'
+      // distanza, non un carattere. Si rimette quando c'e' uno stacco.
+      const parti = r.parti.sort((a,b) => a.transform[4] - b.transform[4]);
+      let t = '';
+      parti.forEach((it, k) => {
+        if (k) {
+          const pre = parti[k-1];
+          const fine = pre.transform[4] + (pre.width || 0);
+          if (it.transform[4] - fine > 0.8 && !/\s$/.test(t) && !/^\s/.test(it.str)) t += ' ';
+        }
+        t += it.str;
+      });
+      t = t.replace(/\s+/g,' ').trim();
+      if (t) righe.push({ x: Math.round(r.x), p: i, t });
+    });
   }
-  return pagine.join('\n');
+  return conRighe ? { testo: pagine.join('\n'), righe } : pagine.join('\n');
 }
 
 let odgCorrente = null;       // l'OdG mostrato adesso
@@ -7823,8 +7970,8 @@ async function odgScegliFile(input) {
     const letti = [];
     for (const f of files) {
       odgPasso('Lettura di ' + f.name);
-      const t = await odgTestoDaPdf(f);
-      letti.push({ nome: f.name, testo: t, tipo: odgTipoDoc(t) });
+      const r = await odgTestoDaPdf(f, true);
+      letti.push({ nome: f.name, testo: r.testo, righe: r.righe, tipo: odgTipoDoc(r.testo) });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
     // l'OdG e' sempre il documento piu' corposo dei tre. Prima si prendeva
@@ -7860,7 +8007,10 @@ async function odgScegliFile(input) {
       dati.pickup = odgPickUp(giri.testo, profilo());
     }
     const str = extra.find(x => x.tipo === 'stralci');
-    if (str) dati.stralci = odgStralci(str.testo);
+    if (str) {
+      dati.stralci = odgStralci(str.testo);                 // ripiego a testo
+      dati.sceneggiatura = stralciDaRighe(str.righe || []); // con i rientri
+    }
     odgCorrente = dati;
     await odgSalva(dati);
     showToast('Ordine del giorno caricato.');
@@ -8023,8 +8173,17 @@ function odgDataEstesa(iso) {
   return `${g[d.getDay()]} ${d.getDate()} ${m[d.getMonth()]}`;
 }
 
-/* La scena del giorno, aperta dallo stralcio. A schermo pieno perche'
-   su un telefono una colonna di sceneggiatura non sta in un riquadro. */
+/* C'e' lo stralcio di questa scena? Vale la forma ricostruita dai
+   rientri e, in mancanza, quella a solo testo. */
+function odgHaStralcio(d, n){
+  if (!d || !n) return false;
+  const k = String(n).toUpperCase().replace(/\s+/g,'');
+  const base = k.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'');
+  const sc = d.sceneggiatura || [];
+  if (sc.some(x => x.n === k || x.n === base)) return true;
+  return !!odgStralcioDi(d.stralci, n);
+}
+
 /* Apre un documento caricato. Si mostra il testo estratto, non il PDF:
    e' quello che l'app ha davvero in mano, si legge anche senza rete e
    non occupa spazio. */
@@ -8034,31 +8193,93 @@ function odgApriFile(i){
     ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo }
     : (d.allegati||[])[i];
   if (!f || !f.testo) { showToast('Di questo file non ho il testo.'); return; }
-  const el = document.getElementById('odgScena'); if (!el) return;
-  el.innerHTML = `<div class="sc-top">
+  odgMostraPieno(`<div class="sc-top">
       <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
       <span class="sc-h">${esc(f.nome)}</span>
     </div>
-    <div class="sc-corpo mono">${esc(f.testo)}</div>`;
-  el.style.display='block';
-  document.body.style.overflow='hidden';
+    <div class="sc-foglio"><div class="sc-corpo mono">${esc(f.testo)}</div></div>`);
 }
 
+/*
+ * Le scene del giorno, come si leggono.
+ *
+ * Prima si apriva una scena sola, con il testo incollato in un blocco:
+ * illeggibile, e senza il resto della giornata. Adesso si aprono tutte,
+ * nell'ordine degli stralci, con la forma della sceneggiatura — nome di
+ * chi parla, battuta, didascalia, azione — e si scorre come sul foglio.
+ * Toccando una scena ci si posiziona su quella.
+ */
 function odgApriScena(n){
-  const st = odgStralcioDi(odgCorrente?.stralci, n);
-  if (!st) return;
-  const sc = (odgCorrente.scene||[]).find(x => String(x.n) === String(n)) || {};
-  const el = document.getElementById('odgScena'); if (!el) return;
-  el.innerHTML = `<div class="sc-top">
-      <button class="sc-x" onclick="odgChiudiScena()">‹</button>
-      <span class="sc-n num">${esc(String(n))}</span>
-      <span class="sc-h">${esc(st.testa||'')}</span>
+  const d = odgCorrente;
+  const scene = (d && d.sceneggiatura && d.sceneggiatura.length) ? d.sceneggiatura : null;
+  if (!scene) {
+    // Senza i rientri resta il ripiego a testo: meglio di niente.
+    const st = odgStralcioDi(d?.stralci, n);
+    if (!st) return;
+    const sc = (d.scene||[]).find(x => String(x.n) === String(n)) || {};
+    return odgMostraPieno(`<div class="sc-top"><button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
+      <span class="sc-n num">${esc(String(n))}</span><span class="sc-h">${esc(st.testa||'')}</span></div>
+      <div class="sc-foglio">
+        ${sc.ids?`<div class="sc-id">Cast in scena: ${esc(sc.ids)}</div>`:''}
+        <div class="sc-corpo">${esc(st.testo||'')}</div></div>`);
+  }
+
+  // Gli ID del cast li sa l'ordine del giorno, non lo stralcio: si
+  // riportano qui perche' e' leggendo la scena che si vuole sapere chi
+  // c'e' dentro.
+  const idsDi = numero => {
+    const k = String(numero).toUpperCase();
+    const r = (d.scene||[]).find(x => {
+      const a = String(x.n).toUpperCase().replace(/\s+/g,'');
+      return a === k || a.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'') === k;
+    });
+    return r && r.ids ? r.ids : null;
+  };
+
+  const corpo = scene.map(sc => `<section class="sc-sez" id="sc-${esc(sc.n)}">
+      <div class="sc-cap"><span class="sc-n num">${esc(sc.n)}</span>
+        <span class="sc-h">${esc(sc.testa)}</span></div>
+      ${idsDi(sc.n) ? `<div class="sc-id">Cast in scena: ${esc(idsDi(sc.n))}</div>` : ''}
+      ${sc.blocchi.map(b => `<div class="b-${b.k}">${esc(b.t)}</div>`).join('')}
+    </section>`).join('');
+
+  const scelte = scene.map(sc =>
+    `<button class="sc-tab" data-n="${esc(sc.n)}" onclick="odgVaiScena('${esc(sc.n)}')">${esc(sc.n)}</button>`).join('');
+
+  odgMostraPieno(`<div class="sc-top">
+      <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
+      <span class="sc-h">Scene del giorno</span>
     </div>
-    <div class="sc-corpo">${esc(st.testo||'').replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>')}</div>
-    ${sc.ids?`<div class="sc-id">Cast in scena: ${esc(sc.ids)}</div>`:''}`;
-  el.style.display='block';
-  document.body.style.overflow='hidden';
+    <div class="sc-tabs">${scelte}</div>
+    <div class="sc-foglio">${corpo}</div>`);
+  odgVaiScena(n, true);
 }
+
+/* Porta la scena in cima. Il numero dell'OdG puo' essere 32END mentre lo
+   stralcio e' la 32: la stessa regola del resto. */
+function odgVaiScena(n, subito){
+  const scene = odgCorrente?.sceneggiatura || [];
+  const k = String(n).toUpperCase().replace(/\s+/g,'');
+  const base = k.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'');
+  const sc = scene.find(x => x.n === k) || scene.find(x => x.n === base);
+  if (!sc) return;
+  const el = document.getElementById('sc-' + sc.n);
+  const box = document.querySelector('#odgScena .sc-foglio');
+  if (el && box) {
+    const top = el.offsetTop - box.offsetTop;
+    box.scrollTo({ top, behavior: subito ? 'auto' : 'smooth' });
+  }
+  document.querySelectorAll('#odgScena .sc-tab').forEach(b =>
+    b.classList.toggle('on', b.dataset.n === sc.n));
+}
+
+function odgMostraPieno(html){
+  const el = document.getElementById('odgScena'); if (!el) return;
+  el.innerHTML = html;
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
 function odgChiudiScena(){
   const el=document.getElementById('odgScena');
   if(el){el.style.display='none';el.innerHTML='';}
@@ -8272,12 +8493,12 @@ function odgPienoHtml(d) {
 
 
   ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
-  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li${odgStralcioDi(d.stralci, s.n) ? ` class="apre" onclick="odgApriScena('${esc(String(s.n))}')"` : ''}>
+  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li${odgHaStralcio(d, s.n) ? ` class="apre" onclick="odgApriScena('${esc(String(s.n))}')"` : ''}>
     <span class="n num">${esc(s.n || '')}</span>
     <span class="c"><span class="t">${esc(s.sinossi || '')}</span>
     <span class="s">${[s.ie, s.m, odgCap(s.ambiente || ''), s.pag ? s.pag + ' pag' : ''].filter(Boolean).map(esc).join(' · ')}</span>
     ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}</span>
-    ${odgStralcioDi(d.stralci, s.n) ? '<span class="chev">›</span>' : ''}</li>`).join('')}</ul></div>` : ''}
+    ${odgHaStralcio(d, s.n) ? '<span class="chev">›</span>' : ''}</li>`).join('')}</ul></div>` : ''}
 
   ${(d.cast || []).length ? `<div class="odg-sez">CAST</div>
   <div class="card">${d.cast.map(a => `<div class="odg-att">
