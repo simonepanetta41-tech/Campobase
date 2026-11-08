@@ -7845,7 +7845,7 @@ function ttGiornoHtml(tab,days,tot,sestoIdx){
   }).join('');
   const righe=TTG_ORARI.map(r=>`<div class="ttg-riga">
     <label for="ttg-${tab.id}-${r.k}">${r.l}</label>
-    <input id="ttg-${tab.id}-${r.k}" type="text" inputmode="numeric" placeholder="—"
+    <input id="ttg-${tab.id}-${r.k}" type="text" inputmode="decimal" placeholder="—"
       value="${tab.orari[r.k][i]||''}"
       onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)"
       onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></div>`).join('');
@@ -7930,7 +7930,7 @@ function ttRenderTab(tab){
       const isSesto=i===sestoIdx;
       const cl=[i===5?'sat2':'',isSesto?'sesto2':''].filter(Boolean).join(' ');
       const v=tab.orari[r.k][i]||'';
-      th+=`<td class="${cl}" data-ci="${i}"><input class="ti" type="text" placeholder="—" value="${v}" data-f="${r.k}" data-i="${i}" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
+      th+=`<td class="${cl}" data-ci="${i}"><input class="ti" type="text" inputmode="decimal" placeholder="—" value="${v}" data-f="${r.k}" data-i="${i}" onchange="ttSetO('${tab.id}','${r.k}',${i},this.value)" onblur="ttSetO('${tab.id}','${r.k}',${i},this.value)"></td>`;
     });
     th+=`<td class="tot2">—</td></tr>`;
   });
@@ -8002,8 +8002,51 @@ async function ttDelTab(id){if(ttTabelle.length<=1)return;if(!await askConfirm('
  * controllo sul valore invariato, confermare un orario ridisegnava due
  * volte.
  */
+/*
+ * Mette in forma un orario digitato a mano.
+ *
+ * Sul telefono il tastierino con il punto non c'e' sempre, e quando c'e'
+ * su una tastiera italiana e' una virgola: chiedere "08.00" esatto
+ * significa chiedere un carattere che spesso non si puo' battere. Quindi
+ * si accetta tutto quello che un orario puo' sembrare — 8, 800, 0800,
+ * 8:00, 8,00, 8h00 — e si scrive sempre nella stessa forma.
+ *
+ * Le sole cifre si leggono da destra: le ultime due sono i minuti, quello
+ * che resta sono le ore. Cosi' 830 e' le otto e mezza e 2130 le nove e
+ * mezza di sera, che e' come si battono gli orari quando si va di fretta.
+ * Un minuto solo si completa a destra (8.3 -> 08.30), come su qualunque
+ * campo orario.
+ *
+ * Se non ne esce un orario valido si lascia scritto quello che c'era: il
+ * calcolo lo ignorera', ma almeno si vede l'errore invece di veder
+ * sparire quanto digitato.
+ */
+function ttNormalizzaOra(v){
+  const orig=(v==null?'':String(v)).trim();
+  if(!orig)return '';
+  const s=orig.replace(/[,:hH]/g,'.').replace(/\s+/g,'');
+  let h,m;
+  const sep=s.match(/^(\d{1,2})\.(\d{1,2})$/);
+  if(sep){
+    h=+sep[1];
+    m=+(sep[2].length===1?sep[2]+'0':sep[2]);
+  }else if(/^\d{1,4}$/.test(s)){
+    if(s.length<=2){ h=+s; m=0; }
+    else { h=+s.slice(0,-2); m=+s.slice(-2); }
+  }else return orig;
+  if(!(h>=0&&h<=23&&m>=0&&m<=59))return orig;
+  return String(h).padStart(2,'0')+'.'+String(m).padStart(2,'0');
+}
+
 function ttSetO(tabId,field,di,val){
   const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;
+  val=ttNormalizzaOra(val);
+  // La casella non viene ridisegnata, quindi la forma corretta va
+  // riscritta a mano: chi ha battuto 830 deve vedere 08.30.
+  const el=ttVista==='giorno'
+    ? (ttGiornoSel===di?document.getElementById(`ttg-${tabId}-${field}`):null)
+    : document.querySelector(`#ttb-${tabId} input[data-f="${field}"][data-i="${di}"]`);
+  if(el&&el.value!==val)el.value=val;
   if(t.orari[field][di]===val)return;
   t.orari[field][di]=val;
   // Solo i valori calcolati cambiano: le caselle degli orari e il
