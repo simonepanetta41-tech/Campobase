@@ -174,11 +174,11 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
 /* ── RESULT TABS ── */
 .result-tabs { display: flex; gap: 0; margin-bottom: 28px; background: var(--surface2); border-radius: 10px; padding: 4px; }
 @media(max-width:600px) {
-  .result-tabs { position: fixed; bottom: calc(52px + env(safe-area-inset-bottom)); left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0; background: var(--bg); }
+  .result-tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tabs-2 { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tab { padding: 10px 8px 8px; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .result-tab svg { width: 18px; height: 18px; }
-  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection { padding-bottom: 140px; }
+  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: 96px; }
 }
 .result-tab { flex: 1; background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; padding: 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .wrap-chip { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;border:1.5px solid var(--border);color:var(--muted);background:none;transition:all 0.15s;user-select:none; }
@@ -288,6 +288,115 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-hdr-w{font-size:11px;color:var(--white);font-weight:500;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tt-hdr-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
+/* ── Ordine del giorno ───────────────────────────────────────────────
+ * Si legge sul set, in piedi, spesso al sole. Testo grande, poche righe
+ * per schermata, e l'informazione che serve davvero — a che ora tocca a
+ * te — in cima e in ambra, non persa in mezzo agli orari di tutti. */
+.altro-el{padding:14px 16px;display:flex;flex-direction:column}
+.altro-el button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:9px;
+  padding:14px 16px;min-height:58px;cursor:pointer;color:inherit;font-family:inherit}
+.altro-el .t{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:500;color:var(--white)}
+.altro-el .s{flex:1;min-width:0;font-size:12px;color:var(--muted)}
+.altro-el .ch{color:var(--muted);font-size:16px}
+#odgSection{padding:14px 16px 96px}
+.odg-vuoto{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:58px 22px;gap:9px}
+.odg-vuoto .odg-ic{width:46px;height:46px;color:var(--border-l);margin-bottom:4px}
+.odg-vuoto .odg-ic svg{width:100%;height:100%;display:block}
+.odg-vuoto .odg-t{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--white)}
+.odg-vuoto .odg-s{font-size:13px;color:var(--muted);line-height:1.55;max-width:300px}
+.odg-err{margin-top:4px;font-size:12.5px;color:var(--danger);line-height:1.5;max-width:320px}
+.odg-barra{width:190px;height:3px;border-radius:2px;background:var(--surface2);overflow:hidden;margin-top:14px}
+.odg-barra span{display:block;width:40%;height:100%;background:var(--yellow);
+  animation:odgScorre 1.1s ease-in-out infinite}
+@keyframes odgScorre{0%{margin-left:-40%}100%{margin-left:100%}}
+.odg-btn{display:inline-flex;align-items:center;justify-content:center;margin-top:16px;
+  padding:12px 22px;background:var(--yellow);color:#0A0B0D;border-radius:11px;
+  font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
+  width:100%;max-width:320px;min-height:46px}
+
+.odg-testa .h1{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--white)}
+.odg-testa .h2{font-size:13px;color:var(--muted);margin-top:2px}
+
+.odg-badge{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:13px;
+  padding:14px 16px;border-radius:13px;background:rgba(245,197,66,.12);
+  border:1px solid rgba(245,197,66,.4);cursor:pointer}
+.odg-badge .r{flex:1;min-width:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--yellow)}
+.odg-badge .o{font-family:'DM Mono',monospace;font-size:27px;color:var(--yellow);line-height:1}
+.odg-badge .p{flex-basis:100%;font-size:11.5px;color:var(--white-dim)}
+
+.odg-chi{margin-top:13px;border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.odg-chi .t{padding:14px 16px 2px;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600}
+.odg-chi .s{padding:0 16px 12px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.odg-chi .el{max-height:290px;overflow-y:auto;border-top:1px solid var(--border)}
+.odg-chi button{display:block;width:100%;text-align:left;background:none;border:none;
+  border-bottom:1px solid var(--border);padding:11px 16px;cursor:pointer;min-height:46px;color:inherit}
+.odg-chi button:last-child{border-bottom:none}
+.odg-chi .n{display:block;font-size:14px;color:var(--white)}
+.odg-chi .r{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+
+#odgSection .card{margin-top:11px;background:var(--surface);border:1px solid var(--border);
+  border-radius:13px;overflow:hidden}
+.odg-orari>div{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;border-bottom:1px solid var(--border)}
+.odg-orari>div:last-child{border-bottom:none}
+.odg-orari .k{font-size:13.5px;color:var(--white-dim)}
+.odg-orari .v{font-size:16px;color:var(--white)}
+.odg-luce{display:flex}
+.odg-luce>div{flex:1;min-width:0;padding:10px 6px;text-align:center;border-right:1px solid var(--border)}
+.odg-luce>div:last-child{border-right:none}
+.odg-luce .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.odg-luce .v{display:block;font-size:14px;color:var(--white-dim);margin-top:3px}
+.odg-meteo{padding:12px 16px;font-size:13.5px;color:var(--white-dim)}
+
+.odg-sez{margin:20px 0 0;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.odg-posto{display:flex;align-items:center;gap:12px;padding:13px 16px;text-decoration:none;color:inherit}
+.odg-posto .i{width:22px;height:22px;flex:0 0 22px;color:var(--yellow)}
+.odg-posto .i svg{width:100%;height:100%;display:block}
+.odg-posto .c{flex:1;min-width:0}
+.odg-posto .t{display:block;font-size:14px;color:var(--white)}
+.odg-posto .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-posto .go{font-size:12px;color:var(--yellow);white-space:nowrap}
+
+.odg-scene{list-style:none;margin:0;padding:0}
+.odg-scene li{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.odg-scene li:last-child{border-bottom:none}
+.odg-scene .n{flex:0 0 52px;font-size:13px;color:var(--yellow)}
+.odg-scene .c{flex:1;min-width:0}
+.odg-scene .t{display:block;font-size:13.5px;color:var(--white);line-height:1.45}
+.odg-scene .s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+.odg-scene .ids{display:inline-block;margin-top:5px;padding:1px 7px;border-radius:5px;
+  background:var(--surface2);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--white-dim)}
+
+.odg-att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.odg-att:last-child{border-bottom:none}
+.odg-att .id{flex:0 0 32px;font-size:12px;color:var(--muted)}
+.odg-att .c{flex:1;min-width:0}
+.odg-att .t{display:block;font-size:13.5px;color:var(--white)}
+.odg-att .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-att .o{font-size:14px;color:var(--white-dim)}
+
+.odg-tel{display:flex;align-items:center;gap:12px;padding:12px 16px;text-decoration:none;
+  color:inherit;border-bottom:1px solid var(--border);min-height:52px}
+.odg-tel:last-child{border-bottom:none}
+.odg-tel .c{flex:1;min-width:0}
+.odg-tel .t{display:block;font-size:13.5px;color:var(--white)}
+.odg-tel .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-tel .b{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:9px;
+  border:1px solid var(--yellow);color:var(--yellow)}
+.odg-tel .b svg{width:16px;height:16px;display:block}
+
+.odg-domani{padding:13px 16px}
+.odg-domani .t{display:block;font-size:14px;color:var(--white)}
+.odg-domani .s{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.odg-file{display:flex;align-items:center;gap:12px;padding:13px 16px}
+.odg-file .t{display:block;font-size:13.5px;color:var(--white);word-break:break-all}
+.odg-file .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-togli{display:block;width:100%;margin-top:14px;min-height:46px;
+  background:rgba(255,107,90,.12);border:1px solid var(--danger);border-radius:12px;
+  color:var(--danger);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
+
 .tt-sc-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:7px;cursor:pointer;transition:border-color 0.15s}
 .tt-sc-row:hover{border-color:var(--border-l)}
 .tt-sc-row.sel{border-color:var(--yellow);background:rgba(245,197,66,0.04)}
@@ -857,27 +966,16 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
 
-      <!-- RESULT TABS -->
+      <!-- RESULT TABS — cinque schede, una riga sola.
+           Script, Cast e Wrap sono finiti sotto Altro: si aprono una volta
+           ogni tanto, e tenerli in barra costava una seconda riga fissa che
+           sul telefono mangiava mezzo pollice di schermo. -->
       <div class="result-tabs">
-        <button class="result-tab" id="tabScript" onclick="switchResultTab('script')">
-          <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="14" height="18" rx="2"/><path d="M7 5h6M7 8h6M7 11h4"/><path d="M13 14l2 2-2 2"/></svg>
-          Script
-        </button>
-        <button class="result-tab active" id="tabSpoglio" onclick="switchResultTab('spoglio')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="11" height="14" rx="1.5"/><path d="M6 6h5M6 9h5M6 12h3"/><path d="M16 6v10a1 1 0 01-1 1H5"/></svg> Spoglio</button>
-        <button class="result-tab" id="tabPdl" onclick="switchResultTab('pdl')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="1.5"/><path d="M2 8h16"/><path d="M6 2v4M14 2v4"/><path d="M6 12h2M10 12h2M6 15h2"/></svg> PDL</button>
-      </div>
-
-      <!-- SECOND ROW TABS -->
-      <div class="result-tabs result-tabs-2">
-        <button class="result-tab" id="tabCast" onclick="switchResultTab('cast')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="6" r="3.5"/><path d="M3 18c0-3.314 3.134-6 7-6s7 2.686 7 6"/><rect x="12" y="2" width="6" height="5" rx="1"/><text x="15" y="6.5" font-size="4" text-anchor="middle" stroke="none" fill="currentColor" font-weight="700">1</text></svg> Cast</button>
-        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('timetable')">
-          <svg viewBox="0 0 50 50" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="25" cy="25" r="20"/><line x1="25" y1="7" x2="25" y2="12"/><line x1="25" y1="38" x2="25" y2="43"/><line x1="7" y1="25" x2="12" y2="25"/><line x1="38" y1="25" x2="43" y2="25"/><path d="M25 25L15 14" stroke-width="2"/><path d="M25 25L34 11" stroke-width="1.5"/><circle cx="25" cy="25" r="2" fill="currentColor" stroke="none"/><rect x="22" y="4" width="6" height="3" rx="1"/></svg>
-          Timetable
-        </button>
-        <button class="result-tab" id="tabWrap" onclick="switchResultTab('wrap')">
-          <svg viewBox="0 0 40 44" width="13" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h22l-5 22H9L4 2z"/><path d="M4 2c1-2 3-2 5 0s4 2 5 0 4 2 5 0 3-2 5 0" stroke-width="1.2"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="18" cy="10" r="1" fill="currentColor" stroke="none"/><path d="M15 24v8"/><path d="M8 32h14"/><path d="M26 6c4 0 6 2 6 5s-2 5-6 5"/></svg>
-          Wrap
-        </button>
+        <button class="result-tab" id="tabOdg" onclick="switchResultTab('odg')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="2" width="13" height="16" rx="2"/><path d="M7 2.5V1.5h6v1"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4"/></svg> OdG</button>
+        <button class="result-tab active" id="tabSpoglio" onclick="switchResultTab('spoglio')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="11" height="14" rx="1.5"/><path d="M6 6h5M6 9h5M6 12h3"/><path d="M16 6v10a1 1 0 01-1 1H5"/></svg> Spoglio</button>
+        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('ore')"><svg viewBox="0 0 50 50" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="25" cy="25" r="20"/><path d="M25 25L15 14" stroke-width="2"/><path d="M25 25L34 11" stroke-width="1.5"/><circle cx="25" cy="25" r="2" fill="currentColor" stroke="none"/><rect x="22" y="4" width="6" height="3" rx="1"/></svg> Ore</button>
+        <button class="result-tab" id="tabPdl" onclick="switchResultTab('piano')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="1.5"/><path d="M2 8h16"/><path d="M6 2v4M14 2v4"/><path d="M6 12h2M10 12h2M6 15h2"/></svg> Piano</button>
+        <button class="result-tab" id="tabAltro" onclick="switchResultTab('altro')"><svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor" stroke="none"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg> Altro</button>
       </div>
 
       <!-- SPOGLIO TAB -->
@@ -1107,7 +1205,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div><!-- end castSection -->
 
       <!-- TIMETABLE SECTION -->
-      <div id="timetableSection" style="display:none;flex-direction:column;padding:12px 16px;gap:12px;overflow-y:auto;padding-bottom:140px">
+      <div id="timetableSection" style="display:none;flex-direction:column;padding:12px 16px;gap:12px;overflow-y:auto;padding-bottom:96px">
 
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Timetables</div>
@@ -1391,6 +1489,20 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
           <canvas id="scriptCanvas" style="display:none;max-width:100%;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,0.5)"></canvas>
         </div>
 
+      </div>
+
+
+      <!-- ORDINE DEL GIORNO -->
+      <div id="odgSection" style="display:none"><div id="odgCorpo"></div></div>
+
+      <!-- ALTRO — quello che si apre una volta ogni tanto -->
+      <div id="altroSection" style="display:none">
+        <div class="altro-el">
+          <button onclick="switchResultTab('script')"><span class="t">Sceneggiatura</span><span class="s">Testo e analisi</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('cast')"><span class="t">Cast</span><span class="s">Personaggi e interpreti</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('wrap')"><span class="t">Wrap</span><span class="s">Locali e indirizzi di fine giornata</span><span class="ch">›</span></button>
+          <button onclick="toggleGennaroDrawer()"><span class="t">Gennaro</span><span class="s">Domande sulla produzione</span><span class="ch">›</span></button>
+        </div>
       </div>
 
     </div><!-- end resultsPage -->
@@ -4644,21 +4756,34 @@ document.getElementById('shareResultsContainer')?.addEventListener('click', e =>
 });
 
 // ══ RESULT TABS ══
-function switchResultTab(tab) {
-  const spoglio   = document.getElementById('spoglioSection');
-  const pdl       = document.getElementById('pdlSection');
-  const cast      = document.getElementById('castSection');
-  const timetable = document.getElementById('timetableSection');
-  const wrap      = document.getElementById('wrapSection');
-  const script    = document.getElementById('scriptSection');
+/*
+ * Le cinque schede.
+ *
+ * "altro" non e' una sezione come le altre: e' l'elenco da cui si aprono
+ * Sceneggiatura, Cast e Wrap, che restano schede a tutti gli effetti ma
+ * non occupano piu' un posto in barra. Quando si apre una di quelle, in
+ * barra resta acceso Altro, perche' e' da li' che ci si e' arrivati.
+ */
+const RT_SEZIONI = {
+  odg:'odgSection', spoglio:'spoglioSection', ore:'timetableSection',
+  piano:'pdlSection', altro:'altroSection',
+  cast:'castSection', wrap:'wrapSection', script:'scriptSection'
+};
+const RT_FLEX = ['ore','wrap','script'];      // sezioni a colonna
+const RT_SOTTO_ALTRO = ['cast','wrap','script'];
 
-  spoglio.style.display   = tab === 'spoglio' ? '' : 'none';
-  cast.style.display      = tab === 'cast' ? '' : 'none';
-  if (tab === 'pdl') { pdl.classList.add('on'); } else { pdl.classList.remove('on'); }
-  if (timetable) timetable.style.display = tab === 'timetable' ? 'flex' : 'none';
-  if (tab === 'timetable') {
+function switchResultTab(tab) {
+  for (const [k, id] of Object.entries(RT_SEZIONI)) {
+    const el = document.getElementById(id); if (!el) continue;
+    if (k === 'piano') { el.classList.toggle('on', tab === 'piano'); continue; }
+    el.style.display = tab === k ? (RT_FLEX.includes(k) ? 'flex' : '') : 'none';
+  }
+
+  if (tab === 'odg')  odgRender();
+  if (tab === 'ore') {
     initTimetable();
-    // Aggiorna film dall'analisi corrente ogni volta che si apre il tab
+    // Il film dell'analisi in corso riempie l'intestazione, se non e' stata
+    // scritta a mano.
     try {
       const filmEl = document.getElementById('tt-film');
       if (filmEl && typeof analysisData !== 'undefined' && analysisData?.titolo && !filmEl.dataset.manuallyEdited) {
@@ -4668,20 +4793,20 @@ function switchResultTab(tab) {
       }
     } catch(e) {}
   }
-  if (wrap)      wrap.style.display      = tab === 'wrap'      ? 'flex' : 'none';
-  if (tab === 'wrap') initWrap();
-  if (script)    script.style.display    = tab === 'script'    ? 'flex' : 'none';
+  if (tab === 'wrap')   initWrap();
   if (tab === 'script') initScriptViewer();
 
-  ['tabSpoglio','tabPdl','tabCast','tabTimetable','tabWrap','tabScript'].forEach(id => {
+  const barra = { odg:'tabOdg', spoglio:'tabSpoglio', ore:'tabTimetable',
+                  piano:'tabPdl', altro:'tabAltro' };
+  Object.values(barra).forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.remove('active');
   });
-  const tabMap = { spoglio:'tabSpoglio', pdl:'tabPdl', cast:'tabCast',
-    timetable:'tabTimetable', wrap:'tabWrap', script:'tabScript' };
-  const spoglioActions = document.getElementById('spoglioActions');
-  if (spoglioActions) spoglioActions.style.display = tab === 'spoglio' ? 'flex' : 'none';
-  const activeTab = document.getElementById(tabMap[tab]);
-  if (activeTab) activeTab.classList.add('active');
+  const acceso = barra[tab] || (RT_SOTTO_ALTRO.includes(tab) ? 'tabAltro' : null);
+  const el = acceso && document.getElementById(acceso);
+  if (el) el.classList.add('active');
+
+  const az = document.getElementById('spoglioActions');
+  if (az) az.style.display = tab === 'spoglio' ? 'flex' : 'none';
 }
 
 // ══ WRAP ══
@@ -6742,6 +6867,385 @@ function odgIntestazione(testo) {
   return r;
 }
 
+
+
+/* ── Tabelle dell'OdG: qui serve il modello ───────────────────────────
+ *
+ * Scene, cast e troupe stanno in tabelle a piu' colonne, e pdf.js le
+ * restituisce intrecciate: la riga "C. De Gregorio O.C. | Ass Op.
+ * Backstage V. F. Cassone 08.30 | Parrucchiera L. Marzocchella 07.45"
+ * sono tre persone di tre reparti diversi, stampate affiancate. Un
+ * riconoscimento a regole su questo sarebbe un castello di euristiche
+ * che si rompe al primo OdG di un'altra produzione.
+ *
+ * L'intestazione invece la legge odgIntestazione senza spendere niente,
+ * quindi al modello non la chiediamo nemmeno: il testo lo vede tutto, ma
+ * deve restituire solo cio' che non sappiamo gia' estrarre da soli.
+ */
+const ODG_SYS = `Leggi un ordine del giorno di una produzione cinematografica italiana e restituisci le sue tabelle.
+
+Il testo viene da un PDF e ha spazi sparsi dentro parole e numeri: "0 8.30" e' 08.30, "33 9 7564743" e' 3397564743, "32E ND" e' 32END. Ricomponili.
+
+Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
+{"scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":""}],
+ "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":""}]},
+ "cast":[{"id":"","ruolo":"","interprete":"","scene":"","pickup":"","set":""}],
+ "troupe":[{"reparto":"","ruolo":"","nome":"","partenza":"","set":""}],
+ "contatti":[{"nome":"","ruolo":"","tel":""}]}
+
+scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola. pag: come scritto ("4 1/8").
+domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null.
+cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP. set: l'ultima colonna, SET.
+troupe: tutte le persone sotto "CONVOCAZIONE TROUPE". La tabella ha tre gruppi di colonne affiancati e le righe arrivano intrecciate: ricostruisci ogni persona con il reparto della sua intestazione (REGIA, FOTOGRAFIA, COSTUMI, ELETTRICISTI, MACCHINISTI, SCENOGRAFIA, SUONO, LOCATION, TRUCCO, AUTISTI, MONTAGGIO, VFX, SFX, AGGIUNTI, PRODUZIONE...). partenza e set sono le due colonne di orario; "O.C.", "Vedi GA" e "--" riportali come stanno.
+contatti: solo le persone con un numero di telefono, in testa al documento. tel: sole cifre.
+
+Ometti i campi che il documento non ha, con stringa vuota. Non inventare righe. Rispondi SOLO con il JSON.`;
+
+/* Estrae un ordine del giorno dal testo di un PDF.
+   L'intestazione non costa niente; le tabelle sono una chiamata sola. */
+async function odgEstrai(testo, onPasso) {
+  const passo = onPasso || (() => {});
+  passo('Lettura dell\'intestazione');
+  const testa = odgIntestazione(testo);
+
+  passo('Scene, cast e troupe');
+  let tab = { scene: [], domani: null, cast: [], troupe: [], contatti: [] };
+  try {
+    const r = await callApi('api/pdl', {
+      system: ODG_SYS, max_tokens: 8000,
+      messages: [{ role: 'user', content: [{ type: 'text', text: testo.slice(0, 40000) }] }]
+    });
+    const grezzo = r?.content?.[0]?.text || '';
+    const j = grezzo.slice(grezzo.indexOf('{'), grezzo.lastIndexOf('}') + 1);
+    const p = JSON.parse(j);
+    tab = {
+      scene:     Array.isArray(p.scene) ? p.scene : [],
+      domani:    p.domani && Array.isArray(p.domani.scene) ? p.domani : null,
+      cast:      Array.isArray(p.cast) ? p.cast : [],
+      troupe:    Array.isArray(p.troupe) ? p.troupe : [],
+      contatti:  Array.isArray(p.contatti) ? p.contatti : []
+    };
+  } catch (e) {
+    // L'intestazione resta valida anche se le tabelle non si leggono: meglio
+    // un OdG con gli orari e senza le scene che nessun OdG.
+    console.log('[odg] tabelle non lette:', e.message);
+    tab.errore = e.message;
+  }
+
+  // Gli orari dentro le tabelle arrivano come li ha scritti il modello.
+  // Passarli dalla stessa normalizzazione degli altri evita che "8.3" e
+  // "08.30" convivano nella stessa schermata.
+  const sist = o => { const v = odgOra(o); return v || (o || ''); };
+  tab.cast.forEach(c => { c.pickup = sist(c.pickup); c.set = sist(c.set); });
+  tab.troupe.forEach(c => { c.partenza = sist(c.partenza); c.set = sist(c.set); });
+
+  return Object.assign({}, testa, tab);
+}
+
+/* ── Il PDF ───────────────────────────────────────────────────────────
+ * Su iOS non si puo' condividere un allegato verso una pagina web: il
+ * giro e' salvarlo su File dall'app Mail e poi sceglierlo qui. Quindi
+ * l'ingresso e' un <input type="file"> e basta, senza trascinamenti.
+ */
+async function odgTestoDaPdf(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pagine = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const p = await pdf.getPage(i);
+    const c = await p.getTextContent();
+    pagine.push(c.items.map(x => x.str).join(' '));
+  }
+  return pagine.join('\n');
+}
+
+let odgCorrente = null;       // l'OdG mostrato adesso
+let odgInCorso = false;
+
+async function odgScegliFile(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (odgInCorso) return;
+  odgInCorso = true;
+  odgRender();
+  try {
+    const testo = await odgTestoDaPdf(file);
+    // Un OdG sono due o tre pagine di testo. Molto meno vuol dire che il
+    // PDF e' una scansione senza testo, e il modello leggerebbe il vuoto.
+    if (testo.replace(/\s+/g, '').length < 400) {
+      throw new Error('Questo PDF non contiene testo: sembra la scansione di una pagina stampata. Chiedi il file originale.');
+    }
+    const dati = await odgEstrai(testo, p => odgPasso(p));
+    if (!dati.numero && !dati.convocazione && !(dati.scene || []).length) {
+      throw new Error('Non ho riconosciuto un ordine del giorno in questo file.');
+    }
+    dati.nomeFile = file.name;
+    dati.caricatoIl = new Date().toISOString();
+    odgCorrente = dati;
+    await odgSalva(dati);
+    showToast('Ordine del giorno caricato.');
+  } catch (e) {
+    odgErrore = e.message;
+    showToast(e.message, 'red', 5000);
+  } finally {
+    odgInCorso = false;
+    odgRender();
+  }
+}
+
+let odgErrore = null;
+function odgPasso(t) {
+  const el = document.getElementById('odgPasso');
+  if (el) el.textContent = t;
+}
+
+/* ── Memoria ──────────────────────────────────────────────────────────
+ * Come per gli orari: prima sul telefono, poi sul cloud. L'OdG serve la
+ * mattina presto, spesso in un posto senza campo, e deve esserci comunque.
+ */
+const ODG_LOCALE = 'cb_odg';
+
+function odgFilm() {
+  return (document.getElementById('tt-film')?.value || '').trim();
+}
+
+async function odgSalva(d) {
+  try { localStorage.setItem(ODG_LOCALE, JSON.stringify(d)); } catch (_) {}
+  if (!currentUser || !d.data) return;
+  try {
+    const { error } = await sb.from('odg').upsert({
+      user_id: currentUser.id, film: odgFilm(), data: d.data,
+      numero: d.numero || null, dati: d, updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,film,data' });
+    if (error) throw new Error(error.message);
+  } catch (e) { console.log('[odg] non salvato sul cloud:', e.message); }
+}
+
+async function odgRipristina() {
+  try {
+    const l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
+    if (l) odgCorrente = l;
+  } catch (_) {}
+  if (!currentUser) return;
+  try {
+    const { data } = await sb.from('odg').select('dati,data')
+      .eq('user_id', currentUser.id).order('data', { ascending: false }).limit(1);
+    const r = data && data[0];
+    // Il cloud vince solo se ha una giornata piu' avanti di quella locale:
+    // l'OdG di domani e' sempre quello che serve.
+    if (r && (!odgCorrente || !odgCorrente.data || r.data > odgCorrente.data)) odgCorrente = r.dati;
+  } catch (e) { console.log('[odg] cloud non raggiungibile:', e.message); }
+  odgRender();
+}
+
+function odgRimuovi() {
+  odgCorrente = null; odgErrore = null;
+  try { localStorage.removeItem(ODG_LOCALE); } catch (_) {}
+  odgRender();
+}
+
+
+/* ── Chi sei tu su questo film ────────────────────────────────────────
+ *
+ * Il nome non lo si fa scrivere: quello che si digita ("Simone Panetta")
+ * va poi confrontato con quello che la produzione stampa ("S. Panetta",
+ * "Panetta Simone - Microfonista"), e un confronto approssimativo quando
+ * sbaglia attacca a uno il pick-up di un altro. Si fa scegliere la riga
+ * nella convocazione troupe: un tocco, e da li' in poi sappiamo il nome
+ * nella grafia esatta di questa produzione, piu' ruolo e reparto.
+ */
+const ODG_IO = 'cb_odg_io';
+function odgIo() {
+  try { return JSON.parse(localStorage.getItem(ODG_IO) || 'null'); } catch (_) { return null; }
+}
+function odgSceltoIo(i) {
+  const t = (odgCorrente?.troupe || [])[i];
+  if (!t) return;
+  try { localStorage.setItem(ODG_IO, JSON.stringify({ nome: t.nome, ruolo: t.ruolo, reparto: t.reparto })); } catch (_) {}
+  odgRender();
+}
+function odgCambiaIo() { try { localStorage.removeItem(ODG_IO); } catch (_) {} odgRender(); }
+
+/* La riga della troupe che corrisponde a chi siamo, cercata per nome
+   esatto: e' quello che abbiamo memorizzato scegliendola. */
+function odgMiaRiga() {
+  const io = odgIo(); if (!io) return null;
+  return (odgCorrente?.troupe || []).find(t => t.nome === io.nome) || null;
+}
+
+const ODG_SEGNI = {
+  luogo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+  croce: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M12 9.5v6M9 12.5h6"/><path d="M9 6V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V6"/></svg>',
+  tel:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h3l1.5 4-2 1.4a12 12 0 006.6 6.6L17 13l4 1.5v3a2 2 0 01-2.2 2A17 17 0 013.5 5.2 2 2 0 015.5 3z"/></svg>'
+};
+
+function odgMaps(q) { return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q); }
+function odgCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
+
+function odgDataEstesa(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00'); if (isNaN(d)) return iso;
+  const g = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  const m = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  return `${g[d.getDay()]} ${d.getDate()} ${m[d.getMonth()]}`;
+}
+
+function odgRender() {
+  const c = document.getElementById('odgCorpo'); if (!c) return;
+  if (odgInCorso) { c.innerHTML = odgCaricamentoHtml(); return; }
+  if (!odgCorrente) { c.innerHTML = odgVuotoHtml(); return; }
+  c.innerHTML = odgPienoHtml(odgCorrente);
+}
+
+function odgCaricamentoHtml() {
+  return `<div class="odg-vuoto">
+    <div class="odg-ic">${ODG_SEGNI.luogo}</div>
+    <div class="odg-t">Sto leggendo l'ordine del giorno</div>
+    <div class="odg-s" id="odgPasso">Lettura del PDF</div>
+    <div class="odg-barra"><span></span></div>
+  </div>`;
+}
+
+function odgVuotoHtml() {
+  const err = odgErrore ? `<div class="odg-err">${esc(odgErrore)}</div>` : '';
+  return `<div class="odg-vuoto">
+    <div class="odg-ic">${ODG_SEGNI.luogo}</div>
+    <div class="odg-t">Nessun ordine del giorno</div>
+    <div class="odg-s">Salvalo dalla mail e caricalo qui: orari, scene, cast,
+      numeri utili e il tuo pick-up compaiono da soli.</div>
+    ${err}
+    <label class="odg-btn">Carica l'OdG
+      <input type="file" accept="application/pdf,.pdf" style="display:none" onchange="odgScegliFile(this)">
+    </label>
+  </div>`;
+}
+
+function odgPienoHtml(d) {
+  const io = odgMiaRiga();
+  const pag = (d.scene || []).reduce((a, s) => a + odgPagine(s.pag), 0);
+  const righe = [
+    ['Pronti a girare', d.prontiAGirare],
+    ['Pausa', d.pausa],
+    [d.cestini ? `Catering · ${d.cestini} cestini` : 'Catering', d.catering],
+    ['Fine riprese', d.fineRiprese],
+    ['Fine lavorazione', d.fineLavorazione]
+  ].filter(r => r[1]);
+
+  return `
+  <div class="odg-testa">
+    <div class="h1">OdG ${d.numero || '—'} · ${odgDataEstesa(d.data)}</div>
+    ${d.ambiente ? `<div class="h2">${esc(odgCap(d.ambiente))}${pag ? ' · ' + odgFrazione(pag) + ' pag' : ''}</div>` : ''}
+  </div>
+
+  ${odgBadgeHtml(d, io)}
+
+  ${righe.length ? `<div class="card odg-orari">${righe.map(([k, v]) =>
+      `<div><span class="k">${esc(k)}</span><span class="v num">${esc(v)}</span></div>`).join('')}</div>` : ''}
+
+  ${(d.dawn || d.alba || d.tramonto || d.dusk) ? `<div class="card odg-luce">
+    ${[['dawn', d.dawn], ['alba', d.alba], ['tramonto', d.tramonto], ['dusk', d.dusk]]
+      .filter(x => x[1]).map(([k, v]) => `<div><span class="k">${k}</span><span class="v num">${esc(v)}</span></div>`).join('')}
+  </div>` : ''}
+
+  ${d.meteo ? `<div class="card odg-meteo">${esc(d.meteo)}</div>` : ''}
+
+  ${d.location ? `<div class="odg-sez">DOVE</div>
+  <div class="card"><a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
+    <span class="i">${ODG_SEGNI.luogo}</span>
+    <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
+    <span class="go">Mappa ›</span></a></div>` : ''}
+
+  ${d.ospedale ? `<div class="card" style="margin-top:8px">
+    <a class="odg-posto" href="${odgMaps(d.ospedale)}" target="_blank" rel="noopener">
+    <span class="i">${ODG_SEGNI.croce}</span>
+    <span class="c"><span class="t">${esc(odgPrimaRiga(d.ospedale))}</span><span class="s">Ospedale più vicino</span></span>
+    <span class="go">Mappa ›</span></a></div>` : ''}
+
+  ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
+  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li>
+    <span class="n num">${esc(s.n || '')}</span>
+    <span class="c"><span class="t">${esc(s.sinossi || '')}</span>
+    <span class="s">${[s.ie, s.m, odgCap(s.ambiente || ''), s.pag ? s.pag + ' pag' : ''].filter(Boolean).map(esc).join(' · ')}</span>
+    ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}</span></li>`).join('')}</ul></div>` : ''}
+
+  ${(d.cast || []).length ? `<div class="odg-sez">CAST</div>
+  <div class="card">${d.cast.map(a => `<div class="odg-att">
+    <span class="id num">${esc(a.id || '')}</span>
+    <span class="c"><span class="t">${esc(a.interprete || a.ruolo || '')}</span>
+    <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
+    <span class="o num">${esc(a.set || '')}</span></div>`).join('')}</div>` : ''}
+
+  ${(d.contatti || []).length ? `<div class="odg-sez">NUMERI UTILI</div>
+  <div class="card">${d.contatti.map(p => `<a class="odg-tel" href="tel:${esc((p.tel || '').replace(/\D/g, ''))}">
+    <span class="c"><span class="t">${esc(p.nome || '')}</span><span class="s">${esc(p.ruolo || '')}</span></span>
+    <span class="b">${ODG_SEGNI.tel}</span></a>`).join('')}</div>` : ''}
+
+  ${d.domani ? `<div class="odg-sez">DOMANI</div>
+  <div class="card"><div class="odg-domani">
+    <span class="t">${esc(d.domani.etichetta || '')}</span>
+    ${(d.domani.scene || []).length ? `<span class="s">Scene ${d.domani.scene.map(s => esc(s.n)).join(', ')}</span>` : ''}
+  </div></div>` : ''}
+
+  <div class="card" style="margin-top:14px"><div class="odg-file">
+    <span class="c"><span class="t">${esc(d.nomeFile || 'Ordine del giorno')}</span>
+    <span class="s">Caricato ${odgQuando(d.caricatoIl)}</span></span>
+  </div></div>
+  <button class="odg-togli" onclick="odgRimuovi()">Rimuovi OdG</button>
+  <label class="odg-btn" style="margin-top:9px">Carica un altro OdG
+    <input type="file" accept="application/pdf,.pdf" style="display:none" onchange="odgScegliFile(this)">
+  </label>`;
+}
+
+/* Il riquadro in testa: a che ora sei convocato tu, non la produzione.
+   Finche' non sappiamo chi sei, al suo posto c'e' la domanda. */
+function odgBadgeHtml(d, io) {
+  if (!io) {
+    const t = (d.troupe || []);
+    if (!t.length) return d.convocazione
+      ? `<div class="odg-badge"><span class="r">Convocazione</span><span class="o num">${esc(d.convocazione)}</span></div>` : '';
+    return `<div class="odg-chi">
+      <div class="t">Quale sei tu?</div>
+      <div class="s">Lo chiedo una volta sola. Serve a mostrarti il tuo orario invece di quello generale.</div>
+      <div class="el">${t.map((p, i) => `<button onclick="odgSceltoIo(${i})">
+        <span class="n">${esc(p.nome || '')}</span>
+        <span class="r">${[p.ruolo, p.reparto].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div>
+    </div>`;
+  }
+  const ora = io.set || d.convocazione || '';
+  const part = io.partenza && io.partenza !== io.set ? io.partenza : '';
+  return `<div class="odg-badge" onclick="odgCambiaIo()" title="Tocca per cambiare persona">
+    <span class="r">${[io.ruolo, io.reparto].filter(Boolean).map(esc).join(' · ')}</span>
+    <span class="o num">${esc(ora)}</span>
+    ${part ? `<span class="p num">partenza ${esc(part)}</span>` : ''}
+  </div>`;
+}
+
+// "4 1/8" -> 4.125, per sommare le pagine della giornata
+function odgPagine(s) {
+  if (!s) return 0;
+  const m = String(s).replace(/\s+/g, ' ').trim().match(/^(?:(\d+)\s*)?(?:(\d+)\/(\d+))?$/);
+  if (!m) return 0;
+  return (+(m[1] || 0)) + (m[2] ? (+m[2]) / (+m[3]) : 0);
+}
+// 3.125 -> "3 1/8": le pagine in troupe si contano in ottavi, non in decimali
+function odgFrazione(n) {
+  const int = Math.floor(n + 1e-9), ott = Math.round((n - int) * 8);
+  if (ott === 0) return String(int);
+  if (ott === 8) return String(int + 1);
+  return (int ? int + ' ' : '') + ott + '/8';
+}
+function odgPrimaRiga(s) { return String(s || '').split(/\s{2,}|,/)[0].trim(); }
+function odgQuando(iso) {
+  if (!iso) return 'ora';
+  const d = new Date(iso); if (isNaN(d)) return 'ora';
+  const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+  const g = new Date(d); g.setHours(0, 0, 0, 0);
+  const q = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  if (+g === +oggi) return 'oggi alle ' + q;
+  if (+g === +oggi - 86400000) return 'ieri alle ' + q;
+  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' alle ' + q;
+}
 
 
 // ══ CAST PARSER — from PDL PDF text ══
