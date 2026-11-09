@@ -9949,16 +9949,56 @@ function odgCielo(c){
   return ['Temporale','\u26a1'];
 }
 
+/* Il posto del giorno, in coordinate.
+ *
+ * Si parte dai link che la produzione mette nell'ordine del giorno: quelli
+ * puntano al posto vero, li ha scritti qualcuno che sa dove si gira.
+ *
+ * Quello che NON si usa piu' e' AMBIENTE. Li' c'e' scritto l'ambiente
+ * della scena, che viene dalla sceneggiatura: "CASA PAESE" non e' un
+ * paese, e il geocoder ci ha letto Paese, provincia di Treviso, dando il
+ * meteo del Veneto a chi girava in Puglia. Meglio nessun meteo che un
+ * meteo sbagliato: su quello uno decide se portarsi la cerata.
+ *
+ * L'ordine di preferenza e' quello di chi deve esserci: il set prima di
+ * tutto, poi il campo base, poi i mezzi.
+ */
+const ODG_POSTO_PESO = ['Set', 'Campo base', 'Mezzi tecnici'];
+
+async function odgCoordDaLink(url){
+  const r = await fetch('/api/mappa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',
+               Authorization: 'Bearer ' + (await sb.auth.getSession()).data.session?.access_token },
+    body: JSON.stringify({ url })
+  });
+  if (!r.ok) throw new Error('mappa ' + r.status);
+  const j = await r.json();
+  if (!j || typeof j.lat !== 'number') throw new Error(j && j.error || 'niente coordinate');
+  return { lat: j.lat, lon: j.lon, nome: j.nome || null };
+}
+
+async function odgPosto(d){
+  if (d.posto) return d.posto;                        // gia' sciolto una volta
+  const peso = l => { const i = ODG_POSTO_PESO.indexOf(l.nome); return i < 0 ? 9 : i; };
+  for (const l of [...(d.luoghi || [])].sort((a, b) => peso(a) - peso(b))) {
+    try {
+      const c = await odgCoordDaLink(l.url);
+      d.posto = { ...c, nome: c.nome || l.nome };
+      return d.posto;
+    } catch (e) { console.log('[odg] link non sciolto:', l.nome, e.message); }
+  }
+  // Gli ordini del giorno all'antica scrivono l'indirizzo per esteso.
+  const comune = odgComune(d.location);
+  if (!comune) return null;
+  try { d.posto = await odgCoordinate(comune); return d.posto; }
+  catch (e) { console.log('[odg] comune non trovato:', comune, e.message); return null; }
+}
+
 async function odgPrevisione(d){
   if (!d || !d.data) return null;
-  /* Il comune si cerca dove c'e'. Finche' il luogo stava tutto dentro
-     LOCATION bastava quello; da quando certe produzioni ci mettono solo i
-     link alle mappe, LOCATION e' vuoto e il posto e' scritto in AMBIENTE.
-     Chiederlo a un campo solo voleva dire restare senza meteo proprio sugli
-     ordini del giorno fatti meglio. */
-  const comune = odgComune(d.location) || odgComune(d.ambiente);
-  if (!comune) return null;
-  const c = await odgCoordinate(comune);
+  const c = await odgPosto(d);
+  if (!c) return null;
   const u = 'https://api.open-meteo.com/v1/forecast'
     + '?latitude=' + c.lat + '&longitude=' + c.lon
     + '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m'

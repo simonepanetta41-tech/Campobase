@@ -106,11 +106,93 @@ async function handlePdl(request, env, ctx) {
   }, ctx);
 }
 
+/* ── /api/mappa ───────────────────────────────────────────────────────────────
+ *
+ * Scioglie un link corto di Google Maps e ne restituisce le coordinate.
+ *
+ * Serve per il meteo. Prima il comune si indovinava dal testo dell'ordine
+ * del giorno, e l'ordine del giorno scrive cose come "AMBIENTE: CASA
+ * PAESE" — che e' un'intestazione di sceneggiatura, non un posto. Il
+ * geocoder ci ha letto Paese, provincia di Treviso, e ha dato il meteo di
+ * li' a una troupe che girava in Puglia. Un meteo sbagliato e' peggio di
+ * nessun meteo: chi lo legge ci decide se portarsi la cerata.
+ *
+ * Il link invece la produzione lo mette apposta e punta al posto vero.
+ * Scioglierlo dal telefono non si puo': e' un altro dominio e il browser
+ * non lascia leggere ne' la risposta ne' dove e' andata a finire. Qui si'.
+ *
+ * Solo domini di Google Maps: senza questo controllo diventerebbe un
+ * ripetitore che chiama qualsiasi indirizzo gli si passi, compresi quelli
+ * interni che un Worker puo' raggiungere e il mondo no.
+ */
+const MAPPE_AMMESSE = /^(?:maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]{2,7}|www\.google\.[a-z.]{2,7})$/i;
+
+// Le coordinate compaiono in piu' forme a seconda di dove si viene
+// rimandati: nell'indirizzo finale, oppure dentro la pagina.
+function coordinateDa(testo) {
+  const t = String(testo || '');
+  const forme = [
+    /@(-?\d{1,3}\.\d{3,}),(-?\d{1,3}\.\d{3,})/,
+    /!3d(-?\d{1,3}\.\d{3,})!4d(-?\d{1,3}\.\d{3,})/,
+    /[?&](?:q|ll|daddr|center)=(-?\d{1,3}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/,
+    /\/(-?\d{1,3}\.\d{3,}),(-?\d{1,3}\.\d{3,})/
+  ];
+  for (const re of forme) {
+    const m = re.exec(t);
+    if (!m) continue;
+    const lat = +m[1], lon = +m[2];
+    if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) return { lat, lon };
+  }
+  return null;
+}
+
+function nomeDa(indirizzo) {
+  const m = /\/maps\/place\/([^/@]+)/.exec(String(indirizzo || ''));
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]).replace(/\+/g, ' ').trim() || null; }
+  catch (_) { return null; }
+}
+
+async function handleMappa(request, env) {
+  const { error: authError } = await requireUser(request, env);
+  if (authError) return authError;
+
+  const { body, error } = await readJson(request);
+  if (error) return error;
+
+  let u;
+  try { u = new URL(String(body.url || '')); } catch (_) {
+    return json({ error: 'Indirizzo non valido' }, 400);
+  }
+  if (u.protocol !== 'https:' || !MAPPE_AMMESSE.test(u.hostname)) {
+    return json({ error: 'Accetto solo link di Google Maps' }, 400);
+  }
+
+  const r = await fetch(u.toString(), {
+    redirect: 'follow',
+    // Senza, Google risponde con una pagina ridotta che le coordinate non
+    // le ha.
+    headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
+  });
+
+  let c = coordinateDa(r.url);
+  let nome = nomeDa(r.url);
+  if (!c) {
+    const html = await r.text();
+    c = coordinateDa(html);
+    if (!nome) nome = nomeDa(html);
+  }
+  if (!c) return json({ error: 'Coordinate non trovate' }, 404);
+
+  return json({ lat: c.lat, lon: c.lon, nome: nome || null });
+}
+
 const ROUTES = {
   '/api/analyze': handleAnalyze,
   '/api/chat':    handleChat,
   '/api/pdl':     handlePdl,
-  '/api/wrap':    handleWrap
+  '/api/wrap':    handleWrap,
+  '/api/mappa':   handleMappa
 };
 
 export default {
