@@ -2571,8 +2571,16 @@ async function showApp() {
   // nessuno e a ogni chiusura dell'app l'OdG spariva.
   // Il codice d'invito arrivato da un QR si consuma prima di tutto: se
   // c'e', il film e' quello e l'ordine del giorno va riletto dal suo.
-  filmDallIndirizzo().finally(odgRipristina);
+  filmDallIndirizzo().finally(() => odgRipristina().finally(postaControlla));
 }
+
+/* Si torna a guardare la posta quando l'app torna davanti, non a tempo.
+   Un'app di set sta in tasca tutto il giorno: chiedere ogni minuto
+   consumerebbe batteria e campo per niente, visto che il pacchetto della
+   produzione arriva una volta, la sera. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') postaControlla();
+});
 
 sb.auth.onAuthStateChange((event, session) => {
   if (window.location.pathname.startsWith('/share/')) return;
@@ -8488,9 +8496,22 @@ function odgTipoDoc(t){
 }
 
 async function odgScegliFile(input) {
-  const files = [...(input.files||[])];
+  const files = [...(input.files || [])];
   input.value = '';
-  if (!files.length || odgInCorso) return;
+  await odgLavora(files);
+}
+
+/* Il caricamento vero, staccato dal dito che lo ha scatenato.
+ *
+ * Gli stessi PDF arrivano da due parti: qualcuno li sceglie dal telefono,
+ * oppure li manda la produzione per posta e li scarica l'app da sola. Da
+ * qui in poi il lavoro e' identico, e tenerlo in un posto solo vuol dire
+ * che una correzione vale per tutti e due i casi.
+ *
+ * Torna true se l'ordine del giorno e' stato letto e salvato. Serve a chi
+ * chiama dalla posta, per sapere se il pacchetto si puo' segnare fatto. */
+async function odgLavora(files) {
+  if (!files.length || odgInCorso) return false;
   odgInCorso = true;
   odgRender();
   try {
@@ -8551,10 +8572,12 @@ async function odgScegliFile(input) {
     // I fogli della giornata prima non servono piu' a nessuno.
     cbFileCancella('odg/', letti.map(x => x.file).filter(Boolean));
     showToast('Ordine del giorno caricato.');
+    return true;
   } catch (e) {
-    if (e.pagina && mostraErrore(e.testo, e.dettaglio)) { odgInCorso = false; return; }
+    if (e.pagina && mostraErrore(e.testo, e.dettaglio)) return false;
     odgErrore = e.message;
     showToast(e.message, 'red', 5000);
+    return false;
   } finally {
     odgInCorso = false;
     odgRender();
@@ -8868,6 +8891,78 @@ async function odgRipristina() {
 /* Un film si chiude quando si esce dall'account: il prossimo che entra
    su questo telefono non deve trovarsi dentro la troupe di un altro. */
 function filmDimentica(){ filmImposta(null); }
+
+/* ══ LA POSTA DELLA PRODUZIONE ═══════════════════════════════════════
+ *
+ * Il pacchetto arriva per mail, il Worker lo mette da parte, e qui lo si
+ * va a prendere. Il senso di tutto il giro e' che la sera non si debba
+ * fare niente: l'app si apre e l'ordine del giorno di domani c'e' gia'.
+ *
+ * Si guarda solo quando l'app torna davanti agli occhi, non a tempo: un
+ * telefono sul set ha poca batteria e spesso poco campo, e una domanda
+ * ogni minuto non servirebbe a nessuno — la posta arriva la sera, una
+ * volta al giorno.
+ */
+let postaInCorso = false;
+
+async function postaControlla(){
+  const f = filmCorrente();
+  if (postaInCorso || odgInCorso || !currentUser || !f || !f.id) return;
+  postaInCorso = true;
+  try {
+    const { data, error } = await sb.from('posta')
+      .select('id,oggetto,allegati,ricevuta')
+      .eq('project_id', f.id).eq('stato', 'nuova')
+      .order('ricevuta', { ascending: true }).limit(3);
+    if (error || !data || !data.length) return;
+    for (const p of data) await postaApri(p);
+  } catch (e) {
+    console.log('[posta] non raggiungibile:', e.message);
+  } finally {
+    postaInCorso = false;
+  }
+}
+
+async function postaApri(p){
+  const tenuti = (p.allegati || []).filter(a => a && a.tenuto && a.percorso);
+  if (!tenuti.length) { await postaSegna(p.id, 'senza allegati'); return; }
+
+  /* Il gettone. Lo stesso pacchetto arriva insieme sul telefono di tutta
+     la troupe: senza questo lo aprirebbero in cinque, pagando cinque
+     analisi e scrivendosi addosso a vicenda. Chi arriva primo prende,
+     gli altri hanno indietro niente e lasciano stare. */
+  let preso = null;
+  try {
+    const { data } = await sb.rpc('prendi_posta', { p_posta: p.id });
+    preso = Array.isArray(data) ? data[0] : data;
+  } catch (e) { console.log('[posta] gettone:', e.message); }
+  if (!preso) return;
+
+  showToast('È arrivato un pacchetto dalla produzione.');
+  try {
+    const files = [];
+    for (const a of tenuti) {
+      const { data: blob, error } = await sb.storage.from('posta').download(a.percorso);
+      if (error || !blob) throw new Error('allegato non scaricato: ' + a.nome);
+      files.push(new File([blob], a.nome, { type: a.tipo || 'application/pdf' }));
+    }
+    const fatto = await odgLavora(files);
+    // Non fatto vuol dire che dentro non c'era un ordine del giorno: non
+    // e' un guasto, e' una mail qualsiasi. Si segna e non si ritenta.
+    await postaSegna(p.id, fatto ? 'fatta' : 'scartata', fatto ? null : (odgErrore || 'non e\' un ordine del giorno'));
+  } catch (e) {
+    console.log('[posta] apertura fallita:', e.message);
+    await postaSegna(p.id, 'errore', e.message);
+  }
+}
+
+async function postaSegna(id, stato, nota){
+  try {
+    const campi = { stato };
+    if (nota !== undefined) campi.nota = nota ? String(nota).slice(0, 500) : null;
+    await sb.from('posta').update(campi).eq('id', id);
+  } catch (e) { console.log('[posta] non segnata:', e.message); }
+}
 
 /* Quello che si ricava dal testo non si congela.
  *
