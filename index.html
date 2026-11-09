@@ -626,7 +626,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-chi .n{display:block;font-size:14px;color:var(--white)}
 .odg-chi .r{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
 
-#odgSection .card{margin-top:11px;background:var(--surface);border:1px solid var(--border);
+#odgSection .card,.at-corpo .card{margin-top:11px;background:var(--surface);border:1px solid var(--border);
   border-radius:13px;overflow:hidden}
 .odg-orari>div{display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -662,8 +662,27 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   background:var(--surface2);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--white-dim)}
 
 .odg-att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
-.odg-att.cerca{text-decoration:none;color:inherit;min-height:54px}
-.odg-att .chev{flex:0 0 auto;color:var(--muted);font-size:13px;margin-left:2px}
+.odg-att.cerca{text-decoration:none;color:inherit;min-height:54px;cursor:pointer}
+.odg-att .chev{flex:0 0 auto;color:var(--muted);font-size:16px;margin-left:2px}
+/* La scheda dell'attore */
+.at-corpo{flex:1;min-height:0;overflow-y:auto;padding:14px 16px calc(env(safe-area-inset-bottom) + 30px)}
+.at-wiki{display:flex;gap:13px;margin-bottom:18px}
+.at-wiki img{width:86px;height:112px;flex:0 0 86px;object-fit:cover;border-radius:11px;
+  background:var(--surface2)}
+.at-wiki .c{flex:1;min-width:0}
+.at-wiki p{margin:0;font-size:13px;line-height:1.55;color:var(--white-dim)}
+.at-wiki a{display:inline-block;margin-top:7px;font-size:11.5px;color:var(--muted);text-decoration:none}
+.at-ore{display:flex;gap:26px;margin-bottom:12px}
+.at-ore .k{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.at-ore .v{display:block;font-size:19px;color:var(--white);margin-top:3px}
+.at-nulla{font-size:13px;color:var(--muted)}
+.at-tot{font-size:13.5px;color:var(--white-dim)}
+.at-tot b{font-size:20px;color:var(--white);margin-right:5px}
+.at-elenco{margin-top:8px;font-family:'DM Mono',monospace;font-size:11.5px;line-height:1.7;color:var(--muted);
+  word-break:break-word}
+.at-imdb{display:flex;width:100%;max-width:none;margin-top:20px;text-decoration:none}
+.sp-sc.ferma{background:none;border-style:dashed;color:var(--muted);cursor:default;
+  display:inline-flex;align-items:center;justify-content:center}
 .odg-att:last-child{border-bottom:none}
 .odg-att .id{flex:0 0 32px;font-size:12px;color:var(--muted)}
 .odg-att .c{flex:1;min-width:0}
@@ -8624,6 +8643,137 @@ const ODG_SEGNI = {
 
 function odgMaps(q) { return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q); }
 
+/* ══ LA SCHEDA DI UN ATTORE ════════════════════════════════════════
+ *
+ * Toccando un nome si usciva dall'app: tornando indietro l'ordine del
+ * giorno ripartiva da capo, e per sapere a che ora entra in scena uno
+ * che hai appena cercato ti toccava riscorrere la colonna.
+ *
+ * Dentro il foglio la roba piu' utile e' quella che abbiamo gia' in
+ * casa e non costa ne' rete ne' attesa: le sue scene di oggi con gli
+ * orari, e in quante scene compare in tutto il film — uno in novanta
+ * scene e uno in tre sono due lavori diversi per il suono. IMDb non si
+ * puo' incorniciare qui dentro, perche' vieta di essere messo in pagine
+ * altrui: resta il tasto in fondo per la filmografia.
+ */
+function castNomePerId(id){
+  const r = (window.castData || []).find(x =>
+    String(x.id_ufficiale ?? x.character_id) === String(id));
+  return r ? r.nome : '';
+}
+
+const attNorm = s => senzaAccenti(String(s || '')).toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim();
+
+/* Le scene dell'intero film, se la sceneggiatura e' stata analizzata.
+   Il personaggio nell'OdG e quello nello spoglio sono la stessa persona
+   scritta da due uffici diversi, quindi si confrontano normalizzati e,
+   se non combaciano, per contenimento. */
+function attoreScene(a){
+  const d = window.analysisData || analysisData;
+  const mappa = d && d.personaggi_scene;
+  if (!mappa) return null;
+  const cerca = [a.ruolo, castNomePerId(a.id)].map(attNorm).filter(Boolean);
+  if (!cerca.length) return null;
+  const chiavi = Object.keys(mappa);
+  const k = chiavi.find(x => cerca.includes(attNorm(x)))
+         || chiavi.find(x => cerca.some(c => c.length > 3 &&
+              (attNorm(x).includes(c) || c.includes(attNorm(x)))));
+  return k ? { nome: k, scene: (mappa[k] || []).map(String) } : null;
+}
+
+function odgApriAttore(id){
+  const d = odgCorrente; if (!d) return;
+  const a = (d.cast || []).find(x => String(x.id) === String(id));
+  if (!a) return;
+  const oggi = String(a.scene || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+  const film = attoreScene(a);
+  const tot  = (window.analysisData || analysisData || {}).totale_scene;
+
+  const chip = n => odgHaStralcio(d, n)
+    ? `<button class="sp-sc" onclick="odgApriScena('${esc(n)}')">${esc(n)}</button>`
+    : `<span class="sp-sc ferma">${esc(n)}</span>`;
+
+  odgMostraPieno(`
+    <div class="sc-top">
+      <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
+      <span class="sc-n">${esc(a.interprete || '')}</span>
+      <span class="sc-h">${esc([a.ruolo, a.id ? 'ID ' + a.id : ''].filter(Boolean).join(' · '))}</span>
+    </div>
+    <div class="at-corpo">
+      <div id="atWiki"></div>
+      <div class="odg-sez">OGGI</div>
+      <div class="card" style="padding:13px 15px">
+        ${(a.set || a.pickup) ? `<div class="at-ore">
+          ${a.pickup ? `<div><span class="k">Pick-up</span><span class="v num">${esc(a.pickup)}</span></div>` : ''}
+          ${a.set ? `<div><span class="k">Set</span><span class="v num">${esc(a.set)}</span></div>` : ''}
+        </div>` : ''}
+        ${oggi.length ? `<div class="sp-scene">${oggi.map(chip).join('')}</div>`
+                      : `<div class="at-nulla">Nessuna scena indicata per oggi.</div>`}
+      </div>
+      ${film ? `<div class="odg-sez">NEL FILM</div>
+      <div class="card" style="padding:13px 15px">
+        <div class="at-tot"><b class="num">${film.scene.length}</b> scene${tot ? ' su ' + tot : ''}</div>
+        <div class="at-elenco">${film.scene.slice(0, 60).map(esc).join(' · ')}${film.scene.length > 60 ? ' …' : ''}</div>
+      </div>` : ''}
+      <a class="odg-btn at-imdb" href="${odgImdb(a.interprete)}" target="_blank" rel="noopener">Apri su IMDb</a>
+    </div>`);
+
+  wikiAttore(a.interprete).then(w => {
+    const box = document.getElementById('atWiki');
+    if (!box || !w) return;
+    box.innerHTML = `<div class="at-wiki">
+      ${w.foto ? `<img src="${esc(w.foto)}" alt="" loading="lazy">` : ''}
+      <div class="c"><p>${esc(w.testo)}</p>
+      <a href="${esc(w.url)}" target="_blank" rel="noopener">Wikipedia \u2197</a></div></div>`;
+  });
+}
+
+/* Due righe di chi e'.
+ *
+ * Wikipedia perche' non vuole chiavi, risponde in italiano e si lascia
+ * chiamare da una pagina qualunque. Si cerca con "attore" accanto al
+ * nome e si controlla che il risultato parli davvero di un attore: senza
+ * quel controllo un omonimo calciatore finirebbe nella scheda con la
+ * faccia sbagliata, che e' peggio di nessuna faccia. Quello che si trova
+ * resta sul telefono, cosi' la seconda volta c'e' anche senza campo. */
+const WIKI_MEMO = 'cb_wiki';
+
+async function wikiAttore(nome){
+  const chiave = String(nome || '').trim();
+  if (!chiave) return null;
+  let memo = {};
+  try { memo = JSON.parse(localStorage.getItem(WIKI_MEMO) || '{}'); } catch (_) {}
+  if (Object.prototype.hasOwnProperty.call(memo, chiave)) return memo[chiave];
+
+  let trovato = null;
+  try {
+    const u = 'https://it.wikipedia.org/w/api.php?action=query&format=json&origin=*'
+      + '&generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(chiave + ' attore')
+      + '&prop=extracts|pageimages&exintro=1&explaintext=1&redirects=1'
+      + '&piprop=thumbnail&pithumbsize=240';
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    const p = j && j.query && j.query.pages && Object.values(j.query.pages)[0];
+    if (p && p.extract && /attor|attric|regist|interpret|doppiat/i.test(p.extract)) {
+      const frasi = p.extract.split('. ');
+      trovato = {
+        testo: (frasi.slice(0, 2).join('. ') + (frasi.length > 2 ? '.' : '')).slice(0, 340),
+        foto:  (p.thumbnail && p.thumbnail.source) || null,
+        url:   'https://it.wikipedia.org/wiki/' + encodeURIComponent(String(p.title).replace(/ /g, '_'))
+      };
+    }
+  } catch (_) {
+    return null;   // niente rete: non si ricorda di non aver trovato
+  }
+  memo[chiave] = trovato;
+  // Non deve crescere all'infinito: una troupe per volta basta.
+  const ch = Object.keys(memo);
+  if (ch.length > 120) ch.slice(0, ch.length - 120).forEach(k => delete memo[k]);
+  try { localStorage.setItem(WIKI_MEMO, JSON.stringify(memo)); } catch (_) {}
+  return trovato;
+}
+
 /* Chi e' questo attore.
  *
  * Su un ordine del giorno il cast e' una colonna di nomi, e meta' non ti
@@ -9169,7 +9319,7 @@ function odgPienoHtml(d) {
       <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
       <span class="o num">${esc(a.set || '')}</span>`;
     return odgCercabile(a)
-      ? `<a class="odg-att cerca" href="${odgImdb(a.interprete)}" target="_blank" rel="noopener">${rig}<span class="chev">\u2197</span></a>`
+      ? `<div class="odg-att cerca" onclick="odgApriAttore('${esc(String(a.id||''))}')">${rig}<span class="chev">\u203A</span></div>`
       : `<div class="odg-att">${rig}</div>`;
   }).join('')}</div>` : ''}
 
