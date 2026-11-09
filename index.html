@@ -6570,7 +6570,13 @@ function renderCastTab(rows, showAlert) {
         <span class="chev">\u203A</span>
       </div>`).join('')}</div>
     ${conScene ? `<p class="cast-nota">Il conteggio viene dallo spoglio della sceneggiatura.${
-      righe.some(x => x.n && !x.certo) ? ' Dove è in grigio è una stima del primo giro.' : ''}</p>` : ''}`;
+      righe.some(x => x.n && !x.certo) ? ' Dove è in grigio è una stima del primo giro.' : ''}${
+      righe.some(x => !x.n) ? ' Chi non ce l\'ha fa meno di due scene parlate, oppure nella sceneggiatura si chiama in un modo che non somiglia a questo.' : ''}</p>` : ''}
+    ${(conta.restanti || []).length ? `<div class="odg-sez" style="margin-top:22px">NELLA SCENEGGIATURA, NON IN LISTA</div>
+    <div class="card" style="margin-top:9px;padding:13px 15px">
+      <div class="at-elenco" style="margin:0">${conta.restanti.map(esc).join(' · ')}</div>
+      <p class="cast-nota" style="margin:9px 0 0">Nomi che parlano nella sceneggiatura e che la lista ID non ha, o che ha scritti in un altro modo.</p>
+    </div>` : ''}`;
 }
 
 async function generaCastProvvisorio() {
@@ -8797,6 +8803,24 @@ function personaggiConta(nomi){
       (attDentro(y.r, c[0].r) || attDentro(c[0].r, y.r)));
     if (!altri.length) assegna(x, c[0]);
   });
+  /* 4. una parola in comune, lunga abbastanza da essere un nome.
+     Serve quando i due documenti tengono meta' nome per uno: la lista
+     scrive PRINCIPE COLONNA e la sceneggiatura IL PRINCIPE, oppure
+     COLONNELLO CIRO MAZZACANE e CIRO. Si assegna solo se quella parola
+     non compare in nessun altro dei due elenchi, quindi un cognome
+     ripetuto non puo' far finire le scene sulla persona sbagliata. */
+  const sig = t => attParole(t).filter(w => w.length >= 4);
+  liberi().forEach(x => {
+    const mie = sig(attNorm(x.nome));
+    if (!mie.length) return;
+    const c = voci.filter(v => !presi.has(v) && sig(v.k).some(w => mie.includes(w)));
+    if (c.length !== 1) return;
+    const comuni = sig(c[0].k).filter(w => mie.includes(w));
+    const altriRighe = liberi().filter(y => y !== x && sig(attNorm(y.nome)).some(w => comuni.includes(w)));
+    const altreVoci  = voci.filter(v => v !== c[0] && !presi.has(v) && sig(v.k).some(w => comuni.includes(w)));
+    if (!altriRighe.length && !altreVoci.length) assegna(x, c[0]);
+  });
+  out.restanti = voci.filter(v => !presi.has(v) && v.certo).map(v => v.k);
   return out;
 }
 
