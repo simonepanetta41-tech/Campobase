@@ -716,39 +716,69 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .pdl-upload-zone:hover, .pdl-upload-zone.over { border-color: var(--yellow); background: rgba(245,197,66,0.03); }
 .pdl-upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
-/* Calendar (reuse from PDL standalone) */
-.cal-nav { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
-.cal-month { font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:800; }
-.cal-nav-btn { background:var(--surface2);border:1px solid var(--border);color:var(--white);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.15s; }
-.cal-nav-btn:hover { border-color:var(--yellow);color:var(--yellow); }
+/* ── Piano di lavorazione ─────────────────────────────────────────────
+ * Un calendario su un telefono e' sette colonne strette: le caselle sono
+ * quadrate e arrotondate come nel resto dell'app, e dentro ci sta solo
+ * quello che si legge davvero da lontano — il giorno, il numero di
+ * giornata, l'ora. Il resto e' nella scheda che si apre toccando. */
+#pdlSection{padding:14px 16px 96px}
+#pdlDashboard .panel{background:var(--surface);border:1px solid var(--border);
+  border-radius:13px;padding:14px 15px;margin-bottom:11px}
+#pdlDashboard .panel-label{display:block;font-size:10px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+#pdlDashboard .panel-label::after{display:none}
+.pdl-testa{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;
+  letter-spacing:-.02em;margin:0}
+.pdl-sotto{font-size:12.5px;color:var(--muted);line-height:1.5;margin:3px 0 13px}
+.pdl-barra{display:flex;flex-direction:column;gap:5px}
+.pdl-barra+.pdl-barra{margin-top:13px}
+.pdl-barra .r{display:flex;justify-content:space-between;font-size:13px;color:var(--white-dim)}
+.pdl-barra .r b{font-family:'DM Mono',monospace;font-weight:400;color:var(--white)}
+.pdl-barra .v{height:5px;border-radius:3px;background:var(--surface2);overflow:hidden}
+.pdl-barra .v>div{height:100%;border-radius:3px}
+.pdl-leg{display:flex;flex-wrap:wrap;gap:13px;font-size:12px;color:var(--muted)}
+.pdl-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;
+  vertical-align:-1px}
+.pdl-sb{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid var(--border)}
+.pdl-sb:first-child{border-top:none;padding-top:0}
+.pdl-sb .n{font-family:'DM Mono',monospace;font-size:13px;color:var(--orange);flex:0 0 58px}
+.pdl-sb .c{flex:1;min-width:0;font-size:13px;color:var(--white-dim)}
+.pdl-sb .g{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--muted)}
+.pdl-agg{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  min-height:48px;margin-top:9px;background:none;border:1px dashed var(--border-l);
+  border-radius:12px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;
+  font-size:14px;cursor:pointer}
+.cal-nav { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px; }
+.cal-month { font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-.015em; }
+.cal-vista{display:flex;gap:5px}
+.cal-vista button{min-height:32px;padding:5px 12px;border-radius:9px;cursor:pointer;
+  background:none;border:1px solid var(--border-l);color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-size:12.5px}
+.cal-vista button.on{border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,.12)}
+.cal-nav-btn { width:44px;height:44px;border-radius:12px;border:1px solid var(--border-l);background:none;color:var(--white-dim);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex:0 0 44px; }
 /* minmax(0,1fr) e non 1fr: una colonna di griglia non scende sotto la
    larghezza del suo contenuto piu' largo, e una parola lunga e non
    spezzabile come "TRASFERIMENTO" allargava tutte e sette le colonne
    facendo debordare il calendario fuori dallo schermo. */
-.cal-grid { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px; }
-.cal-dow { text-align:center;font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);padding:6px 0; }
-.cal-cell { min-height:80px;border-radius:8px;padding:6px;position:relative;cursor:default;transition:all 0.15s;touch-action:manipulation;min-width:0;overflow:hidden; }
+.cal-grid { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px; }
+.cal-dow { text-align:center;font-size:11px;color:var(--muted);padding:2px 0 4px; }
+.cal-grid.sett .cal-cell { aspect-ratio:auto; }
+.cal-cell { aspect-ratio:1/1.12;border-radius:9px;border:1px solid var(--border);background:var(--surface);padding:5px 4px;position:relative;cursor:default;touch-action:manipulation;min-width:0;overflow:hidden;display:flex;flex-direction:column;gap:1px; }
 .cal-cell.has-shooting { cursor:pointer; }
 @media(max-width:600px) {
-  .cal-grid { gap:1px; }
-  .cal-cell { min-height:52px; padding:3px; }
-  .cal-cell-day { font-size:11px; }
-  .cal-cell-giorno { font-size:7px; line-height:1.2; }
-  .cal-cell-loc { font-size:7px; line-height:1.2; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  .cal-cell-scenes { flex-wrap:wrap; gap:1px; }
-  .cal-cell-sc { font-size:8px; padding:1px 3px; }
-  .cal-dow { font-size:7px; padding:4px 0; letter-spacing:0; }
+  .cal-cell { padding:4px 3px; }
+  .cal-cell-giorno { font-size:9px; }
 }
 .cal-cell.empty { background:transparent; }
 .cal-cell.has-shooting { cursor:pointer; }
 .cal-cell.has-shooting:hover { transform:translateY(-1px);filter:brightness(1.15); }
-.cal-cell-day { font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;margin-bottom:3px; }
+.cal-cell-day { font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;margin:0; }
 .cal-cell.is-today .cal-cell-day { color:var(--yellow); }
-.cal-cell-giorno { font-size:9px;font-weight:700;margin-bottom:2px;opacity:0.85; }
-.cal-cell-loc { font-size:8px;opacity:0.65;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; }
-.cal-cell-scenes { display:flex;flex-wrap:wrap;gap:2px;margin-top:3px; }
-.cal-cell-sc { font-size:7px;padding:1px 4px;border-radius:3px;font-weight:600;background:rgba(0,0,0,0.3); }
-.cal-cell-note { font-size:8px;color:rgba(255,255,255,0.55);margin-top:2px;font-style:italic;overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.cal-cell-giorno { font-family:'DM Mono',monospace;font-size:9.5px;font-weight:400;color:var(--white-dim);margin:0;line-height:1.3; }
+.cal-cell-loc { font-size:9px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical; }
+.cal-cell-scenes { display:flex;flex-wrap:wrap;gap:2px;margin-top:2px; }
+.cal-cell-sc { font-family:'DM Mono',monospace;font-size:8px;padding:1px 4px;border-radius:3px;background:rgba(0,0,0,0.3); }
+.cal-cell-note { font-size:8.5px;color:var(--muted);margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
 /* Giornata di viaggio: non si gira, quindi non deve somigliare a una
    giornata di riprese ne' a una casella vuota. Righe diagonali e bordo
    tratteggiato la distinguono a colpo d'occhio, anche sul telefono. */
@@ -759,22 +789,34 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .cal-cell.is-viaggio .cal-cell-giorno { color:var(--viaggio); }
 .cal-cell-viaggio { font-size:8px;font-weight:700;color:var(--viaggio);margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere; }
 @media (max-width:600px){ .cal-cell-viaggio { font-size:7px; } }
-.cal-cell.status-complete { border:2px solid var(--green); }
-.cal-cell.status-partial { border:2px solid var(--orange); }
-.cal-cell.status-pending { border:1px solid rgba(255,255,255,0.06); }
-.cal-cell.is-today { box-shadow:0 0 0 2px var(--yellow); }
-.bg-light { background:rgba(110,231,183,0.12); }
-.bg-medium { background:rgba(245,166,35,0.15); }
-.bg-heavy { background:rgba(255,85,85,0.15); }
+/* Lo stato della giornata e' un bordo, non un riempimento: il colore di
+   fondo dice gia' quanto pesa, e due tinte nella stessa casella da 55
+   pixel diventano una macchia. */
+.cal-cell.status-complete { border-color:rgba(110,231,183,.5); }
+.cal-cell.status-partial { border-color:rgba(245,166,35,.55); }
+.cal-cell.is-today { outline:2px solid var(--yellow);outline-offset:-2px; }
+.cal-cell.empty, .cal-cell.vuota { background:none;border-color:transparent; }
+.cal-cell.vuota .cal-cell-day { color:var(--muted);font-weight:400; }
+.bg-light { background:var(--surface); }
+.bg-medium { background:var(--surface); }
+.bg-heavy { background:linear-gradient(180deg,rgba(255,107,90,.17),transparent); }
 
 /* Day modal for PDL */
-.pdl-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:1000;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto; }
+.pdl-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:1000;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto; }
 .pdl-overlay.open { display:flex; }
-.pdl-modal { background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:620px;width:100%;padding:28px;margin:auto; }
-.pdl-modal-header { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px; }
-.pdl-modal-title { font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:800;line-height:1.2; }
+.pdl-modal { background:var(--surface);border:1px solid var(--border-l);border-radius:16px;max-width:620px;width:100%;padding:22px;margin:auto; }
+/* Sul telefono sale dal basso e arriva al bordo: una scheda centrata con
+   il margine attorno sprecava mezzo schermo su una pagina che e' tutta
+   elenco. */
+@media(max-width:600px){
+  .pdl-overlay { padding:0;align-items:flex-end; }
+  .pdl-modal { border-radius:18px 18px 0 0;border-bottom:none;margin:0;max-height:92dvh;
+    overflow-y:auto;padding:20px 16px calc(env(safe-area-inset-bottom) + 20px); }
+}
+.pdl-modal-header { display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:12px; }
+.pdl-modal-title { font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.2; }
 .pdl-modal-title span { color:var(--yellow); }
-.pdl-modal-sub { font-size:11px;color:var(--muted);margin-top:3px; }
+.pdl-modal-sub { font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45; }
 .pdl-chip-hint { font-size:10px;color:var(--muted);margin-bottom:10px; }
 .pdl-scene-chips { display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-bottom:14px; }
 .pdl-transfer { display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 10px;background:rgba(100,180,255,0.08);border:1px solid rgba(100,180,255,0.25);border-radius:7px;font-family:'DM Mono',monospace;font-size:10px;color:rgba(100,180,255,0.9);letter-spacing:0.04em; }
@@ -1398,65 +1440,48 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
           </div>
         </div>
         <div id="pdlDashboard" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-            <div>
-              <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:800" id="pdlFilmTitle">—</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:2px" id="pdlFilmInfo">—</div>
-            </div>
-            <label style="background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-              <svg width="13" height="13" viewBox="0 0 56 64" fill="none" style="vertical-align:middle;margin-right:5px"><rect x="0" y="8" width="56" height="56" rx="4" stroke="currentColor" stroke-width="4"/><rect x="0" y="8" width="56" height="14" rx="4" fill="currentColor"/><rect x="0" y="16" width="56" height="6" fill="currentColor"/><circle cx="8" cy="15" r="4" fill="var(--yellow,#f0e040)"/><circle cx="48" cy="15" r="4" fill="var(--yellow,#f0e040)"/><line x1="18" y1="22" x2="18" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="32" y1="22" x2="32" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="34" x2="56" y2="34" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="46" x2="56" y2="46" stroke="currentColor" stroke-width="2" opacity="0.3"/><rect x="19" y="23" width="12" height="10" rx="1" fill="var(--yellow,#f0e040)" opacity="0.9"/><rect x="33" y="35" width="12" height="10" rx="1" fill="var(--yellow,#f0e040)" opacity="0.9"/></svg> Carica PDL aggiornato
-              <input type="file" accept=".pdf" style="display:none" onchange="loadUpdatedPdlFile(this)">
-            </label>
-          </div>
+          <div class="pdl-testa" id="pdlFilmTitle">—</div>
+          <div class="pdl-sotto" id="pdlFilmInfo">—</div>
 
-          <!-- STATS -->
-          <div class="stats-row" id="pdlStatsRow" style="margin-bottom:16px"></div>
+          <!-- CONTI -->
+          <div class="sp-conti" id="pdlStatsRow"></div>
 
-          <!-- PROGRESS BARS -->
-          <div class="panel" style="margin-bottom:16px">
-            <div class="panel-label">Avanzamento Riprese</div>
-            <div style="display:flex;flex-direction:column;gap:10px" id="pdlProgBars"></div>
-          </div>
-
-          <!-- LEGENDA -->
-          <div class="panel" style="margin-bottom:16px">
-            <div class="panel-label">Legenda</div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px" id="pdlLegenda">
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:3px;background:rgba(110,231,183,0.5)"></div>≤75% media (leggero)</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:3px;background:rgba(245,166,35,0.6)"></div>Nella media</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:3px;background:rgba(255,85,85,0.5)"></div>Sopra media (pesante)</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:50%;background:var(--green)"></div>Completa</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted)"><div style="width:10px;height:10px;border-radius:50%;background:var(--orange)"></div>Parziale</div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--yellow)" id="pdlAvgLabel"></div>
-            </div>
+          <!-- AVANZAMENTO -->
+          <div class="panel" style="margin-top:11px">
+            <div class="panel-label">Avanzamento</div>
+            <div id="pdlProgBars"></div>
           </div>
 
           <!-- STANDBY -->
-          <div class="panel" id="pdlStandbyPanel" style="display:none;margin-bottom:16px">
-            <div class="panel-label">Scene in Stand-by</div>
-            <div style="display:flex;flex-direction:column;gap:6px" id="pdlStandbyList"></div>
+          <div class="panel" id="pdlStandbyPanel" style="display:none">
+            <div class="panel-label">Scene in stand-by</div>
+            <div id="pdlStandbyList"></div>
           </div>
 
           <!-- CALENDAR -->
           <div class="panel" style="margin-bottom:16px">
-            <div class="panel-label">Calendario di Lavorazione</div>
             <div class="cal-nav">
-              <button class="cal-nav-btn" onclick="pdlChangeNav(-1)">‹</button>
-              <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-                <div class="cal-month" id="pdlCalMonth">—</div>
-                <div style="display:flex;gap:4px">
-                  <button id="btnViewMonthly" onclick="setPdlView('monthly')" style="font-size:9px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--yellow);color:#000;font-family:'DM Mono',monospace;cursor:pointer;font-weight:700">Mese</button>
-                  <button id="btnViewWeekly" onclick="setPdlView('weekly')" style="font-size:9px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Mono',monospace;cursor:pointer">Settimana</button>
-                </div>
-              </div>
-              <button class="cal-nav-btn" onclick="pdlChangeNav(+1)">›</button>
+              <button class="cal-nav-btn" onclick="pdlChangeNav(-1)" aria-label="Indietro">‹</button>
+              <div class="cal-month" id="pdlCalMonth">—</div>
+              <button class="cal-nav-btn" onclick="pdlChangeNav(+1)" aria-label="Avanti">›</button>
+            </div>
+            <div class="cal-vista">
+              <button id="btnViewMonthly" class="on" onclick="setPdlView('monthly')">Mese</button>
+              <button id="btnViewWeekly" onclick="setPdlView('weekly')">Settimana</button>
             </div>
             <div class="cal-grid" id="pdlCalGrid"></div>
+            <div class="pdl-leg" id="pdlLegenda" style="margin-top:13px">
+              <span><i style="background:var(--surface2);border:1px solid var(--border-l)"></i>Si gira</span>
+              <span><i style="background:rgba(255,107,90,.35)"></i>Giornata pesante</span>
+              <span><i style="background:rgba(var(--viaggio-rgb),.25);border:1px dashed rgba(var(--viaggio-rgb),.6)"></i>Viaggio</span>
+              <span><i style="border:1.5px solid rgba(110,231,183,.6);background:none"></i>Girata</span>
+              <span id="pdlAvgLabel" style="color:var(--white-dim)"></span>
+            </div>
           </div>
-          <!-- DELETE PDL -->
-          <div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
-            <button onclick="deletePdl()" style="background:none;border:1px solid rgba(255,85,85,0.3);color:rgba(255,85,85,0.6);padding:7px 16px;border-radius:8px;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='rgba(255,85,85,0.3)';this.style.color='rgba(255,85,85,0.6)'">🗑 Elimina PDL</button>
-          </div>
+          <label class="pdl-agg">Carica il piano aggiornato
+            <input type="file" accept=".pdf" style="display:none" onchange="loadUpdatedPdlFile(this)">
+          </label>
+          <button class="odg-togli" style="margin-top:9px" onclick="deletePdl()">Rimuovi il piano</button>
         </div>
       </div><!-- end pdlSection -->
 
@@ -9372,11 +9397,16 @@ async function loadUpdatedPdlFile(input) {
 }
 
 function renderPdlDashboard() {
-  document.getElementById('pdlFilmTitle').textContent = analysisData?.titolo || pdlData.titolo || 'PDL';
-  document.getElementById('pdlFilmInfo').textContent = [pdlData.regista?'Regia: '+pdlData.regista:'',pdlData.versione||'',pdlData.data_inizio||'',pdlData.totale_giorni+' giorni · '+pdlData.totale_scene+' scene'].filter(Boolean).join(' · ');
+  document.getElementById('pdlFilmTitle').textContent = 'Piano di lavorazione';
+  document.getElementById('pdlFilmInfo').textContent = [
+    analysisData?.titolo || pdlData.titolo || '',
+    pdlData.regista ? 'regia ' + pdlData.regista : '',
+    pdlData.versione || '',
+    pdlData.totale_giorni ? pdlData.totale_giorni + ' giorni · ' + pdlData.totale_scene + ' scene' : ''
+  ].filter(Boolean).join(' · ');
   renderPdlStats(); renderPdlCalendar(); renderPdlStandby();
   const avg=getPdlAvgPages();
-  document.getElementById('pdlAvgLabel').textContent='Media: '+avg.toFixed(1)+' pgs/giorno';
+  document.getElementById('pdlAvgLabel').textContent='media ' + avg.toFixed(1) + ' pag/giorno';
 }
 
 function renderPdlStats() {
@@ -9385,13 +9415,17 @@ function renderPdlStats() {
   const standby=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='standby').length,0);
   const completi=Object.values(pdlShootingData).filter(d=>d.status==='complete').length;
   document.getElementById('pdlStatsRow').innerHTML=[
-    {v:pdlData.totale_giorni,l:'Giorni Totali'},{v:completi,l:'Completati'},{v:girate,l:'Scene Girate'},{v:standby,l:'Stand-by'}
-  ].map(s=>`<div class="stat-box"><div class="stat-num">${s.v}</div><div class="stat-desc">${s.l}</div></div>`).join('');
+    [pdlData.totale_giorni ?? '—','Giorni totali'],[completi,'Giornate girate'],
+    [girate,'Scene girate'],[standby,'In stand-by']
+  ].map(([n,k])=>`<div><span class="n num">${n}</span><span class="k">${k}</span></div>`).join('');
   const pct=allSc.length>0?Math.round(girate/allSc.length*100):0;
   const gPct=pdlData.totale_giorni>0?Math.round(completi/pdlData.totale_giorni*100):0;
-  document.getElementById('pdlProgBars').innerHTML=`
-    <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>Scene girate</span><span style="color:var(--yellow)">${girate}/${allSc.length} — ${pct}%</span></div><div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:var(--green);width:${pct}%"></div></div></div>
-    <div style="display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>Giorni completati</span><span style="color:var(--yellow)">${completi}/${pdlData.totale_giorni} — ${gPct}%</span></div><div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:var(--yellow);width:${gPct}%"></div></div></div>`;
+  const barra=(nome,fatto,tot,perc,colore)=>`<div class="pdl-barra">
+    <div class="r"><span>${nome}</span><b>${fatto}/${tot} · ${perc}%</b></div>
+    <div class="v"><div style="width:${perc}%;background:${colore}"></div></div></div>`;
+  document.getElementById('pdlProgBars').innerHTML =
+    barra('Scene', girate, allSc.length, pct, 'var(--green)') +
+    barra('Giornate', completi, pdlData.totale_giorni, gPct, 'var(--yellow)');
 }
 
 function renderPdlStandby() {
@@ -9404,7 +9438,10 @@ function renderPdlStandby() {
   const list=document.getElementById('pdlStandbyList');
   if(!items.length){panel.style.display='none';return;}
   panel.style.display='block';
-  list.innerHTML=items.map(({dayNum,scNum,sc})=>`<div style="background:var(--surface2);border:1px dashed rgba(245,166,35,0.4);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:11px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--orange);min-width:60px">SC.${scNum}</span><span style="color:var(--white-dim);flex:1;font-size:10px">${sc?sc.int_ext+' '+sc.momento+' — '+sc.location:''}</span><span style="font-size:10px;color:var(--muted)">G.${dayNum}</span></div>`).join('');
+  list.innerHTML=items.map(({dayNum,scNum,sc})=>`<div class="pdl-sb">
+    <span class="n">sc. ${escapeHtml(scNum)}</span>
+    <span class="c">${sc?escapeHtml([sc.int_ext,sc.momento,sc.location].filter(Boolean).join(' · ')):''}</span>
+    <span class="g">g. ${dayNum}</span></div>`).join('');
 }
 
 let pdlCalView = 'monthly'; // 'monthly' | 'weekly'
@@ -9412,10 +9449,8 @@ let pdlCurrentWeekStart = null; // Date of Monday of current week
 
 function setPdlView(view) {
   pdlCalView = view;
-  document.getElementById('btnViewMonthly').style.background = view === 'monthly' ? 'var(--yellow)' : 'var(--surface2)';
-  document.getElementById('btnViewMonthly').style.color = view === 'monthly' ? '#000' : 'var(--muted)';
-  document.getElementById('btnViewWeekly').style.background = view === 'weekly' ? 'var(--yellow)' : 'var(--surface2)';
-  document.getElementById('btnViewWeekly').style.color = view === 'weekly' ? '#000' : 'var(--muted)';
+  document.getElementById('btnViewMonthly').classList.toggle('on', view === 'monthly');
+  document.getElementById('btnViewWeekly').classList.toggle('on', view === 'weekly');
   if (view === 'weekly' && !pdlCurrentWeekStart) {
     // Default to current week (or first shooting week)
     const today = new Date();
@@ -9448,6 +9483,8 @@ function renderPdlCalendar() {
   document.getElementById('pdlCalMonth').textContent=months[pdlCurrentMonth]+' '+pdlCurrentYear;
   const grid=document.getElementById('pdlCalGrid');
   grid.innerHTML='';
+  grid.classList.remove('sett');
+  grid.style.gridTemplateColumns='';
   ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].forEach(d=>{const el=document.createElement('div');el.className='cal-dow';el.textContent=d;grid.appendChild(el);});
   const dateMap={};
   getPdlAllGiorni().forEach(g=>{if(g.data)dateMap[g.data]=g;});
@@ -9482,7 +9519,7 @@ function renderPdlCalendar() {
         el.innerHTML = '<div class="cal-cell-day">' + day + '</div><div class="cal-cell-giorno" style="font-size:8px;opacity:0.8">D' + g.numero_giorno + oraStr + '</div>' +
           (g.trasferimento ? '<div class="cal-cell-viaggio">\u{1F68C} ' + escapeHtml(pdlViaggioBreve(g.trasferimento)) + '</div>' : '');
       } else {
-        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">DAY ${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
+        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">D${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
       }
     } else if (viaggiMap[dateStr]) {
       // Giornata di solo viaggio: non e' una giornata di riprese, quindi
@@ -9490,9 +9527,8 @@ function renderPdlCalendar() {
       el.className=`cal-cell is-viaggio ${isToday?'is-today':''}`;
       el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(window.innerWidth<=600?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
     } else {
-      el.className=`cal-cell ${isToday?'is-today':''}`;
-      el.style.background='rgba(255,255,255,0.02)'; el.style.border='1px solid rgba(255,255,255,0.04)';
-      el.innerHTML=`<div class="cal-cell-day" style="color:var(--muted)">${day}</div>`;
+      el.className=`cal-cell vuota ${isToday?'is-today':''}`;
+      el.innerHTML=`<div class="cal-cell-day">${day}</div>`;
     }
     grid.appendChild(el);
   }
@@ -9502,14 +9538,19 @@ function renderPdlCalendarWeekly() {
   const months=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
   const ws = new Date(pdlCurrentWeekStart);
   const we = new Date(ws); we.setDate(ws.getDate() + 6);
-  const sameMonth = ws.getMonth() === we.getMonth();
-  const label = sameMonth
-    ? `${ws.getDate()}–${we.getDate()} ${months[ws.getMonth()]} ${ws.getFullYear()}`
-    : `${ws.getDate()} ${months[ws.getMonth()]} – ${we.getDate()} ${months[we.getMonth()]} ${ws.getFullYear()}`;
+  // Mesi abbreviati: "9–15 Novembre 2026" andava a capo e spingeva via
+  // le frecce.
+  const br = m => months[m].slice(0,3).toLowerCase();
+  const label = ws.getMonth() === we.getMonth()
+    ? `${ws.getDate()}–${we.getDate()} ${br(ws.getMonth())} ${ws.getFullYear()}`
+    : `${ws.getDate()} ${br(ws.getMonth())} – ${we.getDate()} ${br(we.getMonth())} ${ws.getFullYear()}`;
   document.getElementById('pdlCalMonth').textContent = label;
 
   const grid = document.getElementById('pdlCalGrid');
   grid.innerHTML = '';
+  // Nella settimana le caselle non sono quadrate: hanno dentro le scene
+  // e si allungano, quindi la proporzione fissa del mese qui non vale.
+  grid.classList.add('sett');
   const dateMap = {};
   getPdlAllGiorni().forEach(g => { if (g.data) dateMap[g.data] = g; });
   const viaggiMap = pdlViaggiPerData();
@@ -9562,10 +9603,10 @@ function renderPdlCalendarWeekly() {
       const locHtml = isMobile ? '' : `<div class="cal-cell-loc">${g.location_principale||''}</div>`;
       el.innerHTML = `
         <div class="cal-cell-day">${d.getDate()}</div>
-        <div class="cal-cell-giorno">DAY ${g.numero_giorno}</div>
+        <div class="cal-cell-giorno">D${g.numero_giorno}</div>
         ${oraStr ? `<div class="cal-cell-giorno" style="color:${oraColor};margin-top:-2px">${oraStr.replace(' · ','')}</div>` : ''}
         ${locHtml}
-        <div class="cal-cell-scenes" style="display:flex">${sceneHtml}</div>
+        <div class="cal-cell-scenes">${sceneHtml}</div>
         ${g.unita_secondarie?.length ? `<div style="font-size:8px;color:var(--muted);margin-top:3px;letter-spacing:0.05em">2° UNIT</div>` : ''}
         ${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}
         ${sd.notes ? `<div class="cal-cell-note">${sd.notes}</div>` : ''}`;
@@ -9574,11 +9615,9 @@ function renderPdlCalendarWeekly() {
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
       el.innerHTML = `<div class="cal-cell-day">${d.getDate()}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(isMobile?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
     } else {
-      el.className = `cal-cell ${isToday?'is-today':''}`;
-      el.style.background = 'rgba(255,255,255,0.02)';
-      el.style.border = '1px solid rgba(255,255,255,0.04)';
+      el.className = `cal-cell vuota ${isToday?'is-today':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
-      el.innerHTML = `<div class="cal-cell-day" style="color:var(--muted)">${d.getDate()}</div>`;
+      el.innerHTML = `<div class="cal-cell-day">${d.getDate()}</div>`;
     }
     grid.appendChild(el);
   }
@@ -9591,8 +9630,16 @@ function openPdlDayModal(dayNum) {
   pdlModalSceneStates={...(sd.scenes||{})};
   pdlModalStatus=sd.status||'pending';
   const dateStr=g.data?new Date(g.data+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}):'';
-  document.getElementById('pdlModalTitle').innerHTML=`Day <span>${dayNum}</span>`;
-  document.getElementById('pdlModalSub').innerHTML=`${dateStr} · <span style="color:${g.ora_incerta?'var(--orange)':'var(--muted)'}">${g.ora_inizio||''}–${g.ora_fine||''}${g.ora_incerta?' <span title="Orario da confermare">⚠</span>':''}</span> · ${g.location_principale||''} · ${g.pagine_giorno||''} pgs`;
+  document.getElementById('pdlModalTitle').innerHTML=`Giorno <span>${dayNum}</span>`;
+  // Il trattino solo quando c'e' davvero un'ora di fine: "07.30-" non
+  // dice niente a nessuno.
+  const ore = [g.ora_inizio, g.ora_fine].filter(Boolean).join('–');
+  document.getElementById('pdlModalSub').innerHTML = [
+    dateStr,
+    ore ? `<span style="color:${g.ora_incerta?'var(--orange)':'inherit'}">${ore}${g.ora_incerta?' ⚠':''}</span>` : '',
+    g.location_principale || '',
+    g.pagine_giorno ? g.pagine_giorno + ' pag' : ''
+  ].filter(Boolean).join(' · ');
   // Show secondary units if any
   const existingUnits = document.getElementById('pdlModalUnits');
   if (existingUnits) existingUnits.remove();
