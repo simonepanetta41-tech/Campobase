@@ -9,6 +9,22 @@
   "compatibility_date": "2026-11-05",
   "main": "worker/index.js",
 
+  // Il dominio proprio. Dichiararlo qui invece di attaccarlo a mano dal
+  // pannello vuol dire che il deploy lo rimette da solo: se un giorno il
+  // Worker viene ricreato, l'indirizzo torna su senza che qualcuno si
+  // ricordi di ripassare dal pannello.
+  //
+  // custom_domain crea anche il record DNS. Perche' funzioni la zona
+  // campobase.dev deve stare in questo stesso account Cloudflare — e ci sta,
+  // perche' il dominio e' registrato qui.
+  //
+  // www c'e' perche' qualcuno lo scrivera' comunque. Punta allo stesso
+  // Worker: nessun reindirizzamento da mantenere.
+  "routes": [
+    { "pattern": "campobase.dev",     "custom_domain": true },
+    { "pattern": "www.campobase.dev", "custom_domain": true }
+  ],
+
   "assets": {
     // La radice del repo: l'app e' un singolo index.html piu' icone.
     // Cosa NON viene caricato sta in .assetsignore.
