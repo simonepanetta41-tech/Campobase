@@ -7985,6 +7985,27 @@ function odgLuoghi(testo) {
   return out;
 }
 
+/* Fra "ODG" e il suo numero ci puo' stare di tutto: un cancelletto, un
+   "n.", due punti, un trattino basso. La produzione di Missione San
+   Gennaro scrive "ODG _21", e con il solo cancelletto previsto il numero
+   non veniva riconosciuto li': la ricerca proseguiva e si attaccava alla
+   prima cifra che trovava altrove, cosi' il 21 diventava 2. */
+const ODG_PRIMA_DEL_NUMERO = '\\s*[#_:.\\-–]*\\s*(?:n[°\u00ba o.]?\\s*)?';
+// Una cifra per volta, al massimo tre, separate al piu' da uno spazio:
+// l'estrazione del PDF le stacca, ma con due spazi comincia un altro
+// numero — la data che segue — e quello non va preso.
+const ODG_CIFRE = '(\\d(?:\\s?\\d){0,2})';
+
+/* Il numero scritto nel nome del file.
+   Le produzioni lo mettono apposta ("MSG - ODG _21 del 10.11.2026.pdf") ed
+   e' piu' affidabile del testo estratto da un PDF, che perde spazi e
+   spezza le righe dove gli pare. */
+function odgNumeroDaNome(nome) {
+  const m = String(nome || '').match(
+    new RegExp(odgEtichetta('ODG') + ODG_PRIMA_DEL_NUMERO + '(\\d{1,3})', 'i'));
+  return m ? +m[1] : null;
+}
+
 function odgIntestazione(testo) {
   const t = String(testo || '');
   const r = {};
@@ -7995,7 +8016,7 @@ function odgIntestazione(testo) {
      a capo. Prendendo solo la prima cifra, l'OdG 21 diventava l'OdG 2.
      Si ammette un solo spazio fra una cifra e l'altra: con due spazi
      comincia un altro numero — la data che segue — e non va preso. */
-  const mN = t.match(new RegExp(odgEtichetta('ODG') + '\\s*#?\\s*(\\d(?:\\s?\\d){0,2})', 'i'));
+  const mN = t.match(new RegExp(odgEtichetta('ODG') + ODG_PRIMA_DEL_NUMERO + ODG_CIFRE, 'i'));
   if (mN) r.numero = +mN[1].replace(/\s+/g, '');
   const mD = t.match(new RegExp('(\\d{1,2})\\s*(' + ODG_MESI.map(odgEtichetta).join('|') + ')\\s*(\\d{4})', 'i'));
   if (mD) {
@@ -8655,6 +8676,15 @@ async function odgLavora(files) {
     }
     dati.testo = testo;
     dati.nomeFile = file.name;
+    /* Il nome del file corregge il testo quando il testo si e' fermato a
+       meta' numero: il 21 letto come 2 e' esattamente questo caso. Non lo
+       sovrascrive mai del tutto — un file rinominato a mano direbbe la sua
+       su un documento che invece sa chi e'. */
+    const daNome = odgNumeroDaNome(file.name);
+    if (daNome && (!dati.numero || String(daNome).startsWith(String(dati.numero))
+                                   && daNome !== dati.numero)) {
+      dati.numero = daNome;
+    }
     dati.file = principale.file || null;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
