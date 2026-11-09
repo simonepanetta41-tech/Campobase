@@ -8054,6 +8054,7 @@ function odgIntestazione(testo) {
   if (mM) r.mappa = mM[0].replace(/[.,;:]+$/, '');
 
   r.luoghi = odgLuoghi(t);
+  r.pagine = odgTotalePagine(t);
 
   // Regia e produzione, utili per intitolare il progetto
   r.regia = odgValoreDopo(t, 'Regia di', ['MAD', 'Piazza', 'S.p.A', 'Produttore']);
@@ -10165,7 +10166,8 @@ async function odgRecupera() {
 
 function odgPienoHtml(d) {
   const io = odgMiaRiga();
-  const pag = (d.scene || []).reduce((a, s) => a + odgPagine(s.pag), 0);
+  // Il totale dichiarato vince sulla somma delle righe.
+  const pag = d.pagine || (d.scene || []).reduce((a, s) => a + odgPagine(s.pag), 0);
   const righe = [
     ['Pronti a girare', d.prontiAGirare],
     ['Pausa', d.pausa],
@@ -10381,6 +10383,34 @@ function odgFrazione(n) {
   if (ott === 8) return String(int + 1);
   return (int ? int + ' ' : '') + ott + '/8';
 }
+/* Il totale delle pagine lo scrive la produzione in fondo alla tabella
+   delle scene: "Tot. pag.: 3 4/8".
+ *
+ * Sommare le righe da soli sembrava equivalente e non lo e': le scene
+ * compaiono piu' volte nello stesso documento — la seconda unita', la
+ * tabella ripetuta a pagina due — e quello che si sommava non erano le
+ * pagine del giorno ma quante volte erano stampate. 3 4/8 diventava
+ * 7 4/8. Il numero dichiarato invece e' uno solo e lo ha scritto chi
+ * compila il piano. */
+function odgTotalePagine(testo) {
+  // Le tre forme, dalla piu' completa alla piu' secca: "3 4/8", "7/8", "4".
+  // L'ordine conta: cercando prima l'intero, in "7/8" si prendeva il 7 e
+  // si buttavano gli ottavi.
+  const m = String(testo || '').match(new RegExp(
+    'Tot\\s*\\.?\\s*pag\\s*\\.?\\s*:?\\s*(?:'
+    + '(\\d{1,3})\\s+(\\d{1,2})\\s*/\\s*(\\d{1,2})'   // 3 4/8
+    + '|(\\d{1,2})\\s*/\\s*(\\d{1,2})'                 // 7/8
+    + '|(\\d{1,3})(?!\\s*/)'                             // 4
+    + ')', 'i'));
+  if (!m) return 0;
+  const n = m[1] ? (+m[1]) + (+m[2]) / (+m[3])
+          : m[4] ? (+m[4]) / (+m[5])
+          : +m[6];
+  // Una giornata di riprese non fa trenta pagine: se il numero e' assurdo
+  // e' stato letto male, e si torna a sommare le righe.
+  return n > 0 && n < 30 ? n : 0;
+}
+
 function odgPrimaRiga(s) { return String(s || '').split(/\s{2,}|,/)[0].trim(); }
 function odgQuando(iso) {
   if (!iso) return 'ora';
