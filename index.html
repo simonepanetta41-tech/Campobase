@@ -688,9 +688,21 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tr-qr{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;
   background:var(--surface);border:1px solid var(--border);border-radius:13px}
 .tr-qr svg{width:200px;height:200px;display:block;background:#fff;padding:9px;border-radius:9px}
-.tr-qr svg rect{fill:#0A0B0D}
-.tr-qr svg rect:first-child{fill:#fff}
+/* Il disegnatore fa un path solo con dentro tutti i moduli, piu' un rect
+   di fondo. Il fondo resta bianco anche di notte: un QR scuro su scuro la
+   fotocamera non lo legge. */
+.tr-qr svg path{fill:#0A0B0D}
+.tr-qr svg rect{fill:#fff}
 .tr-qr .c{font-size:19px;letter-spacing:.22em;color:var(--yellow)}
+.tr-posta{padding:15px 16px}
+.tr-posta p{margin:0;font-size:13px;line-height:1.55;color:var(--muted)}
+.tr-mail{display:flex;align-items:center;gap:10px;margin:12px 0 11px;
+  padding:11px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px}
+.tr-mail .num{flex:1;min-width:0;font-size:13px;color:var(--white);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-mail button{flex:none;padding:7px 13px;font-size:12px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);color:var(--white)}
+.tr-avviso{font-size:12px!important;color:var(--orange)!important}
 /* Pagina Cast */
 #castSection{padding:14px 16px 96px}
 #castContent{max-width:700px;margin:0 auto;padding:0}
@@ -8603,7 +8615,7 @@ async function filmCarica(projectId){
       const { error } = await sb.from('projects').update({ codice }).eq('id', data.id);
       if (!error) data.codice = codice;
     }
-    filmImposta({ id: data.id, titolo: data.titolo, codice: data.codice });
+    filmImposta({ id: data.id, titolo: data.titolo, codice: data.codice, casella: data.casella });
     return data;
   } catch (e) { console.log('[film] non caricato:', e.message); return null; }
 }
@@ -8627,6 +8639,10 @@ async function filmEntra(codice){
     const f = Array.isArray(data) ? data[0] : data;
     if (!f) return null;
     filmImposta({ id: f.id, titolo: f.titolo, codice: String(codice).toUpperCase() });
+    // La porta d'ingresso restituisce il minimo indispensabile. Il resto —
+    // la casella della posta soprattutto — si legge adesso, che da dentro
+    // il film si puo'.
+    await filmCarica(f.id);
     return f;
   } catch (e) { console.log('[film] ingresso fallito:', e.message); return null; }
 }
@@ -8701,6 +8717,19 @@ async function troupeRender(){
       <button onclick="troupeCondividi()">Manda l'invito</button>
       <button onclick="troupeCopia()">Copia il link</button>
     </div>
+    ${f.casella ? `
+      <div class="odg-sez" style="margin-top:22px">LA POSTA DEL FILM</div>
+      <div class="card tr-posta" style="margin-top:9px">
+        <p>Metti questo indirizzo nella regola di inoltro della tua casella di
+          lavoro. I pacchetti che arrivano qui si aprono da soli nel film, senza
+          che nessuno debba caricare niente.</p>
+        <div class="tr-mail">
+          <span class="num" id="troupeMail">${esc(filmPosta(f))}</span>
+          <button onclick="troupeCopiaMail()">Copia</button>
+        </div>
+        <p class="tr-avviso">È una chiave, non un nome: chi ce l'ha può infilare
+          documenti nel film. Tienila fuori dai gruppi.</p>
+      </div>` : ''}
     <div class="odg-sez" style="margin-top:22px">IN QUESTO FILM</div>
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
   troupeQr(f.codice);
@@ -8754,6 +8783,30 @@ async function troupeCopia(){
   const f = filmCorrente(); if (!f) return;
   try { await navigator.clipboard.writeText(filmLink(f.codice)); showToast('Link copiato.'); }
   catch (_) { showToast(filmLink(f.codice)); }
+}
+
+/* L'indirizzo dove la produzione — o meglio, la regola di inoltro della
+   casella di lavoro — manda i pacchetti.
+ *
+ * Il dominio e' scritto qui e non preso da location: l'app si apre anche
+ * dal vecchio indirizzo workers.dev, e la posta arriva comunque solo su
+ * campobase.dev. Dedurlo da dove si e' aperta la pagina darebbe un
+ * indirizzo che non esiste.
+ *
+ * La casella non e' leggibile apposta. "odg@" sarebbe comodo e sbagliato:
+ * chi conosce l'indirizzo puo' mettere documenti dentro il film, quindi
+ * dev'essere qualcosa che non si indovina. */
+const CB_POSTA_DOMINIO = 'campobase.dev';
+function filmPosta(f){
+  const film = f || filmCorrente();
+  return film && film.casella ? film.casella + '@' + CB_POSTA_DOMINIO : '';
+}
+
+async function troupeCopiaMail(){
+  const m = filmPosta();
+  if (!m) return;
+  try { await navigator.clipboard.writeText(m); showToast('Indirizzo copiato.'); }
+  catch (_) { showToast(m); }
 }
 
 const ODG_LOCALE = 'cb_odg';

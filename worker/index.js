@@ -11,6 +11,7 @@
 
 import { json, readJson, requireUser, consumeQuota, callAnthropic, CORS } from './shared.js';
 import { handleWrap } from './wrap.js';
+import { riceviPosta } from './posta.js';
 
 const FREE_LIMIT = 3;
 
@@ -132,6 +133,26 @@ export default {
     } catch (e) {
       console.error(pathname, e);
       return json({ error: 'Errore interno: ' + e.message }, 500);
+    }
+  },
+
+  /*
+   * La posta in arrivo. Stesso Worker delle richieste HTTP: uno script puo'
+   * esportare sia fetch sia email, e tenerli insieme vuol dire una chiave
+   * sola da configurare e un deploy solo da ricordare.
+   *
+   * Ci arriva da Cloudflare Email Routing, regola catch-all -> Send to a
+   * Worker. Il catch-all serve perche' le regole per indirizzo sono al
+   * massimo 200 per dominio, e un film per produzione le finirebbe.
+   */
+  async email(message, env, ctx) {
+    try {
+      await riceviPosta(message, env, ctx);
+    } catch (e) {
+      console.error('email', e);
+      // Un rimbalzo e' meglio di un'accettazione silenziosa: chi ha
+      // inoltrato il pacchetto viene a saperlo.
+      try { message.setReject('Errore interno'); } catch (_) {}
     }
   }
 };
