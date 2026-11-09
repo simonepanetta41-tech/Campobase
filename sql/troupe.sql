@@ -121,7 +121,13 @@ alter table public.odg add column if not exists project_id uuid references publi
 
 -- Un OdG per giornata e per film. Le righe vecchie, senza film, restano
 -- governate dalla chiave di prima.
-create unique index if not exists odg_film_data_key on public.odg (project_id, data) where project_id is not null;
+-- Intero, non parziale. Con "where project_id is not null" Postgres non
+-- riconosce piu' l'indice in "on conflict (project_id, data)" — un indice
+-- parziale lo riconosce solo se anche il comando porta la stessa
+-- condizione, e un insert non ne ha — e ogni salvataggio falliva con
+-- 42P10. I nulli non danno fastidio: per Postgres due nulli sono diversi
+-- fra loro, quindi gli OdG senza film restano tutti.
+create unique index if not exists odg_film_data_key on public.odg (project_id, data);
 create index if not exists odg_film_idx on public.odg (project_id, data desc);
 
 -- Un OdG legato a un film si vede se si e' della troupe, e basta: anche a

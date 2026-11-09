@@ -8984,7 +8984,14 @@ async function odgSalva(d) {
     const { error } = await sb.from('odg').upsert(riga,
       { onConflict: f ? 'project_id,data' : 'user_id,film,data' });
     if (error) throw new Error(error.message);
-  } catch (e) { console.log('[odg] non salvato sul cloud:', e.message); }
+  } catch (e) {
+    /* Si dice. Per settimane il salvataggio e' fallito in silenzio — un
+       indice parziale che mandava in errore l'upsert — e sul telefono
+       sembrava tutto a posto mentre sul cloud non arrivava niente. Un
+       guasto che non si vede e' peggio di un guasto. */
+    console.log('[odg] non salvato sul cloud:', e.message);
+    showToast('Salvato sul telefono, ma non sul cloud: la troupe non lo vede.', 'red', 6000);
+  }
 }
 
 async function odgRipristina() {
@@ -9979,11 +9986,21 @@ async function odgRecupera() {
   if (!currentUser) { showToast('Serve l\'accesso per riprenderlo.', 'red'); return; }
   const f = filmCorrente();
   try {
-    const q = sb.from('odg').select('dati,data');
-    const { data, error } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
-      .order('data', { ascending: false }).limit(1);
-    if (error) throw new Error(error.message);
-    const r = data && data[0];
+    const cerca = filtro => filtro.order('data', { ascending: false }).limit(1);
+    let r = null;
+    if (f) {
+      const { data, error } = await cerca(sb.from('odg').select('dati,data').eq('project_id', f.id));
+      if (error) throw new Error(error.message);
+      r = data && data[0];
+    }
+    // Se sul film non c'e' niente si guarda anche fra i propri: gli ordini
+    // del giorno caricati prima che il film esistesse non hanno il film
+    // addosso, e questo e' il tasto a cui si chiede aiuto.
+    if (!r) {
+      const { data, error } = await cerca(sb.from('odg').select('dati,data').eq('user_id', currentUser.id));
+      if (error) throw new Error(error.message);
+      r = data && data[0];
+    }
     if (!r || !r.dati) { showToast('Sul cloud non c\'è nessun ordine del giorno.', 'red', 4000); return; }
     odgCorrente = r.dati;
     try { localStorage.setItem(ODG_LOCALE, JSON.stringify(odgCorrente)); } catch (_) {}
