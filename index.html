@@ -7990,8 +7990,13 @@ function odgIntestazione(testo) {
   const r = {};
 
   // Numero dell'OdG e data: "ODG # 20  Lunedì 09 Novembre 2026"
-  const mN = t.match(new RegExp(odgEtichetta('ODG') + '\\s*#?\\s*(\\d{1,3})', 'i'));
-  if (mN) r.numero = +mN[1];
+  /* Le cifre possono arrivare staccate: il PDF stampa "ODG # 21" e
+     l'estrazione restituisce "ODG # 2 1", o manda il 2 a fine riga e l'1
+     a capo. Prendendo solo la prima cifra, l'OdG 21 diventava l'OdG 2.
+     Si ammette un solo spazio fra una cifra e l'altra: con due spazi
+     comincia un altro numero — la data che segue — e non va preso. */
+  const mN = t.match(new RegExp(odgEtichetta('ODG') + '\\s*#?\\s*(\\d(?:\\s?\\d){0,2})', 'i'));
+  if (mN) r.numero = +mN[1].replace(/\s+/g, '');
   const mD = t.match(new RegExp('(\\d{1,2})\\s*(' + ODG_MESI.map(odgEtichetta).join('|') + ')\\s*(\\d{4})', 'i'));
   if (mD) {
     const mese = ODG_MESI.findIndex(x => x.toLowerCase() === mD[2].replace(/\s+/g, '').toLowerCase());
@@ -9109,7 +9114,7 @@ async function postaApri(p){
 
   // Si dice anche di restare: l'analisi dura, e un'app mandata in secondo
   // piano a meta' lavoro viene congelata dal telefono.
-  showToast('Pacchetto dalla produzione: lo apro, tieni l\'app davanti.', 'default', 6000);
+  showToast('Pacchetto dalla produzione. Non chiudere l\'app.', 'default', 6000);
   // Si va dove si vede lavorare. Una barra che avanza in una pagina che
   // nessuno sta guardando non serve a tenere l'app aperta.
   try { if (typeof switchResultTab === 'function') switchResultTab('odg'); } catch (_) {}
@@ -9916,7 +9921,12 @@ function odgCielo(c){
 
 async function odgPrevisione(d){
   if (!d || !d.data) return null;
-  const comune = odgComune(d.location);
+  /* Il comune si cerca dove c'e'. Finche' il luogo stava tutto dentro
+     LOCATION bastava quello; da quando certe produzioni ci mettono solo i
+     link alle mappe, LOCATION e' vuoto e il posto e' scritto in AMBIENTE.
+     Chiederlo a un campo solo voleva dire restare senza meteo proprio sugli
+     ordini del giorno fatti meglio. */
+  const comune = odgComune(d.location) || odgComune(d.ambiente);
   if (!comune) return null;
   const c = await odgCoordinate(comune);
   const u = 'https://api.open-meteo.com/v1/forecast'
@@ -9986,8 +9996,7 @@ function odgCaricamentoHtml() {
     <div class="odg-t">Sto leggendo l'ordine del giorno</div>
     <div class="odg-s" id="odgPasso">Lettura del PDF</div>
     <div class="odg-barra"><span></span></div>
-    <div class="odg-s odg-resta">Ci vuole circa un minuto. Tieni l'app aperta:
-      se finisce in secondo piano il telefono la congela e si ricomincia.</div>
+    <div class="odg-s odg-resta">Non chiudere l'app</div>
   </div>`;
 }
 
