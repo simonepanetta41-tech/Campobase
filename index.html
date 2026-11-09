@@ -690,7 +690,6 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   padding:1px 5px;margin-left:5px;vertical-align:1px}
 .cast-n{font-size:16px;color:var(--white);white-space:nowrap}
 .cast-n i{font-style:normal;font-size:10px;color:var(--muted);margin-left:3px}
-.cast-n.stima{color:var(--muted)}
 .cast-nota{margin:12px 2px 0;font-size:11.5px;line-height:1.5;color:var(--muted)}
 .odg-att:last-child{border-bottom:none}
 .odg-att .id{flex:0 0 32px;font-size:12px;color:var(--muted)}
@@ -6548,8 +6547,7 @@ function renderCastTab(rows, showAlert) {
     const id = r.id_ufficiale ?? r.character_id;
     const c  = conta.get(r.nome);
     return { id, nome: r.nome, minore: r.minore,
-             interprete: interpretePerId(id),
-             n: c ? c.n : 0, certo: c ? c.certo : false };
+             interprete: interpretePerId(id), n: c ? c.n : 0 };
   });
   if (castOrdine === 'scene') righe.sort((a,b) => b.n - a.n);
 
@@ -6566,7 +6564,7 @@ function renderCastTab(rows, showAlert) {
         <span class="id num">${esc(String(r.id))}</span>
         <span class="c"><span class="t">${esc(r.nome)}${r.minore?' <span class="cast-m">minore</span>':''}</span>
         ${r.interprete ? `<span class="s">${esc(r.interprete)}</span>` : ''}</span>
-        ${r.n ? `<span class="cast-n num${r.certo?'':' stima'}">${r.n}<i>sc</i></span>` : ''}
+        ${r.n ? `<span class="cast-n num">${r.n}<i>sc</i></span>` : ''}
         <span class="chev">\u203A</span>
       </div>`).join('')}</div>
     ${(conta.restanti || []).length ? `<div class="odg-sez" style="margin-top:22px">NELLA SCENEGGIATURA, NON IN LISTA</div>
@@ -8768,12 +8766,16 @@ const attDentro = (a, b) => {   // tutte le parole di b, di fila, dentro a
  */
 function personaggiConta(nomi){
   const d = window.analysisData || analysisData || {};
+  /* Solo lo spoglio, che le scene le ha contate una per una.
+   *
+   * Qui dentro finivano anche le pose stimate della lista provvisoria,
+   * come ripiego. Ma una posa non e' una scena: e' una giornata di
+   * lavoro dell'attore, e per una sceneggiatura letta a pezzi le
+   * giornate dei pezzi si sommano. Finivano in una colonna intitolata
+   * "sc" e davano numeri che non stavano in piedi — quarantacinque
+   * scene per un colonnello. Una colonna, una unita'. */
   const voci = Object.entries(d.personaggi_scene || {}).map(([n, sc]) =>
     ({ k: attNorm(n), r: attChiave(n), n: (sc || []).length, scene: (sc || []).map(String), certo: true }));
-  (d.cast_provvisorio || []).forEach(c => {
-    if (c.pose_stimate && !voci.some(v => v.k === attNorm(c.nome)))
-      voci.push({ k: attNorm(c.nome), r: attChiave(c.nome), n: c.pose_stimate, scene: null, certo: false });
-  });
 
   const righe = (nomi || []).map(nome => ({ nome, k: attNorm(nome), r: attChiave(nome) }));
   const out = new Map();
@@ -8822,15 +8824,10 @@ function personaggiConta(nomi){
   };
   const fr = quante(righe, x => attNorm(x.nome));
   const fk = quante(voci,  v => v.k);
-  /* A parita' di parole vince il conteggio vero su quello stimato: la
-     lista provvisoria del primo giro chiama la stessa persona in un
-     terzo modo ancora, e senza questo mezzo punto il pareggio fra le due
-     lascerebbe la riga vuota. */
   const punti = (x, v) => {
     const kv = sig(v.k);
-    const base = sig(attNorm(x.nome)).filter(w => kv.includes(w))
+    return sig(attNorm(x.nome)).filter(w => kv.includes(w))
       .reduce((p, w) => p + (fr.get(w) === 1 && fk.get(w) === 1 ? 2 : 1), 0);
-    return base ? base + (v.certo ? 0.5 : 0) : 0;
   };
   const coppie = [];
   liberi().forEach(x => voci.forEach(v => {
@@ -8845,7 +8842,7 @@ function personaggiConta(nomi){
       !presi.has(o.v) && !out.has(o.x.nome) && (o.x === c.x || o.v === c.v));
     if (!pari) assegna(c.x, c.v);
   });
-  out.restanti = voci.filter(v => !presi.has(v) && v.certo).map(v => v.k);
+  out.restanti = voci.filter(v => !presi.has(v)).map(v => v.k);
   return out;
 }
 
