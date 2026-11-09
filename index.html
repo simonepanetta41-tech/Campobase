@@ -662,6 +662,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   background:var(--surface2);font-family:'DM Mono',monospace;font-size:10.5px;color:var(--white-dim)}
 
 .odg-att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.odg-att.cerca{text-decoration:none;color:inherit;min-height:54px}
+.odg-att .chev{flex:0 0 auto;color:var(--muted);font-size:13px;margin-left:2px}
 .odg-att:last-child{border-bottom:none}
 .odg-att .id{flex:0 0 32px;font-size:12px;color:var(--muted)}
 .odg-att .c{flex:1;min-width:0}
@@ -8622,6 +8624,27 @@ const ODG_SEGNI = {
 
 function odgMaps(q) { return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q); }
 
+/* Chi e' questo attore.
+ *
+ * Su un ordine del giorno il cast e' una colonna di nomi, e meta' non ti
+ * dicono niente finche' non te li trovi davanti. IMDb invece di Google
+ * perche' la pagina dei risultati per nome mostra la faccia in cima e
+ * sotto cosa ha fatto: la faccia serve a riconoscerlo sul set, il resto a
+ * sapere con chi hai a che fare. */
+function odgImdb(nome) {
+  return 'https://www.imdb.com/find/?s=nm&q=' + encodeURIComponent(String(nome || '').trim());
+}
+
+/* Si cerca solo quello che ha senso cercare: una persona con nome e
+   cognome. Le figurazioni speciali e le righe senza interprete su IMDb
+   non esistono, e un tasto che non porta da nessuna parte e' peggio di
+   nessun tasto. */
+const ODG_NON_PERSONE = /^(fig(ur)?\.?|figurazion|generic|controfigur|stunt|cane|bamb|neonat|animal)/i;
+function odgCercabile(a) {
+  const n = String((a && a.interprete) || '').trim();
+  return n.split(/\s+/).length >= 2 && n.length >= 5 && !ODG_NON_PERSONE.test(n);
+}
+
 /* "Parcheggi vicino a Masseria Lamie, Monteiasi": la ricerca la fa la
    mappa, che i parcheggi li conosce davvero e sa quali sono aperti. Non
    la facciamo noi, perche' un indirizzo solo pescato da un database
@@ -9139,11 +9162,16 @@ function odgPienoHtml(d) {
     ${odgHaStralcio(d, s.n) ? '<span class="chev">›</span>' : ''}</li>`).join('')}</ul></div>` : ''}
 
   ${(d.cast || []).length ? `<div class="odg-sez">CAST</div>
-  <div class="card">${d.cast.map(a => `<div class="odg-att">
-    <span class="id num">${esc(a.id || '')}</span>
-    <span class="c"><span class="t">${esc(a.interprete || a.ruolo || '')}</span>
-    <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
-    <span class="o num">${esc(a.set || '')}</span></div>`).join('')}</div>` : ''}
+  <div class="card">${d.cast.map(a => {
+    const chi = a.interprete || a.ruolo || '';
+    const rig = `<span class="id num">${esc(a.id || '')}</span>
+      <span class="c"><span class="t">${esc(chi)}</span>
+      <span class="s">${[a.ruolo, a.scene ? 'sc. ' + a.scene : '', a.pickup ? 'p/up ' + a.pickup : ''].filter(Boolean).map(esc).join(' · ')}</span></span>
+      <span class="o num">${esc(a.set || '')}</span>`;
+    return odgCercabile(a)
+      ? `<a class="odg-att cerca" href="${odgImdb(a.interprete)}" target="_blank" rel="noopener">${rig}<span class="chev">\u2197</span></a>`
+      : `<div class="odg-att">${rig}</div>`;
+  }).join('')}</div>` : ''}
 
   ${(d.contatti || []).length ? `<div class="odg-sez">NUMERI UTILI</div>
   <div class="card">${(d.contatti || []).map(p => `<a class="odg-tel" href="tel:${esc((p.tel || '').replace(/\D/g, ''))}">
