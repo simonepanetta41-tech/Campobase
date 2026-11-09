@@ -8000,13 +8000,69 @@ const ODG_CIFRE = '(\\d(?:\\s?\\d){0,2})';
    Le produzioni lo mettono apposta ("MSG - ODG _21 del 10.11.2026.pdf") ed
    e' piu' affidabile del testo estratto da un PDF, che perde spazi e
    spezza le righe dove gli pare. */
+/* La data scritta nel nome del file.
+ *
+ * "IS_ODG31_11.04.2026.pdf", "12._AFDR_ODG_12_04.11.2024.pdf": la mettono
+ * tutti, ed e' la data della giornata. Nel testo invece di date ce n'e'
+ * piu' d'una — quella di domani, quella della versione del piano — e si
+ * finiva per prendere la prima che capitava: l'ordine del giorno dell'11
+ * aprile risultava del 30 marzo. */
+function odgDataDaNome(nome) {
+  const t = String(nome || '');
+  const buona = (g, me, a) => {
+    if (a < 100) a += 2000;
+    if (g < 1 || g > 31 || me < 1 || me > 12 || a < 2015 || a > 2100) return null;
+    return a + '-' + String(me).padStart(2, '0') + '-' + String(g).padStart(2, '0');
+  };
+
+  /* Si guardano tutte le posizioni, una per una, e si tiene l'ultima buona.
+     In "IS_ODG31_11.04.2026" la prima sequenza che capita e' 31_11.04, che
+     sembra una data e non lo e': e' il numero dell'ordine del giorno
+     attaccato al giorno. Scorrendo fino in fondo si arriva a 11.04.2026,
+     che e' quella vera. Si tiene la prima che regge, non l'ultima: partendo
+     un carattere piu' avanti dentro una data buona se ne ricava un'altra
+     che regge lo stesso ma e' sbagliata — da "11.04.2026" si tira fuori
+     "1.04.2026", cioe' il primo aprile. */
+  const num = /(\d{1,2})[._\-](\d{1,2})[._\-](\d{2,4})(?!\d)/g;
+  for (let i = 0; i < t.length; i++) {
+    num.lastIndex = i;
+    const m = num.exec(t);
+    if (!m || m.index !== i) continue;
+    const d = buona(+m[1], +m[2], +m[3]);
+    if (d) return d;
+  }
+
+  // "DUSE - ODG 41 - Martedì 30 aprile 2024": il mese scritto a parole.
+  const mp = t.match(new RegExp('(\\d{1,2})[\\s_.\\-]*(' + ODG_MESI.join('|')
+                                + ')[\\s_.\\-]*(\\d{4})', 'i'));
+  if (mp) {
+    const me = ODG_MESI.findIndex(x => x.toLowerCase() === mp[2].toLowerCase()) + 1;
+    return buona(+mp[1], me, +mp[3]);
+  }
+  return null;
+}
+
 function odgNumeroDaNome(nome) {
   const m = String(nome || '').match(
     new RegExp(odgEtichetta('ODG') + ODG_PRIMA_DEL_NUMERO + '(\\d{1,3})', 'i'));
   return m ? +m[1] : null;
 }
 
-function odgIntestazione(testo) {
+/* Quello che il nome del file sa meglio del testo.
+   Vale la stessa idea di tutta la serata: se il documento (o il suo nome)
+   dichiara un dato, si legge quello invece di ricostruirlo. */
+function odgCorreggiDalNome(r, nome) {
+  if (!nome) return r;
+  const n = odgNumeroDaNome(nome);
+  // Il numero si corregge solo quando il testo si e' fermato a meta': un
+  // file rinominato a mano non deve smentire un documento che sa chi e'.
+  if (n && (!r.numero || (String(n).startsWith(String(r.numero)) && n !== r.numero))) r.numero = n;
+  const d = odgDataDaNome(nome);
+  if (d) r.data = d;
+  return r;
+}
+
+function odgIntestazione(testo, nomeFile) {
   const t = String(testo || '');
   const r = {};
 
@@ -8025,7 +8081,11 @@ function odgIntestazione(testo) {
   }
 
   // Orari della giornata
-  r.convocazione   = odgOraDopo(t, 'CONVOCAZIONE');
+  /* Fra l'etichetta e l'ora ci puo' stare una parola: meta' delle
+     produzioni scrive "CONVOCAZIONE TROUPE:", non "CONVOCAZIONE:". Si
+     prova prima la forma lunga, che e' piu' precisa. */
+  r.convocazione   = odgOraDopo(t, 'CONVOCAZIONE TROUPE')
+                  || odgOraDopo(t, 'CONVOCAZIONE');
   r.prontiAGirare  = odgOraDopo(t, 'PRONTI A GIRARE');
   r.fineRiprese    = odgOraDopo(t, 'FINE RIPRESE');
   r.fineLavorazione= odgOraDopo(t, 'FINE LAVORAZIONE');
@@ -8059,7 +8119,7 @@ function odgIntestazione(testo) {
   // Regia e produzione, utili per intitolare il progetto
   r.regia = odgValoreDopo(t, 'Regia di', ['MAD', 'Piazza', 'S.p.A', 'Produttore']);
 
-  return r;
+  return odgCorreggiDalNome(r, nomeFile);
 }
 
 
@@ -8609,6 +8669,18 @@ function odgTipoDoc(t){
   // nessun altro documento ha. Nel formato italiano il numero viene dopo
   // ("EST. CAMPI STERMINATI, IN AUTO - GIORNO 32"), non prima.
   const slug = (u.match(/\b(?:INT|EST|EXT|I\/E)\.?\s[^-]{3,70}-\s*(?:GIORNO|NOTTE|ALBA|TRAMONTO|SERA|MATTINA|CONTINUA)/g)||[]).length;
+
+  /* Certe produzioni mandano un documento solo, con l'ordine del giorno in
+     testa e gli stralci di seguito. Contando solo le intestazioni di scena
+     quel documento passava per stralci, e la giornata restava senza orari,
+     senza troupe e senza pick-up.
+     Le etichette dell'ordine del giorno pero' gli stralci non le hanno: se
+     ce ne sono almeno due, comanda l'ordine del giorno. */
+  const etichette = ['CONVOCAZIONE', 'PRONTI A GIRARE', 'FINE RIPRESE',
+                     'FINE LAVORAZIONE', 'OSPEDALE', 'CESTINI', 'CATERING']
+    .filter(e => new RegExp(odgEtichetta(e), 'i').test(u)).length;
+  if (etichette >= 2) return 'odg';
+
   if (slug >= 2) return 'stralci';
   if (/STRALC/.test(u)) return 'stralci';
 
@@ -8681,11 +8753,7 @@ async function odgLavora(files) {
        meta' numero: il 21 letto come 2 e' esattamente questo caso. Non lo
        sovrascrive mai del tutto — un file rinominato a mano direbbe la sua
        su un documento che invece sa chi e'. */
-    const daNome = odgNumeroDaNome(file.name);
-    if (daNome && (!dati.numero || String(daNome).startsWith(String(dati.numero))
-                                   && daNome !== dati.numero)) {
-      dati.numero = daNome;
-    }
+    odgCorreggiDalNome(dati, file.name);
     dati.file = principale.file || null;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
