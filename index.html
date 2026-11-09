@@ -687,6 +687,11 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-file .chev{color:var(--muted);font-size:16px}
 .odg-file .t{display:block;font-size:13.5px;color:var(--white);word-break:break-all}
 .odg-file .s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+/* I due tasti di fondo pagina non sono quello per cui si apre l'OdG: a
+   tutta larghezza sembravano la conclusione della pagina. A meta', in
+   mezzo, si vedono quando si cercano e non prima. */
+.odg-fondo{display:flex;flex-direction:column;align-items:center;gap:9px;margin-top:18px}
+.odg-fondo>.odg-togli,.odg-fondo>.odg-btn{width:62%;min-width:200px;max-width:280px;margin:0}
 .odg-togli{display:block;width:100%;margin-top:14px;min-height:46px;
   background:rgba(255,107,90,.12);border:1px solid var(--danger);border-radius:12px;
   color:var(--danger);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:500;cursor:pointer}
@@ -860,8 +865,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .pdl-chip.girato .pdl-chip-num { text-decoration:line-through; }
 .pdl-chip.standby { border-style:dashed;border-color:var(--orange); }
 .pdl-chip.critical::after { content:'';position:absolute; }
-.pdl-chip-num { font-family:'DM Mono',monospace;font-size:14px;color:var(--white);
-  text-decoration:underline;text-decoration-color:var(--border-l);text-underline-offset:3px; }
+.pdl-chip-num { font-family:'DM Mono',monospace;font-size:14px;color:var(--white); }
+.pdl-chip .ch { margin-left:auto;color:var(--muted);font-size:15px;line-height:1 }
 .pdl-chip-cast { width:100%;margin-top:5px;padding-top:6px;border-top:1px solid var(--border);
   display:flex;flex-direction:column;gap:2px }
 .pdl-chip-cast div { display:flex;align-items:baseline;gap:6px;font-size:11.5px;white-space:nowrap }
@@ -9163,10 +9168,12 @@ function odgPienoHtml(d) {
       <span class="s">${esc({giri:'Giri auto',stralci:'Stralci'}[a.tipo]||'Allegato')}</span></span>
       <span class="chev">›</span></div>`).join('')}
   </div>
-  <button class="odg-togli" onclick="odgRimuovi()">Rimuovi OdG</button>
-  <label class="odg-btn" style="margin-top:9px">Carica un altro OdG
-    <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
-  </label>`;
+  <div class="odg-fondo">
+    <button class="odg-togli" onclick="odgRimuovi()">Rimuovi OdG</button>
+    <label class="odg-btn">Carica un altro OdG
+      <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
+    </label>
+  </div>`;
 }
 
 /* Il riquadro in testa: a che ora sei convocato tu, non la produzione.
@@ -9775,12 +9782,17 @@ function renderPdlModalChips(g) {
       }).join('')
     }</div>` : '';
 
-    return `<div class="pdl-chip ${typeClass} ${stato==='done'?'girato':''} ${stato==='standby'?'standby':''} ${crit?'critical':''}" onclick="cyclePdlSceneModal('${sc.numero}')" title="${sc.location||''} — ${sc.int_ext||''} ${sc.momento||''}">
+    /* Tutto il riquadro porta alla pagina della sceneggiatura. Prima ci
+       portava il solo numero, e toccare il resto cambiava lo stato della
+       scena: due gesti diversi a un millimetro di distanza, e quello che
+       si voleva quasi sempre era leggere la scena. */
+    return `<div class="pdl-chip ${typeClass} ${stato==='done'?'girato':''} ${stato==='standby'?'standby':''} ${crit?'critical':''}" onclick="openSceneFromPdl('${sc.numero}',event)" title="${sc.location||''} — ${sc.int_ext||''} ${sc.momento||''}">
       <div class="alto">
         ${icon?`<span class="seg">${icon}</span>`:''}
-        <span class="pdl-chip-num" onclick="openSceneFromPdl('${sc.numero}',event)">${sc.numero}</span>
+        <span class="pdl-chip-num">${sc.numero}</span>
         <span class="q">${[sc.int_ext,sc.momento].filter(Boolean).join(' ')}</span>
         ${crit?'<span class="q" style="color:var(--danger)">critica</span>':''}
+        <span class="ch">›</span>
       </div>
       ${castBlock}
     </div>`;
@@ -9827,12 +9839,6 @@ function chiudiViaggio() {
   document.getElementById('pdlViaggioModal').classList.remove('open');
 }
 
-function cyclePdlSceneModal(scNum) {
-  const cur=pdlModalSceneStates[scNum]||'pending';
-  pdlModalSceneStates[scNum]=cur==='pending'?'done':cur==='done'?'standby':'pending';
-  const g=getPdlGiorno(pdlModalDayNum); if(g) renderPdlModalChips(g);
-}
-
 function updatePdlModalStatus(g) {
   const total=(g.scene||[]).length;
   const done=Object.values(pdlModalSceneStates).filter(v=>v==='done').length;
@@ -9848,7 +9854,7 @@ function updatePdlModalStatus(g) {
 }
 
 async function openSceneFromPdl(scNum, e) {
-  e.stopPropagation();
+  if (e) e.stopPropagation();
   if (!pdfB64Array.length) { alert('PDF non disponibile — ricarica la sceneggiatura'); return; }
 
   // Load analysisData from Supabase if not in memory
