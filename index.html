@@ -8702,7 +8702,15 @@ async function troupeMembri(){
 async function troupeRender(){
   const box = document.getElementById('troupeCorpo');
   if (!box) return;
-  const f = filmCorrente();
+  let f = filmCorrente();
+  /* Quello in memoria e' il film com'era quando lo si e' aperto. Un film
+     aperto prima che le caselle esistessero non ce l'ha, e fino a ieri la
+     pagina si limitava a non mostrare la riga della posta — cioe' nascondeva
+     un pezzo invece di andarselo a prendere. Ora se manca lo rilegge. */
+  if (f && f.id && !f.casella) {
+    await filmCarica(f.id);
+    f = filmCorrente() || f;
+  }
   if (!f) {
     box.innerHTML = `<div class="sp-vuoto">Nessun film aperto.<br>
       Analizza una sceneggiatura, oppure fatti mandare l'invito da chi ci lavora.</div>`;
