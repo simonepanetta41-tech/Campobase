@@ -2576,7 +2576,9 @@ async function showApp() {
   // nessuno e a ogni chiusura dell'app l'OdG spariva.
   // Il codice d'invito arrivato da un QR si consuma prima di tutto: se
   // c'e', il film e' quello e l'ordine del giorno va riletto dal suo.
-  filmDallIndirizzo().finally(() => odgRipristina().finally(postaControlla));
+  filmDallIndirizzo()
+    .then(filmDaMembro)                       // entrato altrove? il film lo si ritrova
+    .finally(() => odgRipristina().finally(postaControlla));
 }
 
 /* Si torna a guardare la posta quando l'app torna davanti, non a tempo.
@@ -8811,6 +8813,34 @@ function filmInvitoInAttesa(){
     }
   } catch (_) {}
   try { return localStorage.getItem(CB_INVITO) || (c ? c.trim() : null); } catch (_) { return c ? c.trim() : null; }
+}
+
+/* Il film si ritrova da solo, ovunque si faccia l'accesso.
+ *
+ * Il codice d'invito si consuma una volta sola e lascia il segno dove
+ * capita: chi inquadra il QR entra in Safari, e se poi si installa l'app
+ * sulla schermata home quella parte da una memoria sua, vuota. Ma
+ * l'ingresso nel film e' scritto nel database, non sul telefono: basta
+ * andarselo a riprendere.
+ *
+ * Vale anche per il secondo telefono, per il telefono nuovo e per chi si
+ * e' disconnesso e rientra: si entra una volta, e da li' in poi il film
+ * c'e' e basta. */
+async function filmDaMembro(){
+  if (!currentUser || filmCorrente()) return null;
+  try {
+    const { data, error } = await sb.from('film_membri')
+      .select('project_id, created_at, projects(id,titolo,codice,casella,user_id)')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false }).limit(1);
+    if (error) throw new Error(error.message);
+    const r = data && data[0];
+    const p = r && (Array.isArray(r.projects) ? r.projects[0] : r.projects);
+    if (!p || !p.id) return null;
+    filmImposta({ id: p.id, titolo: p.titolo, codice: p.codice, casella: p.casella,
+                  mio: p.user_id === currentUser.id });
+    return p;
+  } catch (e) { console.log('[film] non ritrovato:', e.message); return null; }
 }
 
 async function filmDallIndirizzo(){
