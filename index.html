@@ -8742,13 +8742,18 @@ async function troupeRender(){
       Analizza una sceneggiatura, oppure fatti mandare l'invito da chi ci lavora.</div>`;
     return;
   }
+  /* L'invito lo fa chi ha aperto il film, e basta.
+     Il QR e il codice sono la chiave d'ingresso: lasciarli a tutti vuol
+     dire che chiunque sia entrato puo' far entrare altri, e nessuno se ne
+     accorge. Chi e' dentro vede la troupe, non la porta. */
   box.innerHTML = `
     <div class="sp-testa"><span class="t">${esc(f.titolo || 'Il film')}</span></div>
-    <div class="tr-qr"><div id="troupeQr"></div><div class="c num">${esc(f.codice || '')}</div></div>
-    <div class="sp-azioni">
-      <button onclick="troupeCondividi()">Manda l'invito</button>
-      <button onclick="troupeCopia()">Copia il link</button>
-    </div>
+    ${f.mio ? `
+      <div class="tr-qr"><div id="troupeQr"></div><div class="c num">${esc(f.codice || '')}</div></div>
+      <div class="sp-azioni">
+        <button onclick="troupeCondividi()">Manda l'invito</button>
+        <button onclick="troupeCopia()">Copia il link</button>
+      </div>` : ''}
     ${f.casella && f.mio ? `
       <div class="odg-sez" style="margin-top:22px">LA POSTA DEL FILM</div>
       <div class="card tr-posta" style="margin-top:9px">
@@ -8764,7 +8769,7 @@ async function troupeRender(){
       </div>` : ''}
     <div class="odg-sez" style="margin-top:22px">IN QUESTO FILM</div>
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
-  troupeQr(f.codice);
+  if (f.mio) troupeQr(f.codice);
   const m = await troupeMembri();
   const el = document.getElementById('troupeElenco');
   if (!el) return;
