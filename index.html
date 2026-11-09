@@ -684,8 +684,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .sp-sc.ferma{background:none;border-style:dashed;color:var(--muted);cursor:default;
   display:inline-flex;align-items:center;justify-content:center}
 #troupeSection{padding:14px 16px 96px}
-.tr-spiega{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--muted)}
-.tr-qr{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;
+.tr-qr{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;margin-top:16px;
   background:var(--surface);border:1px solid var(--border);border-radius:13px}
 .tr-qr svg{width:200px;height:200px;display:block;background:#fff;padding:9px;border-radius:9px}
 /* Il disegnatore fa un path solo con dentro tutti i moduli, piu' un rect
@@ -1933,7 +1932,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div class="altro-el">
           <button onclick="switchResultTab('script')"><span class="t">Script</span><span class="s">Il testo della sceneggiatura</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('analisi')"><span class="t">Analisi</span><span class="s">Il tuo reparto e cosa vedi nello spoglio</span><span class="ch">›</span></button>
-          <button onclick="switchResultTab('troupe')"><span class="t">Troupe</span><span class="s">Chi c'è nel film, e come farli entrare</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('troupe')"><span class="t">Troupe</span><span class="s">Invita Membri</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('cast')"><span class="t">Cast</span><span class="s">Personaggi e interpreti</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('wrap')"><span class="t">Wrap</span><span class="s">Locali e indirizzi di fine giornata</span><span class="ch">›</span></button>
           <!-- Gennaro e' nascosto per i primi test: il codice resta, la voce no. -->
@@ -8630,7 +8629,7 @@ async function filmCarica(projectId){
   if (!projectId || !currentUser) return null;
   try {
     const { data } = await sb.from('projects')
-      .select('id,titolo,codice,casella').eq('id', projectId).maybeSingle();
+      .select('id,titolo,codice,casella,user_id').eq('id', projectId).maybeSingle();
     if (!data) return null;
     // Un film aperto prima che i codici esistessero non ne ha uno.
     if (!data.codice) {
@@ -8638,7 +8637,11 @@ async function filmCarica(projectId){
       const { error } = await sb.from('projects').update({ codice }).eq('id', data.id);
       if (!error) data.codice = codice;
     }
-    filmImposta({ id: data.id, titolo: data.titolo, codice: data.codice, casella: data.casella });
+    filmImposta({ id: data.id, titolo: data.titolo, codice: data.codice, casella: data.casella,
+                  // Chi ha aperto il film. Serve per la casella della posta,
+                  // che riguarda lui e a tutti gli altri direbbe solo una
+                  // cosa in piu' da non toccare.
+                  mio: data.user_id === currentUser.id });
     return data;
   } catch (e) { console.log('[film] non caricato:', e.message); return null; }
 }
@@ -8730,7 +8733,7 @@ async function troupeRender(){
      aperto prima che le caselle esistessero non ce l'ha, e fino a ieri la
      pagina si limitava a non mostrare la riga della posta — cioe' nascondeva
      un pezzo invece di andarselo a prendere. Ora se manca lo rilegge. */
-  if (f && f.id && !f.casella) {
+  if (f && f.id && (!f.casella || f.mio === undefined)) {
     await filmCarica(f.id);
     f = filmCorrente() || f;
   }
@@ -8741,14 +8744,12 @@ async function troupeRender(){
   }
   box.innerHTML = `
     <div class="sp-testa"><span class="t">${esc(f.titolo || 'Il film')}</span></div>
-    <p class="tr-spiega">Chi inquadra questo codice entra nel film. Da quel momento
-      l'ordine del giorno che carica uno lo leggono tutti, senza ricaricare niente.</p>
     <div class="tr-qr"><div id="troupeQr"></div><div class="c num">${esc(f.codice || '')}</div></div>
     <div class="sp-azioni">
       <button onclick="troupeCondividi()">Manda l'invito</button>
       <button onclick="troupeCopia()">Copia il link</button>
     </div>
-    ${f.casella ? `
+    ${f.casella && f.mio ? `
       <div class="odg-sez" style="margin-top:22px">LA POSTA DEL FILM</div>
       <div class="card tr-posta" style="margin-top:9px">
         <p>Metti questo indirizzo nella regola di inoltro della tua casella di
