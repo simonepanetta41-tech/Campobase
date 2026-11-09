@@ -6569,9 +6569,6 @@ function renderCastTab(rows, showAlert) {
         ${r.n ? `<span class="cast-n num${r.certo?'':' stima'}">${r.n}<i>sc</i></span>` : ''}
         <span class="chev">\u203A</span>
       </div>`).join('')}</div>
-    ${conScene ? `<p class="cast-nota">Il conteggio viene dallo spoglio della sceneggiatura.${
-      righe.some(x => x.n && !x.certo) ? ' Dove è in grigio è una stima del primo giro.' : ''}${
-      righe.some(x => !x.n) ? ' Chi non ce l\'ha fa meno di due scene parlate, oppure nella sceneggiatura si chiama in un modo che non somiglia a questo.' : ''}</p>` : ''}
     ${(conta.restanti || []).length ? `<div class="odg-sez" style="margin-top:22px">NELLA SCENEGGIATURA, NON IN LISTA</div>
     <div class="card" style="margin-top:9px;padding:13px 15px">
       <div class="at-elenco" style="margin:0">${conta.restanti.map(esc).join(' · ')}</div>
@@ -8803,22 +8800,50 @@ function personaggiConta(nomi){
       (attDentro(y.r, c[0].r) || attDentro(c[0].r, y.r)));
     if (!altri.length) assegna(x, c[0]);
   });
-  /* 4. una parola in comune, lunga abbastanza da essere un nome.
-     Serve quando i due documenti tengono meta' nome per uno: la lista
-     scrive PRINCIPE COLONNA e la sceneggiatura IL PRINCIPE, oppure
-     COLONNELLO CIRO MAZZACANE e CIRO. Si assegna solo se quella parola
-     non compare in nessun altro dei due elenchi, quindi un cognome
-     ripetuto non puo' far finire le scene sulla persona sbagliata. */
-  const sig = t => attParole(t).filter(w => w.length >= 4);
-  liberi().forEach(x => {
-    const mie = sig(attNorm(x.nome));
-    if (!mie.length) return;
-    const c = voci.filter(v => !presi.has(v) && sig(v.k).some(w => mie.includes(w)));
-    if (c.length !== 1) return;
-    const comuni = sig(c[0].k).filter(w => mie.includes(w));
-    const altriRighe = liberi().filter(y => y !== x && sig(attNorm(y.nome)).some(w => comuni.includes(w)));
-    const altreVoci  = voci.filter(v => v !== c[0] && !presi.has(v) && sig(v.k).some(w => comuni.includes(w)));
-    if (!altriRighe.length && !altreVoci.length) assegna(x, c[0]);
+  /* 4. parole in comune, pesate.
+   *
+   * I due documenti tengono mezzo nome per uno e a volte lo girano: la
+   * lista scrive COLONNELLO CIRO MAZZACANE e PRINCIPE COLONNA, la
+   * sceneggiatura MAZZACANE CIRO e COLONNA STEFANO. Nessuna delle due
+   * stringhe contiene l'altra, ma una parola in comune ce l'hanno.
+   *
+   * Non tutte le parole valgono uguale: una che compare una volta sola
+   * in entrambi gli elenchi, cioe' un cognome, dice molto; CIRO, che in
+   * una storia napoletana e' di tre persone, dice poco. Quindi due punti
+   * alle parole uniche e uno alle altre, si guardano tutte le coppie
+   * possibili e si assegnano prima quelle che valgono di piu'. A pari
+   * punteggio non si assegna niente: due Esposito restano senza numero
+   * invece di prenderselo a caso. */
+  const sig = t => [...new Set(attParole(t).filter(w => w.length >= 4))];
+  const quante = (lista, f) => {
+    const m = new Map();
+    lista.forEach(e => sig(f(e)).forEach(w => m.set(w, (m.get(w) || 0) + 1)));
+    return m;
+  };
+  const fr = quante(righe, x => attNorm(x.nome));
+  const fk = quante(voci,  v => v.k);
+  /* A parita' di parole vince il conteggio vero su quello stimato: la
+     lista provvisoria del primo giro chiama la stessa persona in un
+     terzo modo ancora, e senza questo mezzo punto il pareggio fra le due
+     lascerebbe la riga vuota. */
+  const punti = (x, v) => {
+    const kv = sig(v.k);
+    const base = sig(attNorm(x.nome)).filter(w => kv.includes(w))
+      .reduce((p, w) => p + (fr.get(w) === 1 && fk.get(w) === 1 ? 2 : 1), 0);
+    return base ? base + (v.certo ? 0.5 : 0) : 0;
+  };
+  const coppie = [];
+  liberi().forEach(x => voci.forEach(v => {
+    if (presi.has(v)) return;
+    const p = punti(x, v);
+    if (p) coppie.push({ x, v, p });
+  }));
+  coppie.sort((a, b) => b.p - a.p);
+  coppie.forEach(c => {
+    if (out.has(c.x.nome) || presi.has(c.v)) return;
+    const pari = coppie.some(o => o !== c && o.p === c.p &&
+      !presi.has(o.v) && !out.has(o.x.nome) && (o.x === c.x || o.v === c.v));
+    if (!pari) assegna(c.x, c.v);
   });
   out.restanti = voci.filter(v => !presi.has(v) && v.certo).map(v => v.k);
   return out;
