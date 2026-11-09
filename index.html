@@ -380,6 +380,14 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   font-family:'DM Mono',monospace;font-size:12px}
 .sc-tab.on{border-color:var(--yellow);color:var(--yellow)}
 .sc-foglio{padding:0 20px 40px;overflow-y:auto;height:100%}
+/* Il PDF com'e': le pagine una sotto l'altra, in una colonna che scorre */
+/* Il fondo abbondante serve: senza, l'ultima pagina non puo' salire in
+   cima e toccare l'ultima scena non la porta sotto gli occhi. */
+.pdf-rullo{flex:1;min-height:0;overflow-y:auto;padding:12px 12px 65vh;
+  display:flex;flex-direction:column;align-items:center;gap:12px;background:#15181C}
+.pdf-pag{display:block;height:auto;border-radius:4px;background:#fff;
+  box-shadow:0 2px 14px rgba(0,0,0,.5)}
+.pdf-attesa{padding:40px 0;font-size:13px;color:var(--muted)}
 /* La forma della sceneggiatura: azione al margine, battuta rientrata,
    nome di chi parla piu' dentro ancora. */
 .b-azione{font-size:14.5px;line-height:1.6;color:var(--white-dim);margin:0 0 13px}
@@ -644,6 +652,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-scene{list-style:none;margin:0;padding:0}
 .odg-scene li{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border)}
 .odg-scene li:last-child{border-bottom:none}
+.odg-scene li.stacco{display:block;padding:9px 16px;background:var(--surface2);
+  font-family:'DM Mono',monospace;font-size:10.5px;letter-spacing:.13em;color:var(--muted)}
 .odg-scene .n{flex:0 0 52px;font-size:13px;color:var(--yellow)}
 .odg-scene .c{flex:1;min-width:0}
 .odg-scene .t{display:block;font-size:13.5px;color:var(--white);line-height:1.45}
@@ -7865,13 +7875,14 @@ const ODG_SYS = `Leggi un ordine del giorno di una produzione cinematografica it
 Il testo viene da un PDF e ha spazi sparsi dentro parole e numeri: "0 8.30" e' 08.30, "33 9 7564743" e' 3397564743, "32E ND" e' 32END. Ricomponili.
 
 Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
-{"scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":""}],
- "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":""}]},
+{"scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}],
+ "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}]},
  "cast":[{"id":"","ruolo":"","interprete":"","scene":"","pickup":"","set":""}],
  "troupe":[{"reparto":"","ruolo":"","nome":"","partenza":"","set":""}],
  "contatti":[{"nome":"","ruolo":"","tel":""}]}
 
 scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola. pag: come scritto ("4 1/8").
+Fra una scena e l'altra la tabella puo' avere una riga senza numero, con una scritta sola in maiuscolo (TRASFERIMENTO, DRONE UNIT, SECOND UNIT, PRANZO, SPOSTAMENTO): e' uno stacco nella giornata, non una scena. Rendila come {"n":"","nota":"TRASFERIMENTO"} al posto suo nell'elenco, senza attaccarla alla scena prima o dopo.
 domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null.
 cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP. set: l'ultima colonna, SET.
 troupe: tutte le persone sotto "CONVOCAZIONE TROUPE". La tabella ha tre gruppi di colonne affiancati e le righe arrivano intrecciate: ricostruisci ogni persona con il reparto della sua intestazione (REGIA, FOTOGRAFIA, COSTUMI, ELETTRICISTI, MACCHINISTI, SCENOGRAFIA, SUONO, LOCATION, TRUCCO, AUTISTI, MONTAGGIO, VFX, SFX, AGGIUNTI, PRODUZIONE...). partenza e set sono le due colonne di orario; "O.C.", "Vedi GA" e "--" riportali come stanno.
@@ -8100,14 +8111,25 @@ function stralciDaRighe(righe){
     return (m ? m[1] : s).toUpperCase();
   };
 
+  /* Il piede di pagina — "Blue Rev. (mm/dd/yy) 2." — per il PDF e' una
+     riga al margine come un'altra, e finiva in coda all'azione in fondo
+     alla pagina. Non e' sceneggiatura: e' il colore della revisione e il
+     numero di pagina, e a chi legge sul set non dice niente. */
+  const servizio = t => {
+    const s = String(t).trim();
+    return s.length < 48 &&
+      (/^(?:[A-Za-zÀ-ÿ']+\s+)?rev(?:\.|ision)/i.test(s) || /^\d{1,3}\.?$/.test(s));
+  };
+
   const scene = [];
   let corrente = null, ultimoNumero = null;
   for (const r of righe) {
     const k = tipo(r);
     if (k === 'segno') continue;
     if (k === 'numero') { ultimoNumero = numero(r.t); continue; }
+    if (servizio(r.t)) continue;
     if (k === 'azione' && SLUG.test(r.t)) {
-      corrente = { n: ultimoNumero || String(scene.length+1), testa: r.t, righe: [] };
+      corrente = { n: ultimoNumero || String(scene.length+1), testa: r.t, righe: [], p: r.p };
       scene.push(corrente);
       continue;
     }
@@ -8274,8 +8296,13 @@ async function odgScegliFile(input) {
     const letti = [];
     for (const f of files) {
       odgPasso('Lettura di ' + f.name);
+      // I byte prima del testo: se pdf.js prende il buffer per se', dopo
+      // non c'e' piu' niente da mettere da parte.
+      const chiave = odgChiaveFile(f.name);
+      const salvato = await cbFileSalva(chiave, await f.arrayBuffer());
       const r = await odgTestoDaPdf(f, true);
-      letti.push({ nome: f.name, testo: r.testo, righe: r.righe, tipo: odgTipoDoc(r.testo) });
+      letti.push({ nome: f.name, testo: r.testo, righe: r.righe,
+                   tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
     // l'OdG e' sempre il documento piu' corposo dei tre. Prima si prendeva
@@ -8300,11 +8327,12 @@ async function odgScegliFile(input) {
     }
     dati.testo = testo;
     dati.nomeFile = file.name;
+    dati.file = principale.file || null;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
     // scheda scena: gli stralci sono la sceneggiatura del giorno, e i giri
     // auto hanno il pick-up di ognuno.
-    dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo }));
+    dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo, file: x.file }));
     const giri = extra.find(x => x.tipo === 'giri');
     if (giri) {
       dati.giriTesto = giri.testo;
@@ -8317,6 +8345,8 @@ async function odgScegliFile(input) {
     }
     odgCorrente = dati;
     await odgSalva(dati);
+    // I fogli della giornata prima non servono piu' a nessuno.
+    cbFileCancella('odg/', letti.map(x => x.file).filter(Boolean));
     showToast('Ordine del giorno caricato.');
   } catch (e) {
     if (e.pagina && mostraErrore(e.testo, e.dettaglio)) { odgInCorso = false; return; }
@@ -8361,21 +8391,39 @@ async function odgRipristina() {
     const l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
     if (l) odgCorrente = l;
   } catch (_) {}
-  if (!currentUser) return;
-  try {
-    const { data } = await sb.from('odg').select('dati,data')
-      .eq('user_id', currentUser.id).order('data', { ascending: false }).limit(1);
-    const r = data && data[0];
-    // Il cloud vince solo se ha una giornata piu' avanti di quella locale:
-    // l'OdG di domani e' sempre quello che serve.
-    if (r && (!odgCorrente || !odgCorrente.data || r.data > odgCorrente.data)) odgCorrente = r.dati;
-  } catch (e) { console.log('[odg] cloud non raggiungibile:', e.message); }
+  if (currentUser) {
+    try {
+      const { data } = await sb.from('odg').select('dati,data')
+        .eq('user_id', currentUser.id).order('data', { ascending: false }).limit(1);
+      const r = data && data[0];
+      // Il cloud vince solo se ha una giornata piu' avanti di quella locale:
+      // l'OdG di domani e' sempre quello che serve.
+      if (r && (!odgCorrente || !odgCorrente.data || r.data > odgCorrente.data)) odgCorrente = r.dati;
+    } catch (e) { console.log('[odg] cloud non raggiungibile:', e.message); }
+  }
+  odgRicalcola();
   odgRender();
+}
+
+/* Quello che si ricava dal testo non si congela.
+ *
+ * Il pick-up era salvato insieme al resto, e un OdG ripreso dal telefono
+ * riportava a galla l'orario che il lettore sbagliava il giorno in cui
+ * era stato caricato. Il testo dei giri auto invece e' salvato: rileggerlo
+ * costa niente e vale anche per chi scrive il proprio nome dopo. */
+function odgRicalcola() {
+  const d = odgCorrente;
+  if (!d) return;
+  if (d.giriTesto) {
+    const p = odgPickUp(d.giriTesto, profilo());
+    if (p) d.pickup = p;
+  }
 }
 
 function odgRimuovi() {
   odgCorrente = null; odgErrore = null;
   try { localStorage.removeItem(ODG_LOCALE); } catch (_) {}
+  cbFileCancella('odg/');
   odgRender();
 }
 
@@ -8477,6 +8525,27 @@ function odgDataEstesa(iso) {
   return `${g[d.getDay()]} ${d.getDate()} ${m[d.getMonth()]}`;
 }
 
+/* TRASFERIMENTO, DRONE UNIT, SECOND UNIT.
+ *
+ * Nella tabella delle scene sono righe senza numero: non sono scene, sono
+ * stacchi nella giornata, e messe in colonna come le altre si leggono
+ * come il titolo della scena accanto. Qui diventano una riga per conto
+ * loro. Il modello ora le marca con "nota", ma le riconosciamo anche
+ * quando se le ritrova in mano in un'altra colonna. */
+const ODG_STACCHI = /^(TRASFERIMENTO|SPOSTAMENTO|TRASFERTA|DRONE\s*UNIT|SECOND\s*UNIT|SPLIT\s*UNIT|UNIT\s*B|PRANZO|TRAVEL(\s*DAY)?|COMPANY\s*MOVE|WRAP)\b/i;
+
+function odgStacco(s){
+  if (!s) return null;
+  const n = String(s.n || '').trim();
+  if (s.nota && !n) return String(s.nota).trim().toUpperCase();
+  if (n && !/\d/.test(n) && ODG_STACCHI.test(n)) return n.toUpperCase();
+  if (!n) {
+    const t = String(s.sinossi || s.ambiente || '').trim();
+    if (t && t.length < 32 && ODG_STACCHI.test(t)) return t.toUpperCase();
+  }
+  return null;
+}
+
 /* C'e' lo stralcio di questa scena? Vale la forma ricostruita dai
    rientri e, in mancanza, quella a solo testo. */
 function odgHaStralcio(d, n){
@@ -8488,15 +8557,131 @@ function odgHaStralcio(d, n){
   return !!odgStralcioDi(d.stralci, n);
 }
 
-/* Apre un documento caricato. Si mostra il testo estratto, non il PDF:
-   e' quello che l'app ha davvero in mano, si legge anche senza rete e
-   non occupa spazio. */
-function odgApriFile(i){
+/* \u2500\u2500 I file del giorno, interi \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ *
+ * Il testo estratto serve all'app; a chi lavora serve il foglio come
+ * l'ha stampato la produzione \u2014 i rientri veri, le colonne, i segni di
+ * revisione al margine. Ricostruirlo e' sempre un'approssimazione, e su
+ * un documento che si guarda in piedi sul set l'approssimazione si vede.
+ *
+ * I byte non stanno in localStorage, che regge stringhe corte e si
+ * riempie in fretta: stanno in IndexedDB, l'unico deposito del telefono
+ * abbastanza capiente che sopravvive alla chiusura dell'app. Il testo
+ * resta salvato lo stesso, cosi' dove i byte non ci sono \u2014 un OdG
+ * ripreso dal cloud su un altro telefono \u2014 si ripiega sulla lettura
+ * ricostruita invece di non mostrare niente.
+ */
+const CB_DB = 'campobase', CB_STORE = 'file';
+
+function cbDb(){
+  return new Promise((ris, no) => {
+    if (!window.indexedDB) return no(new Error('niente IndexedDB'));
+    const r = indexedDB.open(CB_DB, 1);
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains(CB_STORE)) r.result.createObjectStore(CB_STORE);
+    };
+    r.onsuccess = () => ris(r.result);
+    r.onerror   = () => no(r.error || new Error('IndexedDB chiuso'));
+  });
+}
+
+async function cbFileSalva(chiave, buf){
+  try {
+    const db = await cbDb();
+    await new Promise((ris, no) => {
+      const t = db.transaction(CB_STORE, 'readwrite');
+      t.objectStore(CB_STORE).put(buf, chiave);
+      t.oncomplete = ris; t.onerror = () => no(t.error);
+    });
+    return true;
+  } catch (e) { console.log('[file] non salvato:', e.message); return false; }
+}
+
+async function cbFileLeggi(chiave){
+  if (!chiave) return null;
+  try {
+    const db = await cbDb();
+    return await new Promise((ris, no) => {
+      const t = db.transaction(CB_STORE, 'readonly');
+      const q = t.objectStore(CB_STORE).get(chiave);
+      q.onsuccess = () => ris(q.result || null);
+      q.onerror   = () => no(q.error);
+    });
+  } catch (e) { return null; }
+}
+
+/* Cancella tutto quello che sta sotto un prefisso, tranne le chiavi da
+   tenere: l'OdG di oggi sostituisce quello di ieri, e i fogli di ieri
+   non servono piu' a nessuno. */
+async function cbFileCancella(prefisso, tieni){
+  const salvi = new Set(tieni || []);
+  try {
+    const db = await cbDb();
+    await new Promise((ris, no) => {
+      const t = db.transaction(CB_STORE, 'readwrite');
+      const s = t.objectStore(CB_STORE);
+      const q = s.openKeyCursor();
+      q.onsuccess = () => { const c = q.result; if (!c) return;
+        const k = String(c.key);
+        if (k.startsWith(prefisso) && !salvi.has(k)) s.delete(k);
+        c.continue(); };
+      t.oncomplete = ris; t.onerror = () => no(t.error);
+    });
+  } catch (_) {}
+}
+
+const odgChiaveFile = nome => 'odg/' + String(nome || '').replace(/[^\w.\-]+/g, '_');
+
+/* Le pagine si disegnano tutte, una sotto l'altra, nella stessa colonna
+   che si scorre: un documento del set si sfoglia, non si naviga. Alla
+   larghezza dello schermo per il rapporto di pixel, se no su un telefono
+   il corpo 12 della sceneggiatura e' una macchia grigia. */
+async function odgDisegnaPdf(buf, box, pagina){
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf).slice() }).promise;
+  box.innerHTML = '';
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const largh = Math.max(240, box.clientWidth - 24);
+  for (let i = 1; i <= Math.min(pdf.numPages, 40); i++) {
+    const pag = await pdf.getPage(i);
+    const base = pag.getViewport({ scale: 1 });
+    const v = pag.getViewport({ scale: (largh / base.width) * dpr });
+    const cv = document.createElement('canvas');
+    cv.id = 'pdfpag-' + i; cv.className = 'pdf-pag';
+    cv.width = v.width; cv.height = v.height; cv.style.width = largh + 'px';
+    box.appendChild(cv);
+    await pag.render({ canvasContext: cv.getContext('2d'), viewport: v }).promise;
+    if (i === 1 && pagina) odgVaiPagina(pagina, true);
+  }
+  if (pagina) odgVaiPagina(pagina, true);
+}
+
+function odgVaiPagina(p, subito){
+  const box = document.querySelector('#odgScena .pdf-rullo');
+  const el  = document.getElementById('pdfpag-' + p);
+  if (!box || !el) return;
+  box.scrollTo({ top: el.offsetTop - box.offsetTop, behavior: subito ? 'auto' : 'smooth' });
+}
+
+/* Apre un documento caricato: il PDF vero quando ce l'abbiamo in casa,
+   il testo estratto quando no. */
+async function odgApriFile(i){
   const d = odgCorrente; if (!d) return;
   const f = i < 0
-    ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo }
+    ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo, file: d.file }
     : (d.allegati||[])[i];
-  if (!f || !f.testo) { showToast('Di questo file non ho il testo.'); return; }
+  if (!f) return;
+  const buf = await cbFileLeggi(f.file);
+  if (buf) {
+    odgMostraPieno(`<div class="sc-top">
+        <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
+        <span class="sc-h">${esc(f.nome)}</span>
+      </div>
+      <div class="pdf-rullo"><div class="pdf-attesa">Apertura\u2026</div></div>`);
+    const box = document.querySelector('#odgScena .pdf-rullo');
+    try { await odgDisegnaPdf(buf, box); return; }
+    catch (e) { console.log('[file] PDF non disegnato:', e.message); }
+  }
+  if (!f.testo) { showToast('Di questo file non ho il testo.'); return; }
   odgMostraPieno(`<div class="sc-top">
       <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
       <span class="sc-h">${esc(f.nome)}</span>
@@ -8513,9 +8698,34 @@ function odgApriFile(i){
  * chi parla, battuta, didascalia, azione — e si scorre come sul foglio.
  * Toccando una scena ci si posiziona su quella.
  */
-function odgApriScena(n){
+async function odgApriScena(n){
   const d = odgCorrente;
   const scene = (d && d.sceneggiatura && d.sceneggiatura.length) ? d.sceneggiatura : null;
+
+  /* Il foglio vero, se ce l'abbiamo: e' quello che gira sul set, con i
+     rientri della produzione e i suoi segni. La ricostruzione resta per
+     quando i byte non ci sono. */
+  const att = (d && d.allegati || []).find(a => a.tipo === 'stralci' && a.file);
+  if (scene && att) {
+    const buf = await cbFileLeggi(att.file);
+    if (buf) {
+      const scelte = scene.map(sc =>
+        `<button class="sc-tab" data-n="${esc(sc.n)}" onclick="odgVaiScena('${esc(sc.n)}')">${esc(sc.n)}</button>`).join('');
+      odgMostraPieno(`<div class="sc-top">
+          <button class="sc-x" onclick="odgChiudiScena()">‹</button>
+          <span class="sc-h">Stralci del giorno</span>
+        </div>
+        <div class="sc-tabs">${scelte}</div>
+        <div class="pdf-rullo"><div class="pdf-attesa">Apertura…</div></div>`);
+      const box = document.querySelector('#odgScena .pdf-rullo');
+      try {
+        await odgDisegnaPdf(buf, box);
+        odgVaiScena(n, true);
+        return;
+      } catch (e) { console.log('[stralci] PDF non disegnato:', e.message); }
+    }
+  }
+
   if (!scene) {
     // Senza i rientri resta il ripiego a testo: meglio di niente.
     const st = odgStralcioDi(d?.stralci, n);
@@ -8567,11 +8777,16 @@ function odgVaiScena(n, subito){
   const base = k.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'');
   const sc = scene.find(x => x.n === k) || scene.find(x => x.n === base);
   if (!sc) return;
-  const el = document.getElementById('sc-' + sc.n);
-  const box = document.querySelector('#odgScena .sc-foglio');
-  if (el && box) {
-    const top = el.offsetTop - box.offsetTop;
-    box.scrollTo({ top, behavior: subito ? 'auto' : 'smooth' });
+  // Sul PDF ci si sposta di pagina, sulla ricostruzione di sezione.
+  if (document.querySelector('#odgScena .pdf-rullo')) {
+    odgVaiPagina(sc.p || 1, subito);
+  } else {
+    const el = document.getElementById('sc-' + sc.n);
+    const box = document.querySelector('#odgScena .sc-foglio');
+    if (el && box) {
+      const top = el.offsetTop - box.offsetTop;
+      box.scrollTo({ top, behavior: subito ? 'auto' : 'smooth' });
+    }
   }
   document.querySelectorAll('#odgScena .sc-tab').forEach(b =>
     b.classList.toggle('on', b.dataset.n === sc.n));
@@ -8797,7 +9012,9 @@ function odgPienoHtml(d) {
 
 
   ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
-  <div class="card"><ul class="odg-scene">${d.scene.map(s => `<li${odgHaStralcio(d, s.n) ? ` class="apre" onclick="odgApriScena('${esc(String(s.n))}')"` : ''}>
+  <div class="card"><ul class="odg-scene">${d.scene.map(s => odgStacco(s)
+    ? `<li class="stacco">${esc(odgStacco(s))}</li>`
+    : `<li${odgHaStralcio(d, s.n) ? ` class="apre" onclick="odgApriScena('${esc(String(s.n))}')"` : ''}>
     <span class="n num">${esc(s.n || '')}</span>
     <span class="c"><span class="t">${esc(s.sinossi || '')}</span>
     <span class="s">${[s.ie, s.m, odgCap(s.ambiente || ''), s.pag ? s.pag + ' pag' : ''].filter(Boolean).map(esc).join(' · ')}</span>
