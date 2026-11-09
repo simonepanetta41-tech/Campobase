@@ -7876,8 +7876,23 @@ function odgOraDopo(testo, et) {
 function odgValoreDopo(testo, et, stop) {
   let t = odgDopo(testo, et, 160);
   if (!t) return null;
-  const fine = t.search(new RegExp('(' + stop.map(odgEtichetta).join('|') + ')\\s*:?', 'i'));
-  if (fine > 0) t = t.slice(0, fine);
+  const elenco = '(' + stop.map(odgEtichetta).join('|') + ')';
+  /* L'etichetta seguente puo' stare attaccata a questa: nell'ordine del
+     giorno di Missione San Gennaro "LOCATION:" e' seguito subito da
+     "MEZZI TECNICI:", e cercando il taglio solo dopo il primo carattere
+     finiva dentro Dove tutto il resto della riga — due link, il meteo e
+     l'ora dell'alba.
+     A posizione zero pero' si taglia solo davanti a un'etichetta vera,
+     cioe' seguita dai due punti: se no un valore che comincia per
+     "Catering Village" sparirebbe perche' inizia con una parola che per
+     caso sta nell'elenco. */
+  const re = new RegExp(elenco + '(\\s*:)?', 'gi');
+  let m, fine = -1;
+  while ((m = re.exec(t)) !== null) {
+    if (m.index > 0 || m[2]) { fine = m.index; break; }   // a zero serve il colon
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  if (fine >= 0) t = t.slice(0, fine);
   return t.replace(/\s+/g, ' ').trim()
           .replace(/^[\s.,;:/|-]+/, '')      // residui quando l'etichetta era in mezzo a una frase
           .replace(/[\s/|-]+$/, '').trim() || null;
@@ -7889,6 +7904,47 @@ const ODG_STOP = ['LOCATION', 'AMBIENTE', 'METEO', 'DAWN', 'ALBA', 'TRAMONTO', '
 
 const ODG_MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio',
               'agosto','settembre','ottobre','novembre','dicembre'];
+
+/* I posti della giornata, con il loro nome.
+ *
+ * Nell'ordine del giorno i link alle mappe hanno davanti l'etichetta di
+ * cosa sono: "MEZZI TECNICI: https://... CB: https://...". Prima finivano
+ * tutti dentro un unico blocco di testo illeggibile, link compresi. Qui si
+ * prende l'etichetta attaccata a ogni link e si fa un posto per ciascuno.
+ *
+ * CB sta per campo base, ed e' la sigla che usano tutte le produzioni. */
+const ODG_POSTI = [
+  ['CAMPO BASE',     'Campo base'],
+  ['CB',             'Campo base'],
+  ['MEZZI TECNICI',  'Mezzi tecnici'],
+  ['MEZZI',          'Mezzi tecnici'],
+  ['SET',            'Set'],
+  ['LOCATION',       'Location'],
+  ['CATERING',       'Catering'],
+  ['PARCHEGGIO',     'Parcheggio'],
+  ['TRUCCO',         'Trucco e costumi'],
+  ['OSPEDALE',       'Ospedale']
+];
+
+function odgLuoghi(testo) {
+  const t = String(testo || '');
+  const out = [], visti = new Set();
+  // L'etichetta e' in maiuscolo e sta attaccata ai due punti prima del link.
+  const re = /([A-ZÀ-Ù][A-ZÀ-Ù0-9\s.\/'-]{0,28}?)\s*:\s*(https?:\/\/\S+)/g;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    const url = m[2].replace(/[.,;:]+$/, '');
+    if (visti.has(url)) continue;
+    visti.add(url);
+    const grezza = m[1].replace(/\s+/g, ' ').trim();
+    // Si guarda la coda dell'etichetta: "LOCATION / MEZZI TECNICI" e'
+    // comunque i mezzi tecnici.
+    const noto = ODG_POSTI.find(([k]) =>
+      new RegExp('(^|[\\s/|-])' + odgEtichetta(k) + '$', 'i').test(grezza));
+    out.push({ nome: noto ? noto[1] : odgCap(grezza), url });
+  }
+  return out;
+}
 
 function odgIntestazione(testo) {
   const t = String(testo || '');
@@ -7931,6 +7987,8 @@ function odgIntestazione(testo) {
   // segue nel PDF ("METEO:") finirebbe dentro l'indirizzo.
   const mM = t.match(/https?:\/\/\S+/);
   if (mM) r.mappa = mM[0].replace(/[.,;:]+$/, '');
+
+  r.luoghi = odgLuoghi(t);
 
   // Regia e produzione, utili per intitolare il progetto
   r.regia = odgValoreDopo(t, 'Regia di', ['MAD', 'Piazza', 'S.p.A', 'Produttore']);
@@ -9928,12 +9986,19 @@ function odgPienoHtml(d) {
       <span class="v">${d.pickup.conMe.map(esc).join(' · ')}</span></div>`:''}
   </div>` : ''}
 
-  ${d.location ? `<div class="odg-sez">DOVE</div>
-  <div class="card"><a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
-    <span class="i">${ODG_SEGNI.luogo}</span>
-    <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
-    <span class="go">Mappa ›</span></a>
-    ${d.pickup ? '' : `<a class="odg-posto" href="${odgMapsVicino('parcheggio', d.location)}" target="_blank" rel="noopener">
+  ${(d.location || (d.luoghi || []).length) ? `<div class="odg-sez">DOVE</div>
+  <div class="card">
+    ${(d.luoghi || []).length
+      ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url)}" target="_blank" rel="noopener">
+          <span class="i">${ODG_SEGNI.luogo}</span>
+          <span class="c"><span class="t">${esc(l.nome)}</span>
+          <span class="s">${esc(d.location || 'Mappa della produzione')}</span></span>
+          <span class="go">Mappa ›</span></a>`).join('')
+      : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
+          <span class="i">${ODG_SEGNI.luogo}</span>
+          <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
+          <span class="go">Mappa ›</span></a>`}
+    ${d.pickup || !d.location ? '' : `<a class="odg-posto" href="${odgMapsVicino('parcheggio', d.location)}" target="_blank" rel="noopener">
       <span class="i">${ODG_SEGNI.parcheggio}</span>
       <span class="c"><span class="t">Dove parcheggiare</span>
       <span class="s">I parcheggi più vicini al campo base</span></span>
