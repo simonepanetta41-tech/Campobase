@@ -603,6 +603,10 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-barra.ferma span{animation:none;margin-left:0;transition:width .35s ease}
 .odg-vuoto .odg-resta{margin-top:12px;font-size:12px;color:var(--orange)}
 @keyframes odgScorre{0%{margin-left:-40%}100%{margin-left:100%}}
+.odg-btn2{display:inline-flex;align-items:center;justify-content:center;margin-top:10px;
+  padding:11px 20px;background:none;border:1px solid var(--border-l);color:var(--white-dim);
+  border-radius:11px;font-family:'Space Grotesk',sans-serif;font-size:13px;cursor:pointer;
+  width:100%;max-width:320px;min-height:44px}
 .odg-btn{display:inline-flex;align-items:center;justify-content:center;margin-top:16px;
   padding:12px 22px;background:var(--yellow);color:#0A0B0D;border-radius:11px;
   font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
@@ -7428,12 +7432,25 @@ function pdlComponi(giorni, text) {
   const settimane = [];
   const tagli = [...text.matchAll(/FINE\s+(?:\d+[aª]?\s+)?SETTIMANA/gi)].map(m => m.index);
   tagli.push(text.length);
+  /* Le giornate si tagliano in ordine, non si filtrano.
+     Con il filtro, una giornata fuori sequenza — succede quando il PDF
+     mette una seconda unita' o un recupero in mezzo — veniva contata nel
+     gruppo ma l'indice avanzava come se fosse la prima della fila: da li'
+     in poi i conti scivolavano e qualche giornata spariva dal totale pur
+     restando nel piano. */
   let idx = 0;
   for (const taglio of tagli) {
-    const gruppo = giorni.slice(idx).filter(g => g._fin < taglio);
-    if (!gruppo.length) continue;
-    idx += gruppo.length;
-    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1), giorni: gruppo });
+    let fine = idx;
+    while (fine < giorni.length && giorni[fine]._fin < taglio) fine++;
+    if (fine === idx) continue;
+    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1),
+                     giorni: giorni.slice(idx, fine) });
+    idx = fine;
+  }
+  // Quello che nessun taglio ha raccolto non si butta via.
+  if (idx < giorni.length) {
+    settimane.push({ numero: settimane.length + 1, label: 'Settimana ' + (settimane.length + 1),
+                     giorni: giorni.slice(idx) });
   }
   // Nessun marcatore di settimana: si raggruppa a sei giornate.
   if (settimane.length <= 1 && giorni.length > 8) {
@@ -9929,7 +9946,34 @@ function odgVuotoHtml() {
     <label class="odg-btn">Carica l'OdG
       <input type="file" accept="application/pdf,.pdf" multiple style="display:none" onchange="odgScegliFile(this)">
     </label>
+    <button class="odg-btn2" onclick="odgRecupera()">Riprendi l'ultimo dal cloud</button>
   </div>`;
+}
+
+/* Rimuovere l'ordine del giorno dal telefono non lo cancella dal film: la
+   riga sul cloud resta, ed e' la stessa che legge tutta la troupe. Questo
+   tasto se la riprende, senza rileggere i PDF e senza pagare un'analisi.
+   Prima l'unica strada era ricaricare i file a mano — e se li avevi
+   cancellati dalla mail, non c'era strada. */
+async function odgRecupera() {
+  if (!currentUser) { showToast('Serve l\'accesso per riprenderlo.', 'red'); return; }
+  const f = filmCorrente();
+  try {
+    const q = sb.from('odg').select('dati,data');
+    const { data, error } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
+      .order('data', { ascending: false }).limit(1);
+    if (error) throw new Error(error.message);
+    const r = data && data[0];
+    if (!r || !r.dati) { showToast('Sul cloud non c\'è nessun ordine del giorno.', 'red', 4000); return; }
+    odgCorrente = r.dati;
+    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(odgCorrente)); } catch (_) {}
+    odgRicalcola();
+    odgRender();
+    showToast('Ripreso l\'ordine del giorno del ' + odgDataEstesa(r.data) + '.');
+  } catch (e) {
+    showToast('Non riesco a raggiungere il cloud.', 'red', 4000);
+    console.log('[odg] recupero fallito:', e.message);
+  }
 }
 
 function odgPienoHtml(d) {
