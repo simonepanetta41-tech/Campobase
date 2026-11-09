@@ -6531,12 +6531,12 @@ function renderCastTab(rows, showAlert) {
   alert.style.display = showAlert ? 'flex' : 'none';
   btn.style.display = 'none';
 
-  const conta = personaggiConta();
+  const conta = personaggiConta(rows.map(r => r.nome));
   const ufficiale = (rows[0]?.fonte || 'provvisoria') === 'ufficiale';
 
   const righe = rows.map(r => {
     const id = r.id_ufficiale ?? r.character_id;
-    const c  = conta.get(attNorm(r.nome));
+    const c  = conta.get(r.nome);
     return { id, nome: r.nome, minore: r.minore,
              interprete: interpretePerId(id),
              n: c ? c.n : 0, certo: c ? c.certo : false };
@@ -8701,14 +8701,91 @@ function odgMaps(q) { return 'https://www.google.com/maps/search/?api=1&query=' 
  * per una; le pose stimate del primo giro sono un ripiego per quando lo
  * spoglio non c'e'. La chiave e' il nome del personaggio normalizzato,
  * perche' la lista ID e la sceneggiatura lo scrivono in due modi. */
-function personaggiConta(){
+/* Il titolo non e' il nome.
+ *
+ * La lista del reparto regia scrive PRINCIPE COLONNA, COLONNELLO CIRO
+ * MAZZACANE, ING. RANIERI; la sceneggiatura, sopra la battuta, scrive
+ * COLONNA e RANIERI. Sono la stessa persona, e confrontando le due
+ * stringhe cosi' come sono non combaciava quasi nessuno. Via i titoli e
+ * gli articoli, resta il nome. */
+const ATT_TITOLI = new RegExp('^(?:' + [
+  'IL','LO','LA','L','I','GLI','LE','UN','UNA',
+  'PRINCIPE','PRINCIPESSA','RE','REGINA','BARONE','BARONESSA','CONTE','CONTESSA',
+  'DUCA','DUCHESSA','MARCHESE','MARCHESA','CAVALIERE',
+  'DON','DONNA','SIGNOR','SIGNORA','SIG','SIGRA','MONSIGNOR','MONSIGNORE',
+  'CARDINALE','VESCOVO','PADRE','FRATE','SUORA','SUOR','MADRE','MONACO',
+  'SINDACO','ASSESSORE','PRESIDENTE','MINISTRO','ONOREVOLE',
+  'COLONNELLO','CAPITANO','GENERALE','MARESCIALLO','COMMISSARIO','ISPETTORE',
+  'BRIGADIERE','TENENTE','SERGENTE','AGENTE','APPUNTATO',
+  'DOTTOR','DOTTORE','DOTTORESSA','DOTT','DR','PROFESSOR','PROFESSORE','PROF',
+  'AVVOCATO','AVV','INGEGNER','INGEGNERE','ING','ARCHITETTO','ARCH','GEOMETRA',
+  'ZIO','ZIA','NONNO','NONNA','COMPARE','COMMENDATORE'
+].join('|') + ')\\.?\\s+', 'i');
+
+/* Il nome senza il titolo davanti, togliendone anche due di fila
+   ("IL CARDINALE ASCALESI"). Se resta vuoto, il titolo era il nome:
+   BARONESSA e IL MONACO sono personaggi che si chiamano cosi'. */
+function attChiave(nome){
+  let t = attNorm(nome);
+  for (let i = 0; i < 2; i++) {
+    const r = t.replace(ATT_TITOLI, '').trim();
+    if (!r) break;
+    t = r;
+  }
+  return t;
+}
+
+const attParole = t => t.split(' ').filter(Boolean);
+const attDentro = (a, b) => {   // tutte le parole di b, di fila, dentro a
+  const pa = attParole(a), pb = attParole(b);
+  if (!pb.length || pb.length >= pa.length) return false;
+  for (let i = 0; i + pb.length <= pa.length; i++)
+    if (pb.every((w, j) => pa[i + j] === w)) return true;
+  return false;
+};
+
+/* Quante scene fa ogni personaggio, abbinando la lista ID allo spoglio.
+ *
+ * In tre passaggi, dal piu' sicuro al meno: nome identico, nome senza
+ * titolo identico, e un nome contenuto nell'altro parola per parola.
+ * L'ordine conta: TERESA NAVARRA si prende la sua riga al primo giro, e
+ * cosi' al terzo "NAVARRA" puo' andare solo a Giuseppe. Dove restano due
+ * candidati non si assegna niente: un numero sbagliato accanto a un
+ * personaggio e' peggio di nessun numero.
+ */
+function personaggiConta(nomi){
   const d = window.analysisData || analysisData || {};
-  const out = new Map();
-  Object.entries(d.personaggi_scene || {}).forEach(([n, sc]) =>
-    out.set(attNorm(n), { n: (sc || []).length, scene: (sc || []).map(String), certo: true }));
+  const voci = Object.entries(d.personaggi_scene || {}).map(([n, sc]) =>
+    ({ k: attNorm(n), r: attChiave(n), n: (sc || []).length, scene: (sc || []).map(String), certo: true }));
   (d.cast_provvisorio || []).forEach(c => {
-    const k = attNorm(c.nome);
-    if (!out.has(k) && c.pose_stimate) out.set(k, { n: c.pose_stimate, scene: null, certo: false });
+    if (c.pose_stimate && !voci.some(v => v.k === attNorm(c.nome)))
+      voci.push({ k: attNorm(c.nome), r: attChiave(c.nome), n: c.pose_stimate, scene: null, certo: false });
+  });
+
+  const righe = (nomi || []).map(nome => ({ nome, k: attNorm(nome), r: attChiave(nome) }));
+  const out = new Map();
+  const presi = new Set();
+
+  const assegna = (riga, voce) => { out.set(riga.nome, voce); presi.add(voce); };
+  const liberi = () => righe.filter(x => !out.has(x.nome));
+
+  // 1. lo stesso nome
+  liberi().forEach(x => {
+    const v = voci.find(v => !presi.has(v) && v.k === x.k);
+    if (v) assegna(x, v);
+  });
+  // 2. lo stesso nome senza il titolo
+  liberi().forEach(x => {
+    const c = voci.filter(v => !presi.has(v) && v.r === x.r);
+    if (c.length === 1) assegna(x, c[0]);
+  });
+  // 3. uno dentro l'altro, ma solo se non c'e' ambiguita' da nessuna parte
+  liberi().forEach(x => {
+    const c = voci.filter(v => !presi.has(v) && (attDentro(x.r, v.r) || attDentro(v.r, x.r)));
+    if (c.length !== 1) return;
+    const altri = liberi().filter(y => y !== x &&
+      (attDentro(y.r, c[0].r) || attDentro(c[0].r, y.r)));
+    if (!altri.length) assegna(x, c[0]);
   });
   return out;
 }
@@ -8733,17 +8810,19 @@ const attNorm = s => senzaAccenti(String(s || '')).toUpperCase().replace(/[^A-Z0
    Il personaggio nell'OdG e quello nello spoglio sono la stessa persona
    scritta da due uffici diversi, quindi si confrontano normalizzati e,
    se non combaciano, per contenimento. */
+/* Le scene dell'intero film. Si abbina sull'elenco completo del cast,
+   non sul singolo nome: e' l'insieme che dice se "NAVARRA" e' di
+   Giuseppe o di Teresa, e la pagina Cast e la scheda devono dire lo
+   stesso numero. */
 function attoreScene(a){
   const d = window.analysisData || analysisData;
-  const mappa = d && d.personaggi_scene;
-  if (!mappa) return null;
-  const cerca = [a.ruolo, castNomePerId(a.id)].map(attNorm).filter(Boolean);
-  if (!cerca.length) return null;
-  const chiavi = Object.keys(mappa);
-  const k = chiavi.find(x => cerca.includes(attNorm(x)))
-         || chiavi.find(x => cerca.some(c => c.length > 3 &&
-              (attNorm(x).includes(c) || c.includes(attNorm(x)))));
-  return k ? { nome: k, scene: (mappa[k] || []).map(String) } : null;
+  if (!d || !d.personaggi_scene) return null;
+  const nome = castNomePerId(a.id) || a.ruolo;
+  if (!nome) return null;
+  const tutti = (window.castData || []).map(x => x.nome);
+  const conta = personaggiConta(tutti.includes(nome) ? tutti : tutti.concat([nome]));
+  const v = conta.get(nome);
+  return v && v.scene ? { nome, scene: v.scene } : null;
 }
 
 function odgApriAttore(id){
