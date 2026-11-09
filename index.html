@@ -192,7 +192,6 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
   .result-tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tabs-2 { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tab { padding: 10px 8px 8px; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .result-tab svg { width: 18px; height: 18px; }
   #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: 96px; }
 }
 .result-tab { flex: 1; background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; padding: 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
@@ -413,6 +412,100 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   color:var(--yellow);letter-spacing:.06em}
 .rep-c{display:grid;grid-template-columns:1fr;gap:10px}
 @media (min-width:760px){.rep-c{grid-template-columns:1fr 1fr}}
+/* ── Spoglio ─────────────────────────────────────────────────────────
+ * Si legge come l'ordine del giorno, non come un foglio di calcolo: i
+ * reparti sono blocchi, le categorie righe, le scene pulsanti. Sul set
+ * il gesto e' toccare una scena per vedere cosa ha dentro, non leggere
+ * una tabella di numeri grandi. */
+#spoglioSection{padding:14px 16px 96px}
+.sp-testa{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:13px}
+.sp-testa .t{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
+.sp-testa .s{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.sp-conti{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);
+  border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.sp-conti>div{padding:12px 14px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.sp-conti>div:nth-child(2n){border-right:none}
+.sp-conti>div:nth-last-child(-n+2){border-bottom:none}
+.sp-conti .n{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:600;
+  color:var(--white);line-height:1}
+.sp-conti .k{display:block;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);margin-top:6px}
+.sp-conti .u{display:block;font-family:'DM Mono',monospace;font-size:11px;
+  color:var(--white-dim);margin-top:3px}
+.sp-rep{background:var(--surface);border:1px solid var(--border);border-radius:13px;
+  margin-bottom:10px;overflow:hidden}
+.sp-rep.mio{border-color:var(--yellow)}
+.sp-rep-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;
+  background:var(--surface2);font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:600;color:var(--white-dim)}
+.sp-rep.mio .sp-rep-h{color:var(--yellow)}
+.sp-rep-h .q{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.sp-cat{padding:11px 14px;border-top:1px solid var(--border)}
+.sp-cat.spenta{opacity:.55}
+.sp-cat-n{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.sp-cat-n .i{width:18px;height:18px;flex:0 0 18px;color:var(--yellow)}
+.sp-cat-n .i svg{width:100%;height:100%;display:block}
+.sp-cat-n .t{flex:1;min-width:0;font-size:14px;color:var(--white)}
+.sp-cat-n .q{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.sp-cat-n .nt{min-height:30px;padding:4px 8px;border-radius:7px;background:none;
+  border:1px solid var(--border);color:var(--muted);font-family:inherit;font-size:11px;cursor:pointer}
+.sp-cat-n .nt.pieno{border-color:var(--yellow);color:var(--yellow)}
+.sp-scene{display:flex;flex-wrap:wrap;gap:6px}
+.sp-sc{min-width:42px;min-height:34px;padding:0 10px;border-radius:9px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border-l);color:var(--white);
+  font-family:'DM Mono',monospace;font-size:13px}
+.sp-sc:active{background:rgba(245,197,66,.14);border-color:var(--yellow)}
+.sp-nota{display:none;margin-top:9px}
+.sp-nota.on{display:block}
+.sp-nota textarea{width:100%;min-height:62px;padding:10px 12px;border-radius:9px;resize:vertical;
+  box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);
+  color:var(--white);font-family:'Space Grotesk',sans-serif;font-size:14px;line-height:1.5}
+.sp-nota .st{font-size:10px;color:var(--muted);text-align:right;height:13px}
+.sp-azioni{display:flex;gap:9px;margin-top:18px}
+.sp-azioni button{flex:1;min-height:48px;border-radius:12px;cursor:pointer;background:none;
+  border:1px solid var(--border-l);color:var(--white);
+  font-family:'Space Grotesk',sans-serif;font-size:14px}
+.sp-azioni button.active{border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,.1)}
+.sp-vuoto{padding:30px 16px;text-align:center;font-size:13.5px;color:var(--muted);line-height:1.6}
+/* La scheda di una scena: tutto quello che lo spoglio sa di quella scena,
+   il proprio reparto per primo e gli altri ripiegati. */
+#spScena{position:fixed;inset:0;z-index:300;background:var(--bg);display:none;
+  flex-direction:column;overflow:hidden;padding:0 0 calc(env(safe-area-inset-bottom) + 20px)}
+.sp-corpo{flex:1;overflow-y:auto;padding:15px 16px 40px}
+.sp-vai{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+  min-height:50px;padding:0 15px;margin-bottom:14px;background:var(--surface);
+  border:1px solid var(--border-l);border-radius:12px;color:var(--white);
+  font-family:'Space Grotesk',sans-serif;font-size:14.5px;cursor:pointer}
+.sp-vai .p{font-family:'DM Mono',monospace;font-size:13px;color:var(--yellow);white-space:nowrap}
+.sp-riga{display:flex;align-items:baseline;gap:12px;padding:11px 14px;border-top:1px solid var(--border)}
+.sp-riga .k{flex:0 0 112px;font-size:12.5px;color:var(--muted);line-height:1.4}
+.sp-riga .v{flex:1;min-width:0;font-size:14px;color:var(--white);line-height:1.5}
+.sp-chip{display:inline-block;margin:0 6px 6px 0;padding:5px 11px;border-radius:999px;
+  background:var(--surface2);border:1px solid var(--border);font-size:12.5px;color:var(--white-dim)}
+.sp-altri{width:100%;min-height:48px;margin-top:4px;padding:11px 13px;background:none;
+  border:1px dashed var(--border-l);border-radius:12px;color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-size:13.5px;cursor:pointer;line-height:1.4}
+/* ── Analisi: il tuo reparto e cosa vedi ───────────────────────────── */
+#analisiSection{padding:14px 16px 96px}
+.an-rep{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+.an-rep button{min-height:40px;padding:9px 14px;border-radius:999px;cursor:pointer;background:none;
+  border:1px solid var(--border-l);color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-size:13.5px}
+.an-rep button.on{border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,.12)}
+.an-gr{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;
+  background:var(--surface2);border-top:1px solid var(--border);
+  font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;color:var(--white-dim)}
+.an-gr:first-child{border-top:none}
+.an-gr button{min-height:32px;background:none;border:none;color:var(--yellow);
+  font-family:inherit;font-size:12px;cursor:pointer;padding:4px 2px}
+.an-sp{display:flex;align-items:flex-start;gap:13px;padding:12px 14px;
+  border-top:1px solid var(--border);cursor:pointer;min-height:50px}
+.an-sp .box{width:22px;height:22px;flex:0 0 22px;margin-top:1px;border-radius:6px;
+  border:1.5px solid var(--border-l);display:grid;place-items:center;font-size:13px;color:transparent}
+.an-sp.on .box{background:var(--yellow);border-color:var(--yellow);color:#0A0B0D}
+.an-sp .c{flex:1;min-width:0}
+.an-sp .t{display:block;font-size:14.5px;color:var(--white)}
+.an-sp .d{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
 /* Analisi in corso ed errore */
 .an-centro{max-width:420px;margin:0 auto;padding:60px 24px;text-align:center}
 .an-tit{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;
@@ -488,11 +581,6 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .cb-ing{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;background:none;
   border:none;border-radius:9px;color:var(--muted);cursor:pointer}
 .cb-ing:active{background:var(--surface2)}
-.res-header{margin:0;padding:0}
-/* La riga delle azioni appartiene allo Spoglio. Sulle altre schede sparisce
-   insieme al suo contenuto, invece di lasciare una banda vuota sotto
-   l'intestazione: a nasconderla e' switchResultTab, che gia' decide. */
-.res-header>*{margin:12px 0 10px}
 #odgSection{padding:14px 16px 96px}
 .odg-vuoto{display:flex;flex-direction:column;align-items:center;text-align:center;
   padding:58px 22px;gap:9px}
@@ -608,7 +696,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt2 td.sesto2{background:rgba(245,166,35,0.04)}
 input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer;}
 .result-tab:disabled { opacity: 0.3; cursor: not-allowed; }
-.result-tab svg { vertical-align: middle; flex-shrink: 0; }
+.result-tab svg { width:23px; height:23px; vertical-align: middle; flex-shrink: 0;
+  stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 
 /* ── PDL TAB ── */
 #pdlSection { display: none; }
@@ -698,12 +787,8 @@ body.light .type-int-night { background:rgba(123,156,204,0.2);color:#1a4a8e;bord
 body.light .type-ext-night { background:rgba(42,74,127,0.15);color:#1a3a7a;border-color:rgba(42,74,127,0.5); }
 body.light .type-mixed { color:#555; }
 body.light .type-morning { color:#9a6200; }
-.res-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; flex-wrap: wrap; gap: 12px; }
 .res-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 800; }
 .res-title span { color: var(--yellow); }
-.res-actions { display: flex; gap: 8px; }
-.btn-export { background: var(--surface); border: 1px solid var(--yellow); color: var(--yellow); padding: 8px 14px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.15s; }
-.btn-export:hover { background: var(--yellow); color: #000; }
 .btn-reset { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 8px 14px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.15s; }
 .btn-reset:hover { border-color: var(--white); color: var(--white); }
 
@@ -720,7 +805,7 @@ body.light .type-morning { color:#9a6200; }
 .max-info .badge { background: rgba(245,197,66,0.12); color: var(--yellow); border-radius: 6px; padding: 5px 14px; font-size: 13px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; white-space: nowrap; }
 .max-info .scene-text { color: var(--white-dim); }
 
-#riassuntoBox { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--yellow); border-radius: 10px; padding: 18px 20px; margin-bottom: 28px; font-size: 12px; line-height: 1.8; color: var(--white-dim); }
+#riassuntoBox { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 13px 15px; margin: 11px 0 20px; font-size: 13.5px; line-height: 1.6; color: var(--white-dim); }
 #riassuntoBox .ria-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; font-weight: 500; }
 
 .cats-grid { display: flex; gap: 10px; margin-bottom: 32px; align-items: stretch; }
@@ -746,12 +831,12 @@ body.light .type-morning { color:#9a6200; }
 .subsec-title { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 
 /* ── VERSION COMPARE ── */
-#versionBar { display:none;margin:20px 0;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
-.btn-new-version { display:flex;align-items:center;gap:7px;padding:9px 16px;background:none;border:1px solid var(--yellow);border-radius:8px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;cursor:pointer;transition:all 0.15s; }
+#versionBar { display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:9px 0 0; }
+.btn-new-version { flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 14px;background:none;border:1px dashed var(--border-l);border-radius:12px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;cursor:pointer;transition:all 0.15s; }
 .btn-new-version:hover { background:rgba(245,197,66,0.08); }
-.btn-prev-version { display:flex;align-items:center;gap:7px;padding:9px 16px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;cursor:pointer;transition:all 0.15s; }
+.btn-prev-version { flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 14px;background:none;border:1px solid var(--border-l);border-radius:12px;color:var(--white-dim);font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;cursor:pointer;transition:all 0.15s; }
 .btn-prev-version:hover { border-color:var(--muted);color:var(--white); }
-.version-label { font-size:11px;color:var(--muted);font-family:'DM Mono',monospace; }
+.version-label { flex-basis:100%;font-size:11.5px;color:var(--muted);font-family:'DM Mono',monospace;text-align:center; }
 
 /* Confronto modale */
 #compareModal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;padding:16px; }
@@ -777,17 +862,6 @@ body.light .type-morning { color:#9a6200; }
 .spin { animation:spin 1s linear infinite;display:inline-block; }
 @keyframes spin { to { transform:rotate(360deg); } }
 @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-.cat-note-toggle { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border); cursor: pointer; user-select: none; }
-.cat-note-toggle:hover .cat-note-label { color: var(--yellow); }
-.cat-note-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); flex: 1; transition: color 0.15s; }
-.cat-note-label.has-content { color: var(--yellow); }
-.cat-note-arrow { font-size: 9px; color: var(--muted); transition: transform 0.2s; line-height: 1; }
-.cat-note-arrow.open { transform: rotate(180deg); }
-.cat-note-body { display: none; margin-top: 8px; }
-.cat-note-body.open { display: block; }
-.cat-note-ta { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--white); font-family: 'DM Mono', monospace; font-size: 11px; outline: none; resize: none; min-height: 64px; transition: border-color 0.15s; line-height: 1.6; }
-.cat-note-ta:focus { border-color: var(--yellow); }
-.cat-note-save { font-size: 9px; color: var(--muted); text-align: right; margin-top: 3px; height: 12px; }
 
 /* ── CHAT ── */
 #chatSection { display: none; margin-top: 40px; }
@@ -873,7 +947,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
 @media print {
   body { background:#fff !important; color:#000 !important; font-family: Arial, sans-serif; }
-  header, nav, #homePage, #settingsPage, #systemPage, #progressPanel, #chatSection, .res-actions, footer { display: none !important; }
+  header, nav, #homePage, #settingsPage, #systemPage, #progressPanel, #chatSection, .sp-azioni, #versionBar, footer { display: none !important; }
   #resultsPage { display: block !important; }
   .stat-box, .cat { border: 1px solid #ccc !important; background: #fff !important; break-inside: avoid; }
   .stat-num { color: #000 !important; }
@@ -911,9 +985,6 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 .import-success.show { display:block; }
 .share-auth-note { font-size:11px; color:var(--muted); }
 .share-auth-note a { color:var(--yellow); cursor:pointer; }
-.btn-share { background:var(--surface); border:1px solid var(--border); color:var(--white-dim); padding:8px 14px; border-radius:8px; font-family:'DM Mono',monospace; font-size:11px; cursor:pointer; transition:all 0.15s; }
-.btn-share:hover { border-color:var(--yellow); color:var(--yellow); }
-.btn-share.active { border-color:var(--yellow); color:var(--yellow); background:rgba(245,197,66,0.08); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
@@ -1181,47 +1252,25 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
     <!-- RESULTS -->
     <div id="resultsPage">
-      <div class="res-header">
-        <div class="res-actions">
-          <div id="spoglioActions" style="display:flex;gap:6px">
-            <button class="btn-share" id="btnShare" onclick="openShareModal()">🔗 Condividi</button>
-            <button class="btn-export" onclick="exportPdf()">⬇ Esporta PDF</button>
-          </div>
-        </div>
-      </div>
 
       <!-- RESULT TABS — cinque schede, una riga sola.
            Script, Cast e Wrap sono finiti sotto Altro: si aprono una volta
            ogni tanto, e tenerli in barra costava una seconda riga fissa che
            sul telefono mangiava mezzo pollice di schermo. -->
       <div class="result-tabs">
-        <button class="result-tab" id="tabOdg" onclick="switchResultTab('odg')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="2" width="13" height="16" rx="2"/><path d="M7 2.5V1.5h6v1"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4"/></svg> OdG</button>
-        <button class="result-tab active" id="tabSpoglio" onclick="switchResultTab('spoglio')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="11" height="14" rx="1.5"/><path d="M6 6h5M6 9h5M6 12h3"/><path d="M16 6v10a1 1 0 01-1 1H5"/></svg> Spoglio</button>
-        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('ore')"><svg viewBox="0 0 50 50" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="25" cy="25" r="20"/><path d="M25 25L15 14" stroke-width="2"/><path d="M25 25L34 11" stroke-width="1.5"/><circle cx="25" cy="25" r="2" fill="currentColor" stroke="none"/><rect x="22" y="4" width="6" height="3" rx="1"/></svg> Ore</button>
-        <button class="result-tab" id="tabPdl" onclick="switchResultTab('piano')"><svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="14" rx="1.5"/><path d="M2 8h16"/><path d="M6 2v4M14 2v4"/><path d="M6 12h2M10 12h2M6 15h2"/></svg> Piano</button>
-        <button class="result-tab" id="tabAltro" onclick="switchResultTab('altro')"><svg viewBox="0 0 20 20" width="15" height="15" fill="currentColor" stroke="none"><circle cx="4.5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15.5" cy="10" r="1.5"/></svg> Altro</button>
+        <button class="result-tab" id="tabOdg" onclick="switchResultTab('odg')"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h3"/></svg> OdG</button>
+        <button class="result-tab active" id="tabSpoglio" onclick="switchResultTab('spoglio')"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h16M9 9v11"/></svg> Spoglio</button>
+        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('ore')"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg> Ore</button>
+        <button class="result-tab" id="tabPdl" onclick="switchResultTab('piano')"><svg viewBox="0 0 24 24"><path d="M4 5h16v15H4zM4 9h16M9 3v4M15 3v4"/></svg> Piano</button>
+        <button class="result-tab" id="tabAltro" onclick="switchResultTab('altro')"><svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg> Altro</button>
       </div>
 
       <!-- SPOGLIO TAB -->
       <div id="spoglioSection">
-      <div class="sec-label">Statistiche generali</div>
-      <div class="stats-row" id="statsRow"></div>
+      <div class="sp-testa"><span class="t">Spoglio</span><span class="s" id="spConta"></span></div>
+      <div class="sp-conti" id="statsRow"></div>
       <div class="max-info" id="maxInfo" style="display:none"></div>
-      <div id="riassuntoBox" style="display:none"><div class="ria-label">Sinossi</div><div id="riassuntoText"></div></div>
-
-      <!-- VERSION BAR -->
-      <div id="versionBar">
-        <button class="btn-new-version" onclick="document.getElementById('newVersionInput').click()">
-          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10l6-6 6 6"/></svg>
-          Carica nuova versione
-        </button>
-        <input type="file" id="newVersionInput" accept=".pdf" style="display:none" onchange="handleNewVersion(this)">
-        <button class="btn-prev-version" id="btnPrevVersion" style="display:none" onclick="openCompareModal(false)">
-          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/></svg>
-          Versione precedente
-        </button>
-        <span class="version-label" id="versionLabel"></span>
-      </div>
+      <div id="riassuntoBox" style="display:none"><div id="riassuntoText"></div></div>
 
       <!-- COMPARE MODAL -->
       <div id="compareModal">
@@ -1251,14 +1300,33 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
 
-      <div class="sec-label" style="margin-top:28px">Dettaglio categorie</div>
-      <div class="cats-grid" id="catsGrid"></div>
+      <div class="odg-sez" style="margin-top:24px">Reparti</div>
+      <div id="catsGrid" style="margin-top:9px"></div>
 
       <!-- NOTE MANUALI -->
-      <div id="notesSection" style="margin-top:32px;margin-bottom:8px">
-        <div class="panel-label" style="margin-bottom:10px">Note</div>
-        <textarea id="analysisNotes" placeholder="" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;color:var(--white);font-family:'DM Mono',monospace;font-size:12px;outline:none;resize:none;min-height:100px;transition:border-color 0.15s;line-height:1.6" oninput="scheduleNotesSave()"></textarea>
+      <div id="notesSection" style="margin-top:22px">
+        <div class="odg-sez" style="margin:0 0 9px">Note</div>
+        <textarea id="analysisNotes" placeholder="Quello che vuoi ricordarti di questa sceneggiatura." style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px 15px;color:var(--white);font-family:'Space Grotesk',sans-serif;font-size:14px;outline:none;resize:vertical;min-height:92px;line-height:1.55" oninput="scheduleNotesSave()"></textarea>
         <div id="notesSaveStatus" style="font-size:10px;color:var(--muted);text-align:right;margin-top:4px;height:14px"></div>
+      </div>
+
+      <!-- Le azioni stanno in fondo: si usano a lettura finita, e in cima
+           rubavano la prima schermata a quello che si viene a leggere. -->
+      <div class="sp-azioni">
+        <button id="btnShare" onclick="openShareModal()">Condividi</button>
+        <button onclick="exportPdf()">Esporta PDF</button>
+      </div>
+      <div id="versionBar">
+        <button class="btn-new-version" onclick="document.getElementById('newVersionInput').click()">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10l6-6 6 6"/></svg>
+          Carica nuova versione
+        </button>
+        <input type="file" id="newVersionInput" accept=".pdf" style="display:none" onchange="handleNewVersion(this)">
+        <button class="btn-prev-version" id="btnPrevVersion" style="display:none" onclick="openCompareModal(false)">
+          <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 3"/></svg>
+          Versione precedente
+        </button>
+        <span class="version-label" id="versionLabel"></span>
       </div>
 
       <!-- CHAT -->
@@ -1716,10 +1784,27 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <div id="odgSection" style="display:none"><div id="odgCorpo"></div></div>
       <div id="odgScena" style="display:none"></div>
 
+      <!-- ANALISI — il reparto e le categorie che si vogliono vedere.
+           Stava insieme allo Script sotto una voce sola, e per cambiare
+           una categoria toccava passare dal lettore del testo. -->
+      <div id="analisiSection" style="display:none">
+        <div class="sp-testa"><span class="t">Il tuo reparto</span></div>
+        <div class="an-rep" id="anReparti"></div>
+        <div class="odg-sez" style="margin:0 0 9px">Cosa vedi nello spoglio</div>
+        <div id="anSpunte" style="background:var(--surface);border:1px solid var(--border);border-radius:13px;overflow:hidden"></div>
+        <p style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:12px 2px 0">
+          Lo spoglio le estrae tutte per tutti i reparti. Qui scegli quali
+          vuoi in evidenza: le altre restano, in fondo e in grigio.</p>
+      </div>
+
+      <!-- La scheda di una scena dello spoglio -->
+      <div id="spScena" style="display:none"></div>
+
       <!-- ALTRO — quello che si apre una volta ogni tanto -->
       <div id="altroSection" style="display:none">
         <div class="altro-el">
-          <button onclick="switchResultTab('script')"><span class="t">Sceneggiatura</span><span class="s">Testo e analisi</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('script')"><span class="t">Script</span><span class="s">Il testo della sceneggiatura</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('analisi')"><span class="t">Analisi</span><span class="s">Il tuo reparto e cosa vedi nello spoglio</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('cast')"><span class="t">Cast</span><span class="s">Personaggi e interpreti</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('wrap')"><span class="t">Wrap</span><span class="s">Locali e indirizzi di fine giornata</span><span class="ch">›</span></button>
           <!-- Gennaro e' nascosto per i primi test: il codice resta, la voce no. -->
@@ -2057,7 +2142,6 @@ function renderShareResults(d) {
     { v: d.scene_interno,                    l: 'Interno' },
     { v: d.scene_esterno,                    l: 'Esterno' },
     { v: d.max_attori_parlanti?.numero||'—', l: 'Max Attori\nstessa scena' },
-    { v: d.media_attori_parlanti||'—',        l: 'Media Attori\nper scena' },
   ].map(s => `<div class="stat-box"><div class="stat-num">${s.v}</div><div class="stat-desc">${s.l}</div></div>`).join('');
 
   const maxHtml = d.max_attori_parlanti?.scena
@@ -2567,7 +2651,6 @@ function exportPdf() {
     { val: String(d.scene_interno || '—'), lbl: 'INTERNO' },
     { val: String(d.scene_esterno || '—'), lbl: 'ESTERNO' },
     { val: String(d.max_attori_parlanti?.numero || '—'), lbl: 'MAX ATTORI' },
-    { val: String(d.media_attori_parlanti || '—'), lbl: 'MEDIA ATTORI' },
   ];
   const boxW = cw / statsData.length;
   statsData.forEach(({ val, lbl }, i) => {
@@ -3371,6 +3454,8 @@ function spoglioAllinea(s, c){
 /* Il reparto dell'utente, dal profilo. I nomi dei reparti in crew list
    non coincidono con le nostre chiavi, quindi si cerca per parola. */
 function spoglioMioReparto(){
+  const scelto = spoglioRepScelto();
+  if (scelto) return scelto;
   const r = (profilo().reparto||'').toLowerCase();
   if (!r) return null;
   const m = {suono:'suono', fonic:'suono', microfon:'suono',
@@ -3382,6 +3467,43 @@ function spoglioMioReparto(){
              stunt:'stuntsfx', sfx:'stuntsfx', effett:'stuntsfx', armi:'stuntsfx'};
   for (const [k,v] of Object.entries(m)) if (r.includes(k)) return v;
   return null;
+}
+
+/* Quello che si vuole vedere per primo nello spoglio.
+ *
+ * Il reparto del profilo serve all'ordine del giorno: e' scritto come lo
+ * scrive la produzione in crew list, e non sempre dice in che chiave uno
+ * legge la sceneggiatura — un fonico su un film musicale vuole playback e
+ * musica diegetica in cima, chiunque li firmi. Qui si sceglie a mano, e la
+ * scelta vince su quella dedotta dal profilo, che resta com'e'.
+ */
+const CB_REP_SPOGLIO = 'cb_rep_spoglio';
+const CB_CAT_ATTIVE  = 'cb_cat_attive';
+
+function spoglioRepScelto(){
+  let r = null;
+  try { r = localStorage.getItem(CB_REP_SPOGLIO); } catch(_){}
+  return REPARTI.some(x => x[0] === r) ? r : null;
+}
+
+function spoglioCatReparto(rep){
+  return SPOGLIO.filter(c => c.rep === rep).map(c => c.key);
+}
+
+/* Le categorie in evidenza. Senza una scelta esplicita sono quelle del
+   proprio reparto; senza reparto, tutte — meglio vedere troppo che
+   trovarsi mezza pagina spenta senza sapere perche'. */
+function catAttive(){
+  try {
+    const s = JSON.parse(localStorage.getItem(CB_CAT_ATTIVE) || 'null');
+    if (Array.isArray(s)) return new Set(s);
+  } catch(_){}
+  const rep = spoglioMioReparto();
+  return new Set(rep ? spoglioCatReparto(rep) : SPOGLIO.map(c => c.key));
+}
+
+function catSalva(set){
+  try { localStorage.setItem(CB_CAT_ATTIVE, JSON.stringify([...set])); } catch(_){}
 }
 
 /* "eco forte, volta a botte" -> "Eco forte, volta a botte".
@@ -3425,7 +3547,7 @@ const SPOGLIO_ICONE = (() => {
 // ══ SYSPROMPT ══
 const SYSPROMPT = `Sei un analista di sceneggiature per il cinema. Fai lo spoglio per tutta la troupe, non per un reparto solo. Analizza e rispondi SOLO con JSON valido. Nessun testo. Nessun markdown.
 
-{"titolo":"string","scene_list":[{"n":"string","ie":"INT/EST/EXT/I-E","m":"D/N/M/E/T","p":0}],"riassunto":"string (10-12 righe: genere, trama, personaggi chiave, tono)","totale_scene":0,"scene_interno":0,"scene_esterno":0,"scene_interno_giorno":0,"scene_interno_notte":0,"scene_esterno_giorno":0,"scene_esterno_notte":0,"max_attori_parlanti":{"numero":0,"scena":"string"},"media_attori_parlanti":0,${spoglioSchema()},"cast_provvisorio":[{"character_id":1,"nome":"string","pose_stimate":0}],"personaggi_scene":{"NOME":["1","2"]}}
+{"titolo":"string","scene_list":[{"n":"string","ie":"INT/EST/EXT/I-E","m":"D/N/M/E/T","p":0}],"riassunto":"string (10-12 righe: genere, trama, personaggi chiave, tono)","totale_scene":0,"scene_interno":0,"scene_esterno":0,"scene_interno_giorno":0,"scene_interno_notte":0,"scene_esterno_giorno":0,"scene_esterno_notte":0,"max_attori_parlanti":{"numero":0,"scena":"string"},${spoglioSchema()},"cast_provvisorio":[{"character_id":1,"nome":"string","pose_stimate":0}],"personaggi_scene":{"NOME":["1","2"]}}
 
 Regole:
 - scene_list: TUTTE le scene con n=numero, ie=INT/EST/EXT/I-E, m=D(giorno)N(notte)M(mattino)E(sera)T(tramonto), p=numero pagina della sceneggiatura (obbligatorio)
@@ -3439,7 +3561,6 @@ ${spoglioIstruzioni()}
 
 - cast_provvisorio: tutti i personaggi con dialogo, ordinati per pose_stimate desc, character_id progressivo
 - personaggi_scene: solo personaggi con 2+ scene, solo numero scena senza SC.
-- media_attori_parlanti: intero per eccesso
 - ogni scena include numero pagina PDF: (p.X)
 Rispondi SOLO con il JSON.`;
 
@@ -3651,82 +3772,271 @@ function renderResults(d) {
   try { if (d.titolo) { const f=document.getElementById('tt-film');
         if (f && !f.dataset.manuallyEdited) f.value = d.titolo; } cbTestata(); } catch(_) {}
 
-  // Stats
-  const intDetail = (d.scene_interno_giorno != null && d.scene_interno_notte != null)
-    ? `<div class="stat-sub">${d.scene_interno_giorno} Giorno · ${d.scene_interno_notte} Notte</div>` : '';
-  const extDetail = (d.scene_esterno_giorno != null && d.scene_esterno_notte != null)
-    ? `<div class="stat-sub">${d.scene_esterno_giorno} Giorno · ${d.scene_esterno_notte} Notte</div>` : '';
-
-  document.getElementById('statsRow').innerHTML = [
-    { v: d.totale_scene,                    l: 'Scene Totali',              sub: '' },
-    { v: d.scene_interno,                   l: 'Interno',                   sub: intDetail },
-    { v: d.scene_esterno,                   l: 'Esterno',                   sub: extDetail },
-    { v: d.max_attori_parlanti?.numero||'—',l: 'Max Attori\nstessa scena',  sub: '' },
-    { v: d.media_attori_parlanti||'—',      l: 'Media Attori\nper scena',   sub: '' },
-  ].map(s => `<div class="stat-box"><div class="stat-num">${s.v}</div><div class="stat-desc">${s.l}</div>${s.sub}</div>`).join('');
-
-  // Max scene
-  const mi = document.getElementById('maxInfo');
-  if (d.max_attori_parlanti?.scena) {
-    mi.style.display = 'flex';
-    mi.innerHTML = `<span class="badge">Scena con + attori parlanti</span><span class="scene-text ref" style="cursor:pointer">${d.max_attori_parlanti.scena}</span>`;
-  }
-
-  // Riassunto
-  if (d.riassunto) {
-    document.getElementById('riassuntoBox').style.display = 'block';
-    document.getElementById('riassuntoText').textContent = d.riassunto;
-  }
-
-  // Categories
-  /* Le categorie si disegnano dalla tabella, raggruppate per reparto e
-     con il proprio in cima: un microfonista e un costumista guardano la
-     stessa sceneggiatura cercando cose diverse, e scorrere sei reparti
-     altrui prima del proprio e' il modo piu' veloce per smettere di
-     aprire la scheda. Si mostrano solo i reparti che hanno qualcosa. */
-  const dati = spoglioDati(d);
-  const mioRep = spoglioMioReparto();
-  const ordine = REPARTI.slice().sort((a,b) =>
-    (a[0]===mioRep?-1:0) - (b[0]===mioRep?-1:0));
-
-  const blocchi = ordine.map(([rk, rnome]) => {
-    const cats = SPOGLIO.filter(c => c.rep===rk && dati[c.key]?.scene?.length);
-    if (!cats.length) return '';
-    const schede = cats.map(c => {
-      const sc = dati[c.key].scene;
-      const nota = (catNotesData[c.key] || '').trim();
-      const voci = sc.map(x => {
-        const testo = c.campi.map(k => x[k]).filter(Boolean).join(' · ');
-        return `<div class="ci">${testo?`<strong>${esc(spoglioMaiuscola(testo))}</strong><br>`:''}<span class="ref">${esc(x.scena)}</span></div>`;
-      }).join('');
-      return `<div class="cat active" id="cat-card-${c.key}">
-        <div class="cat-top">
-          <span class="cat-ico">${SPOGLIO_ICONE[c.key]||SPOGLIO_ICONE._}</span>
-          <span class="cat-name">${esc(c.nome)}</span>
-          <span class="badge-count">${sc.length} sc.</span>
-        </div>
-        <div class="cat-items">${voci}</div>
-        <div class="cat-note-toggle" onclick="toggleCatNote('${c.key}')">
-          <span class="cat-note-label${nota?' has-content':''}">Note${nota?' ·':''}</span>
-          <span class="cat-note-arrow${nota?' open':''}" id="cat-note-arrow-${c.key}">▼</span>
-        </div>
-        <div class="cat-note-body${nota?' open':''}" id="cat-note-body-${c.key}">
-          <textarea class="cat-note-ta" id="cat-note-ta-${c.key}" placeholder="Note per questa categoria..." oninput="scheduleCatNotesSave('${c.key}')">${esc(nota)}</textarea>
-          <div class="cat-note-save" id="cat-note-save-${c.key}"></div>
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="rep"><div class="rep-t">${esc(rnome)}${rk===mioRep?' <span>il tuo</span>':''}</div>
-      <div class="rep-c">${schede}</div></div>`;
-  }).filter(Boolean).join('');
-
-  document.getElementById('catsGrid').innerHTML = blocchi ||
-    '<div class="prog-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>';
+  spoglioRender(d);
 
   document.getElementById('resultsPage').classList.add('on');
   setTimeout(activateRefs, 50);
   initChat(d);
   showGennaroFab();
+}
+
+/* ══ LA PAGINA DELLO SPOGLIO ═══════════════════════════════════════
+ *
+ * Si disegna da sola, perche' cambiare una spunta nelle impostazioni
+ * dell'analisi deve ridisegnare questa e nient'altro: renderResults
+ * riapre anche la chat e la pagina dei risultati, e non e' quello che
+ * si chiede toccando una casella.
+ */
+function spoglioRender(d){
+  if (!d) return;
+  const dati = spoglioDati(d);
+  const att  = catAttive();
+  const mio  = spoglioMioReparto();
+
+  /* I conti in cima. Niente media attori per scena: su una sceneggiatura
+     intera e' sempre due virgola qualcosa, e non ha mai cambiato una
+     decisione di nessuno. */
+  const luce = (g,n) => (g != null && n != null) ? `<span class="u">${g} g · ${n} n</span>` : '';
+  document.getElementById('statsRow').innerHTML = [
+    [d.totale_scene ?? '—',  'Scene totali', ''],
+    [d.scene_interno ?? '—', 'Interno',  luce(d.scene_interno_giorno, d.scene_interno_notte)],
+    [d.scene_esterno ?? '—', 'Esterno',  luce(d.scene_esterno_giorno, d.scene_esterno_notte)],
+    [d.max_attori_parlanti?.numero ?? '—', 'Max attori stessa scena',
+     d.max_attori_parlanti?.scena ? `<span class="u">sc. ${esc(spoglioNum(d.max_attori_parlanti.scena))}</span>` : '']
+  ].map(([n,k,u]) => `<div><span class="n num">${esc(String(n))}</span><span class="k">${k}</span>${u}</div>`).join('');
+
+  const mi = document.getElementById('maxInfo');
+  if (mi) mi.style.display = 'none';   // il dato sta nel riquadro dei conti
+
+  if (d.riassunto) {
+    document.getElementById('riassuntoBox').style.display = 'block';
+    document.getElementById('riassuntoText').textContent = d.riassunto;
+  }
+
+  /* I reparti, a blocchi. Prima quelli che contengono almeno una
+     categoria scelta: un microfonista e un costumista guardano la stessa
+     sceneggiatura cercando cose diverse, e scorrere sei reparti altrui
+     prima del proprio e' il modo piu' rapido per smettere di aprire la
+     pagina. Le altre categorie restano, in fondo e spente. */
+  const gruppi = REPARTI.map(([rk, rnome]) => {
+    const voci = SPOGLIO.filter(c => c.rep === rk && dati[c.key]?.scene?.length)
+      .map(c => ({ c, scene: spoglioOrdina(dati[c.key].scene) }));
+    return voci.length ? { rk, rnome, voci } : null;
+  }).filter(Boolean);
+
+  /* Il proprio reparto apre sempre la pagina, poi i reparti che
+     contengono una categoria spuntata, poi il resto. A parità di peso
+     resta l'ordine della tabella. */
+  const tutte = SPOGLIO.every(c => att.has(c.key));
+  const scelto = g => g.rk === mio || (!tutte && g.voci.some(v => att.has(v.c.key)));
+  const peso = g => g.rk === mio ? 0 : scelto(g) ? 1 : 2;
+  const ordinati = gruppi.slice().sort((a,b) => peso(a) - peso(b));
+
+  const html = ordinati.map(g => `
+    <div class="sp-rep${scelto(g) ? ' mio' : ''}">
+      <div class="sp-rep-h"><span>${esc(g.rnome)}</span><span class="q">${g.voci.length}</span></div>
+      ${g.voci.map(v => spoglioRigaCat(v.c, v.scene, att.has(v.c.key))).join('')}
+    </div>`).join('');
+
+  document.getElementById('catsGrid').innerHTML = html ||
+    '<div class="sp-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>';
+
+  const conta = document.getElementById('spConta');
+  if (conta) {
+    const n = Object.values(dati).reduce((s,v) => s + (v.scene?.length||0), 0);
+    conta.textContent = (d.totale_scene ? d.totale_scene + ' scene · ' : '') +
+      n + ' segnalazion' + (n === 1 ? 'e' : 'i');
+  }
+}
+
+/* Una categoria: il nome, quante scene, le scene da toccare, la nota. */
+function spoglioRigaCat(c, scene, accesa){
+  const nota = (catNotesData[c.key] || '').trim();
+  const chip = scene.map(x =>
+    `<button class="sp-sc" onclick="spoglioApriScena('${esc(spoglioNum(x.scena))}')">${esc(spoglioNum(x.scena))}</button>`
+  ).join('');
+  return `<div class="sp-cat${accesa ? '' : ' spenta'}" id="sp-cat-${c.key}">
+    <div class="sp-cat-n">
+      <span class="i">${SPOGLIO_ICONE[c.key] || SPOGLIO_ICONE._}</span>
+      <span class="t">${esc(c.nome)}</span>
+      <span class="q">${scene.length}</span>
+      <button class="nt${nota ? ' pieno' : ''}" id="sp-nota-b-${c.key}"
+        onclick="toggleCatNote('${c.key}')">Note${nota ? ' ·' : ''}</button>
+    </div>
+    <div class="sp-scene">${chip}</div>
+    <div class="sp-nota${nota ? ' on' : ''}" id="sp-nota-${c.key}">
+      <textarea id="sp-nota-ta-${c.key}" placeholder="Note su ${esc(c.nome.toLowerCase())}…"
+        oninput="scheduleCatNotesSave('${c.key}')">${esc(nota)}</textarea>
+      <div class="st" id="sp-nota-st-${c.key}"></div>
+    </div>
+  </div>`;
+}
+
+/* "SC.32A - INT. CASA - GIORNO (p.14)" -> "32A". Il numero e' quello che
+   si cerca con gli occhi e quello che sta scritto sull'ordine del giorno;
+   il resto della riga lo si legge nella scheda della scena. */
+function spoglioNum(scena){
+  const s = String(scena || '').trim();
+  const m = s.match(/^\s*(?:SC\.?|SCENA)?\s*0*(\d{1,3}[A-Za-z]{0,2})\b/i);
+  return m ? m[1].toUpperCase() : s.split(/[\s—–-]/)[0].toUpperCase();
+}
+
+/* In ordine di sceneggiatura: prima il numero, poi la lettera, perche'
+   la 35A viene dopo la 35 e prima della 36. */
+function spoglioOrdina(scene){
+  const chiave = s => {
+    const n = spoglioNum(s.scena);
+    return [parseInt(n, 10) || 0, n.replace(/^\d+/, '')];
+  };
+  return scene.slice().sort((a,b) => {
+    const [p,ps] = chiave(a), [q,qs] = chiave(b);
+    return p - q || ps.localeCompare(qs);
+  });
+}
+
+const SPOGLIO_MOMENTO = { D:'giorno', N:'notte', M:'mattino', E:'sera', T:'tramonto' };
+
+/* La scheda di una scena: tutto quello che lo spoglio sa di quella scena,
+ * il proprio reparto per primo e gli altri ripiegati dietro un tasto.
+ * Nella pagina dello spoglio una scena compare in piu' categorie e in
+ * piu' reparti: qui si vede tutta insieme, che e' come la si prepara.
+ */
+function spoglioApriScena(n){
+  const d = window.analysisData || analysisData;
+  const box = document.getElementById('spScena');
+  if (!d || !box) return;
+  const num  = String(n).toUpperCase();
+  const dati = spoglioDati(d);
+  const att  = catAttive();
+  const mio  = spoglioMioReparto();
+
+  let testa = null, pagina = null;
+  const gruppi = REPARTI.map(([rk, rnome]) => {
+    const righe = [];
+    for (const c of SPOGLIO.filter(x => x.rep === rk)) {
+      for (const s of (dati[c.key]?.scene || [])) {
+        if (spoglioNum(s.scena) !== num) continue;
+        if (!testa) testa = s.scena;
+        const p = String(s.scena).match(/\(p\.?\s*(\d+)/i);
+        if (p && !pagina) pagina = +p[1];
+        const v = c.campi.map(k => s[k]).filter(Boolean).join(' · ');
+        righe.push({ nome: c.nome, key: c.key, v: spoglioMaiuscola(v) || 'Segnalata' });
+      }
+    }
+    return righe.length ? { rk, rnome, righe } : null;
+  }).filter(Boolean);
+
+  const sl = (d.scene_list || []).find(x => String(x.n).toUpperCase() === num);
+  if (sl && sl.p && !pagina) pagina = +sl.p;
+  // Il numero sta gia' nel titolo e la pagina nel tasto: nella riga di
+  // sotto resta quello che non c'e' altrove.
+  let meta = testa ? String(testa)
+    .replace(/^\s*(?:SC\.?|SCENA)?\s*\d+[A-Za-z]*\s*[-–—]\s*/i, '')
+    .replace(/\s*\(\s*p\.?\s*\d+[^)]*\)\s*$/i, '').trim() : '';
+  if (!meta && sl) meta = [sl.ie, SPOGLIO_MOMENTO[sl.m] || sl.m].filter(Boolean).join(' · ');
+
+  const inScena = Object.entries(d.personaggi_scene || {})
+    .filter(([, v]) => Array.isArray(v) && v.some(x => String(x).toUpperCase() === num))
+    .map(([k]) => k);
+
+  const tutte = SPOGLIO.every(c => att.has(c.key));
+  const mia = g => g.rk === mio || (!tutte && g.righe.some(r => att.has(r.key)));
+  const blocco = g => `<div class="sp-rep${mia(g) ? ' mio' : ''}">
+    <div class="sp-rep-h"><span>${esc(g.rnome)}</span><span class="q">${g.righe.length}</span></div>
+    ${g.righe.map(r => `<div class="sp-riga"><span class="k">${esc(r.nome)}</span>
+      <span class="v">${esc(r.v)}</span></div>`).join('')}
+  </div>`;
+
+  /* Senza reparto e senza scelte non c'e' un "mio" da mettere davanti:
+     meglio mostrare tutto che nascondere tutto dietro un tasto. */
+  const scelti = gruppi.filter(mia).sort((a,b) => (a.rk === mio ? 0 : 1) - (b.rk === mio ? 0 : 1));
+  const miei  = scelti.length ? scelti : gruppi;
+  const altri = gruppi.filter(g => !miei.includes(g));
+
+  box.innerHTML = `
+    <div class="sc-top">
+      <button class="sc-x" onclick="spoglioChiudiScena()" aria-label="Chiudi">✕</button>
+      <span class="sc-n">Scena ${esc(num)}</span>
+      <span class="sc-h">${esc(meta)}</span>
+    </div>
+    <div class="sp-corpo">
+      ${inScena.length ? `<div style="margin-bottom:13px">${inScena.map(p =>
+        `<span class="sp-chip">${esc(p)}</span>`).join('')}</div>` : ''}
+      ${pagina ? `<button class="sp-vai" onclick="spoglioVaiAllaPagina(${pagina})">
+        <span>Apri nella sceneggiatura</span><span class="p">p. ${pagina} ›</span></button>` : ''}
+      ${miei.map(blocco).join('')}
+      ${altri.length ? `<button class="sp-altri" id="spAltriBtn" onclick="spoglioAltriRep()">
+          ${esc(altri.map(g => g.rnome).join(' · '))} ▾</button>
+        <div id="spAltri" style="display:none;margin-top:10px">${altri.map(blocco).join('')}</div>` : ''}
+    </div>`;
+  box.style.display = 'flex';
+}
+
+function spoglioChiudiScena(){
+  const box = document.getElementById('spScena');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+}
+
+function spoglioAltriRep(){
+  const d = document.getElementById('spAltri'), b = document.getElementById('spAltriBtn');
+  if (d) d.style.display = 'block';
+  if (b) b.style.display = 'none';
+}
+
+/* Il numero di pagina che il modello segna e' quello stampato sulla
+   sceneggiatura; il PDF puo' avere copertina e frontespizio davanti. */
+function spoglioVaiAllaPagina(p){
+  if (!pdfB64Array.length) { showToast('📄 PDF non disponibile — ricarica la sceneggiatura', 'default', 3000); return; }
+  openPageModal(p + pageOffset);
+}
+
+/* ══ ANALISI — il reparto e le categorie che si vogliono vedere ══════ */
+function analisiRender(){
+  const rep = spoglioMioReparto(), att = catAttive();
+  const r = document.getElementById('anReparti');
+  if (r) r.innerHTML = REPARTI.map(([id, nome]) =>
+    `<button class="${id === rep ? 'on' : ''}" onclick="analisiReparto('${id}')">${esc(nome)}</button>`).join('');
+  const s = document.getElementById('anSpunte');
+  if (s) s.innerHTML = REPARTI.map(([id, nome]) => {
+    const cats = SPOGLIO.filter(c => c.rep === id);
+    const tutte = cats.every(c => att.has(c.key));
+    return `<div class="an-gr"><span>${esc(nome)}</span>
+        <button onclick="analisiGruppo('${id}',${!tutte})">${tutte ? 'nessuna' : 'tutte'}</button></div>`
+      + cats.map(c => `<div class="an-sp${att.has(c.key) ? ' on' : ''}" onclick="analisiSpunta('${c.key}')">
+          <span class="box">✓</span><span class="c"><span class="t">${esc(c.nome)}</span>
+          <span class="d">${esc(analisiSintesi(c))}</span></span></div>`).join('');
+  }).join('');
+}
+
+/* La descrizione per il modello e' lunga e finisce con le istruzioni sui
+   campi: a schermo serve solo la prima parte, e corta. */
+function analisiSintesi(c){
+  let t = String(c.desc || '').split(/\.\s/)[0].trim();
+  if (t.length > 76) t = t.slice(0, 74).replace(/[\s,;]+\S*$/, '') + '…';
+  return spoglioMaiuscola(t);
+}
+
+function analisiReparto(id){
+  try { localStorage.setItem(CB_REP_SPOGLIO, id); } catch(_){}
+  catSalva(new Set(spoglioCatReparto(id)));   // un punto di partenza, poi si aggiusta
+  analisiRender();
+  spoglioRender(window.analysisData || analysisData);
+}
+
+function analisiSpunta(k){
+  const s = catAttive();
+  s.has(k) ? s.delete(k) : s.add(k);
+  catSalva(s);
+  analisiRender();
+  spoglioRender(window.analysisData || analysisData);
+}
+
+function analisiGruppo(id, accendi){
+  const s = catAttive();
+  for (const k of spoglioCatReparto(id)) accendi ? s.add(k) : s.delete(k);
+  catSalva(s);
+  analisiRender();
+  spoglioRender(window.analysisData || analysisData);
 }
 
 function resetApp() {
@@ -4093,7 +4403,6 @@ function mergeSerieResults(results) {
 
   const maxEp = results.reduce((best,r) => (r.data.max_attori_parlanti?.numero||0) > (best.data.max_attori_parlanti?.numero||0) ? r : best, results[0]);
   merged.max_attori_parlanti = maxEp.data.max_attori_parlanti;
-  merged.media_attori_parlanti = Math.ceil(results.reduce((s,r) => s + (parseFloat(r.data.media_attori_parlanti)||0), 0) / results.length);
 
   const castMap = {};
   results.forEach(r => {
@@ -4658,15 +4967,14 @@ function scheduleNotesSave() {
 }
 
 function scheduleCatNotesSave(key) {
-  const val = document.getElementById('cat-note-ta-' + key)?.value.trim() || '';
+  const val = document.getElementById('sp-nota-ta-' + key)?.value.trim() || '';
   catNotesData[key] = val;
-  // update label style
-  const label = document.querySelector(`#cat-card-${key} .cat-note-label`);
-  if (label) {
-    label.classList.toggle('has-content', !!val);
-    label.textContent = val ? 'Note ·' : 'Note';
+  const b = document.getElementById('sp-nota-b-' + key);
+  if (b) {
+    b.classList.toggle('pieno', !!val);
+    b.textContent = val ? 'Note ·' : 'Note';
   }
-  const status = document.getElementById('cat-note-save-' + key);
+  const status = document.getElementById('sp-nota-st-' + key);
   if (status) status.textContent = '...';
   clearTimeout(_catNotesSaveTimer);
   _catNotesSaveTimer = setTimeout(saveAllNotes, 1500);
@@ -4682,7 +4990,7 @@ async function saveAllNotes() {
     if (status) { status.textContent = '✓ Salvato'; setTimeout(() => { status.textContent = ''; }, 2000); }
     // clear per-cat save indicators
     Object.keys(catNotesData).forEach(k => {
-      const s = document.getElementById('cat-note-save-' + k);
+      const s = document.getElementById('sp-nota-st-' + k);
       if (s) { s.textContent = '✓'; setTimeout(() => { if(s) s.textContent = ''; }, 2000); }
     });
   } catch(e) {
@@ -4709,12 +5017,10 @@ function loadNotes(raw) {
 }
 
 function toggleCatNote(key) {
-  const body  = document.getElementById('cat-note-body-' + key);
-  const arrow = document.getElementById('cat-note-arrow-' + key);
+  const body = document.getElementById('sp-nota-' + key);
   if (!body) return;
-  const isOpen = body.classList.toggle('open');
-  if (arrow) arrow.classList.toggle('open', isOpen);
-  if (isOpen) document.getElementById('cat-note-ta-' + key)?.focus();
+  const aperta = body.classList.toggle('on');
+  if (aperta) document.getElementById('sp-nota-ta-' + key)?.focus();
 }
 
 function rotateChatPlaceholder() {
@@ -4797,7 +5103,7 @@ function buildTimetableContext() {
 }
 
 function buildChatContext(d) {
-  const lines = [`FILM: ${d.titolo} | Scene: ${d.totale_scene} (INT:${d.scene_interno} EXT:${d.scene_esterno}) | Max att: ${d.max_attori_parlanti?.numero} | Media: ${d.media_attori_parlanti}`];
+  const lines = [`FILM: ${d.titolo} | Scene: ${d.totale_scene} (INT:${d.scene_interno} EXT:${d.scene_esterno}) | Max att: ${d.max_attori_parlanti?.numero}`];
   // Le categorie per Gennaro: dalla tabella, cosi' quando se ne aggiunge
   // una la chat la conosce senza che nessuno se ne ricordi.
   const dd = spoglioDati(d);
@@ -5311,10 +5617,11 @@ document.getElementById('shareResultsContainer')?.addEventListener('click', e =>
 const RT_SEZIONI = {
   odg:'odgSection', spoglio:'spoglioSection', ore:'timetableSection',
   piano:'pdlSection', altro:'altroSection',
-  cast:'castSection', wrap:'wrapSection', script:'scriptSection'
+  cast:'castSection', wrap:'wrapSection', script:'scriptSection',
+  analisi:'analisiSection'
 };
 const RT_FLEX = ['ore','wrap','script'];      // sezioni a colonna
-const RT_SOTTO_ALTRO = ['cast','wrap','script'];
+const RT_SOTTO_ALTRO = ['cast','wrap','script','analisi'];
 
 function switchResultTab(tab) {
   for (const [k, id] of Object.entries(RT_SEZIONI)) {
@@ -5337,8 +5644,9 @@ function switchResultTab(tab) {
       }
     } catch(e) {}
   }
-  if (tab === 'wrap')   initWrap();
-  if (tab === 'script') initScriptViewer();
+  if (tab === 'wrap')    initWrap();
+  if (tab === 'script')  initScriptViewer();
+  if (tab === 'analisi') analisiRender();
 
   const barra = { odg:'tabOdg', spoglio:'tabSpoglio', ore:'tabTimetable',
                   piano:'tabPdl', altro:'tabAltro' };
@@ -5350,10 +5658,6 @@ function switchResultTab(tab) {
   if (el) el.classList.add('active');
 
   try { cbTestata(); } catch(_) {}
-  const az = document.getElementById('spoglioActions');
-  if (az) az.style.display = tab === 'spoglio' ? 'flex' : 'none';
-  const rh = document.querySelector('.res-header');
-  if (rh) rh.style.display = tab === 'spoglio' ? 'flex' : 'none';
 }
 
 // ══ WRAP ══
