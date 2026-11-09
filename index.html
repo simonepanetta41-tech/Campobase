@@ -3092,7 +3092,7 @@ async function caricaPiani(items){
       if (!el || !p.data) return;
       const girate = Object.values(p.shooting_data || {}).filter(x => x && x.status === 'complete').length;
       const righe = [
-        p.data.totale_giorni ? p.data.totale_giorni + ' giorni' : '',
+        pdlTotali(p.data).giorni ? pdlTotali(p.data).giorni + ' giorni' : '',
         girate ? girate + ' girati' : '',
         p.data.produzione || p.data.regista || ''
       ].filter(Boolean);
@@ -7773,6 +7773,26 @@ function getPdlSceneTypeClass(ie, m) {
 }
 
 function getPdlAllGiorni() { return (pdlData?.settimane||[]).flatMap(s=>s.giorni||[]); }
+
+/* I totali si contano dalle giornate, non si leggono da un campo.
+ *
+ * Caricando un PDL aggiornato le settimane si uniscono — le vecchie piu'
+ * le nuove — ma totale_giorni restava quello del solo PDF nuovo, che
+ * contiene solo la coda della lavorazione. Il calendario mostrava la
+ * giornata 38 e il contatore diceva 22.
+ *
+ * Contare qui invece di fidarsi sistema anche i piani gia' salvati, senza
+ * farli ricaricare a nessuno. */
+function pdlTotali(p) {
+  const g = (p?.settimane || []).flatMap(s => s.giorni || []);
+  // Il piu' alto fra i due. Il campo dichiarato nasce contando le stesse
+  // giornate, quindi non e' mai piu' grande del vero: se lo e', vuol dire
+  // che e' il piano in mano a essere parziale, e si crede a lui.
+  return {
+    giorni: Math.max(g.length, p?.totale_giorni || 0),
+    scene:  Math.max(g.reduce((a, x) => a + (x.scene || []).length, 0), p?.totale_scene || 0)
+  };
+}
 function getPdlGiorno(num) { return getPdlAllGiorni().find(g=>g.numero_giorno===num); }
 function savePdlShootingData() {
   if(pdlData) localStorage.setItem('pdl_sd_'+pdlData.titolo, JSON.stringify(pdlShootingData));
@@ -10419,6 +10439,13 @@ async function loadUpdatedPdlFile(input) {
     } else {
       pdlData={...newPdl,settimane:oldDays.length>0?[{numero:0,label:'Settimane precedenti',giorni:oldDays},...newPdl.settimane]:newPdl.settimane};
     }
+    // I totali del PDF nuovo valgono solo per il PDF nuovo: dopo l'unione
+    // si ricontano, se no restano salvati sbagliati.
+    const tot=pdlTotali(pdlData);
+    pdlData.totale_giorni=tot.giorni; pdlData.totale_scene=tot.scene;
+    const tutte=getPdlAllGiorni();
+    pdlData.data_inizio=tutte.find(g=>g.data)?.data||pdlData.data_inizio;
+    pdlData.data_fine=[...tutte].reverse().find(g=>g.data)?.data||pdlData.data_fine;
     localStorage.setItem('pdl_full_bk_'+pdlData.titolo,JSON.stringify(pdlData));
     renderPdlDashboard();
     if(currentAnalysisId) savePdlToSupabase();
@@ -10435,7 +10462,8 @@ function renderPdlDashboard() {
     analysisData?.titolo || pdlData.titolo || '',
     pdlData.regista ? 'regia ' + pdlData.regista : '',
     pdlData.versione || '',
-    pdlData.totale_giorni ? pdlData.totale_giorni + ' giorni · ' + pdlData.totale_scene + ' scene' : ''
+    (() => { const t = pdlTotali(pdlData);
+             return t.giorni ? t.giorni + ' giorni · ' + t.scene + ' scene' : ''; })()
   ].filter(Boolean).join(' · ');
   renderPdlStats(); renderPdlCalendar(); renderPdlStandby();
   const avg=getPdlAvgPages();
@@ -10447,18 +10475,19 @@ function renderPdlStats() {
   const girate=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='done').length,0);
   const standby=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='standby').length,0);
   const completi=Object.values(pdlShootingData).filter(d=>d.status==='complete').length;
+  const tot=pdlTotali(pdlData);
   document.getElementById('pdlStatsRow').innerHTML=[
-    [pdlData.totale_giorni ?? '—','Giorni totali'],[completi,'Giornate girate'],
+    [tot.giorni || '—','Giorni totali'],[completi,'Giornate girate'],
     [girate,'Scene girate'],[standby,'In stand-by']
   ].map(([n,k])=>`<div><span class="n num">${n}</span><span class="k">${k}</span></div>`).join('');
   const pct=allSc.length>0?Math.round(girate/allSc.length*100):0;
-  const gPct=pdlData.totale_giorni>0?Math.round(completi/pdlData.totale_giorni*100):0;
+  const gPct=tot.giorni>0?Math.round(completi/tot.giorni*100):0;
   const barra=(nome,fatto,tot,perc,colore)=>`<div class="pdl-barra">
     <div class="r"><span>${nome}</span><b>${fatto}/${tot} · ${perc}%</b></div>
     <div class="v"><div style="width:${perc}%;background:${colore}"></div></div></div>`;
   document.getElementById('pdlProgBars').innerHTML =
     barra('Scene', girate, allSc.length, pct, 'var(--green)') +
-    barra('Giornate', completi, pdlData.totale_giorni, gPct, 'var(--yellow)');
+    barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)');
 }
 
 function renderPdlStandby() {
