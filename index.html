@@ -683,6 +683,15 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .at-imdb{display:flex;width:100%;max-width:none;margin-top:20px;text-decoration:none}
 .sp-sc.ferma{background:none;border-style:dashed;color:var(--muted);cursor:default;
   display:inline-flex;align-items:center;justify-content:center}
+/* Pagina Cast */
+#castSection{padding:14px 16px 96px}
+#castContent{max-width:700px;margin:0 auto;padding:0}
+.cast-m{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:5px;
+  padding:1px 5px;margin-left:5px;vertical-align:1px}
+.cast-n{font-size:16px;color:var(--white);white-space:nowrap}
+.cast-n i{font-style:normal;font-size:10px;color:var(--muted);margin-left:3px}
+.cast-n.stima{color:var(--muted)}
+.cast-nota{margin:12px 2px 0;font-size:11.5px;line-height:1.5;color:var(--muted)}
 .odg-att:last-child{border-bottom:none}
 .odg-att .id{flex:0 0 32px;font-size:12px;color:var(--muted)}
 .odg-att .c{flex:1;min-width:0}
@@ -1560,6 +1569,15 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
             </div>
           </div>
 
+          <!-- Tabella cast -->
+          <div id="castTableWrap"></div>
+
+          <!-- Bottone genera provvisoria -->
+          <div id="castGeneraBtn" style="display:none;margin-top:16px;text-align:center">
+            <button onclick="generaCastProvvisorio()" style="padding:10px 22px;border-radius:8px;border:1px solid var(--yellow);background:none;color:var(--yellow);cursor:pointer;font-size:13px;font-weight:600">Genera lista ID provvisoria</button>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">Ricavata dalla sceneggiatura già analizzata</div>
+          </div>
+
           <!-- Upload ufficiale -->
           <div style="border:1px dashed var(--border);border-radius:10px;padding:18px 20px;margin-bottom:24px">
             <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">Carica lista ID ufficiale</div>
@@ -1569,15 +1587,6 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
               <button onclick="document.getElementById('castUploadInput').click()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--white);cursor:pointer;font-size:12px">📎 Scegli file</button>
               <span id="castUploadLabel" style="font-size:11px;color:var(--muted)">Nessun file selezionato</span>
             </div>
-          </div>
-
-          <!-- Tabella cast -->
-          <div id="castTableWrap"></div>
-
-          <!-- Bottone genera provvisoria -->
-          <div id="castGeneraBtn" style="display:none;margin-top:16px;text-align:center">
-            <button onclick="generaCastProvvisorio()" style="padding:10px 22px;border-radius:8px;border:1px solid var(--yellow);background:none;color:var(--yellow);cursor:pointer;font-size:13px;font-weight:600">Genera lista ID provvisoria</button>
-            <div style="font-size:10px;color:var(--muted);margin-top:6px">Ricavata dalla sceneggiatura già analizzata</div>
           </div>
 
         </div>
@@ -6476,16 +6485,45 @@ async function scriptGoToScene() {
 }
 
 // ══ END SCRIPT VIEWER ══
+/* Dalla pagina Cast si apre la stessa scheda. Si passa il solo ID e il
+   resto si ricava qui: un nome con l'apostrofo — ce ne sono — dentro un
+   onclick spaccherebbe il codice. */
+function castApri(id){
+  const r = (window.castData || []).find(x => String(x.id_ufficiale ?? x.character_id) === String(id));
+  // Se l'ordine del giorno lo convoca oggi, gli orari li ha lui: la
+  // scheda dev'essere la stessa da qualunque porta ci si entri.
+  const o = ((odgCorrente || {}).cast || []).find(x => String(x.id) === String(id)) || {};
+  if (!r && !o.id) return;
+  apriScheda({ ...o, id, ruolo: (r && r.nome) || o.ruolo || '', interprete: o.interprete || '' });
+}
+
+let castOrdine = 'id';
+
+function castOrdina(o){ castOrdine = o; renderCastTab(window.castData || [], castAlertVisibile); }
+let castAlertVisibile = false;
+
+/* La pagina Cast.
+ *
+ * Era una tabella con ID e personaggio, e basta. Mancava la cosa per cui
+ * la si apre: quante scene fa ciascuno. Il numero ce l'avevamo gia' —
+ * lo spoglio le conta tutte — ma non si vedeva da nessuna parte se non
+ * aprendo un attore alla volta dall'ordine del giorno, e solo per chi
+ * era convocato quel giorno.
+ *
+ * Accanto al personaggio c'e' l'interprete quando l'ordine del giorno
+ * l'ha detto: la lista ufficiale del reparto regia gli attori non li
+ * porta, arrivano una convocazione alla volta.
+ */
 function renderCastTab(rows, showAlert) {
   const alert = document.getElementById('castAlert');
   const wrap  = document.getElementById('castTableWrap');
   const btn   = document.getElementById('castGeneraBtn');
   if (!alert || !wrap) return;
+  castAlertVisibile = !!showAlert;
 
   if (!rows?.length) {
-    // No cast yet — show genera button
     alert.style.display = 'none';
-    wrap.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--muted);font-size:13px">Nessuna lista ID ancora caricata.</div>`;
+    wrap.innerHTML = `<div class="sp-vuoto">Nessuna lista ID ancora caricata.</div>`;
     btn.style.display = 'block';
     return;
   }
@@ -6493,35 +6531,36 @@ function renderCastTab(rows, showAlert) {
   alert.style.display = showAlert ? 'flex' : 'none';
   btn.style.display = 'none';
 
-  const fonte = rows[0]?.fonte || 'provvisoria';
-  const isUfficiale = fonte === 'ufficiale';
+  const conta = personaggiConta();
+  const ufficiale = (rows[0]?.fonte || 'provvisoria') === 'ufficiale';
 
+  const righe = rows.map(r => {
+    const id = r.id_ufficiale ?? r.character_id;
+    const c  = conta.get(attNorm(r.nome));
+    return { id, nome: r.nome, minore: r.minore,
+             interprete: interpretePerId(id),
+             n: c ? c.n : 0, certo: c ? c.certo : false };
+  });
+  if (castOrdine === 'scene') righe.sort((a,b) => b.n - a.n);
+
+  const conScene = righe.filter(x => x.n).length;
   wrap.innerHTML = `
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="background:var(--surface2)">
-            <th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:600;width:80px">ID</th>
-            <th style="padding:10px 16px;text-align:left;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:600">Personaggio</th>
-            <th style="padding:10px 16px;text-align:right;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-weight:600;width:80px">${isUfficiale ? 'Ufficiale' : 'Provvisorio'}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((r, i) => `
-            <tr style="border-top:1px solid var(--border);${i%2===0?'background:var(--surface)':'background:var(--surface2)'}">
-              <td style="padding:11px 16px">
-                <span style="display:inline-block;min-width:32px;text-align:center;background:var(--yellow);color:#000;font-weight:700;font-size:13px;border-radius:6px;padding:2px 8px">${r.id_ufficiale ?? r.character_id}</span>
-              </td>
-              <td style="padding:11px 16px;font-size:13px;color:var(--white);font-weight:500">
-                ${r.nome}${r.minore ? ' <span style="font-size:9px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;vertical-align:middle">M</span>' : ''}
-              </td>
-              <td style="padding:11px 16px;text-align:right">
-                <span style="font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${isUfficiale ? 'ufficiale' : 'stimato'}</span>
-              </td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    <div class="sp-testa"><span class="t">Cast</span>
+      <span class="s">${righe.length} personagg${righe.length===1?'io':'i'}${ufficiale?' · lista ufficiale':''}</span></div>
+    ${conScene ? `<div class="cal-vista" style="margin-bottom:11px">
+      <button class="${castOrdine==='id'?'on':''}" onclick="castOrdina('id')">Per ID</button>
+      <button class="${castOrdine==='scene'?'on':''}" onclick="castOrdina('scene')">Per scene</button>
+    </div>` : ''}
+    <div class="card" style="margin:0">${righe.map(r => `
+      <div class="odg-att cerca" onclick="castApri('${esc(String(r.id))}')">
+        <span class="id num">${esc(String(r.id))}</span>
+        <span class="c"><span class="t">${esc(r.nome)}${r.minore?' <span class="cast-m">minore</span>':''}</span>
+        ${r.interprete ? `<span class="s">${esc(r.interprete)}</span>` : ''}</span>
+        ${r.n ? `<span class="cast-n num${r.certo?'':' stima'}">${r.n}<i>sc</i></span>` : ''}
+        <span class="chev">\u203A</span>
+      </div>`).join('')}</div>
+    ${conScene ? `<p class="cast-nota">Il conteggio viene dallo spoglio della sceneggiatura.${
+      righe.some(x => x.n && !x.certo) ? ' Dove è in grigio è una stima del primo giro.' : ''}</p>` : ''}`;
 }
 
 async function generaCastProvvisorio() {
@@ -8656,6 +8695,32 @@ function odgMaps(q) { return 'https://www.google.com/maps/search/?api=1&query=' 
  * puo' incorniciare qui dentro, perche' vieta di essere messo in pagine
  * altrui: resta il tasto in fondo per la filmografia.
  */
+/* Quante scene fa ogni personaggio.
+ *
+ * Il numero vero e' quello dello spoglio, che le scene le ha contate una
+ * per una; le pose stimate del primo giro sono un ripiego per quando lo
+ * spoglio non c'e'. La chiave e' il nome del personaggio normalizzato,
+ * perche' la lista ID e la sceneggiatura lo scrivono in due modi. */
+function personaggiConta(){
+  const d = window.analysisData || analysisData || {};
+  const out = new Map();
+  Object.entries(d.personaggi_scene || {}).forEach(([n, sc]) =>
+    out.set(attNorm(n), { n: (sc || []).length, scene: (sc || []).map(String), certo: true }));
+  (d.cast_provvisorio || []).forEach(c => {
+    const k = attNorm(c.nome);
+    if (!out.has(k) && c.pose_stimate) out.set(k, { n: c.pose_stimate, scene: null, certo: false });
+  });
+  return out;
+}
+
+/* L'interprete che l'ordine del giorno ha messo accanto a questo ID.
+   La lista cast ufficiale i nomi degli attori non li porta quasi mai:
+   arrivano un giorno alla volta, dalle convocazioni. */
+function interpretePerId(id){
+  const c = ((odgCorrente || {}).cast || []).find(x => String(x.id) === String(id));
+  return (c && c.interprete) || '';
+}
+
 function castNomePerId(id){
   const r = (window.castData || []).find(x =>
     String(x.id_ufficiale ?? x.character_id) === String(id));
@@ -8684,7 +8749,14 @@ function attoreScene(a){
 function odgApriAttore(id){
   const d = odgCorrente; if (!d) return;
   const a = (d.cast || []).find(x => String(x.id) === String(id));
-  if (!a) return;
+  if (a) apriScheda(a);
+}
+
+/* La stessa scheda la apre anche la pagina Cast, che dell'attore sa il
+   personaggio e l'ID ma non gli orari: quelli ci sono solo nei giorni in
+   cui e' convocato. */
+function apriScheda(a){
+  const d = odgCorrente || {};
   const oggi = String(a.scene || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
   const film = attoreScene(a);
   const tot  = (window.analysisData || analysisData || {}).totale_scene;
@@ -8696,28 +8768,29 @@ function odgApriAttore(id){
   odgMostraPieno(`
     <div class="sc-top">
       <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
-      <span class="sc-n">${esc(a.interprete || '')}</span>
-      <span class="sc-h">${esc([a.ruolo, a.id ? 'ID ' + a.id : ''].filter(Boolean).join(' · '))}</span>
+      <span class="sc-n">${esc(a.interprete || a.ruolo || '')}</span>
+      <span class="sc-h">${esc([a.interprete ? a.ruolo : '', a.id ? 'ID ' + a.id : ''].filter(Boolean).join(' · '))}</span>
     </div>
     <div class="at-corpo">
       <div id="atWiki"></div>
-      <div class="odg-sez">OGGI</div>
+      ${(oggi.length || a.set || a.pickup) ? `<div class="odg-sez">OGGI</div>
       <div class="card" style="padding:13px 15px">
         ${(a.set || a.pickup) ? `<div class="at-ore">
           ${a.pickup ? `<div><span class="k">Pick-up</span><span class="v num">${esc(a.pickup)}</span></div>` : ''}
           ${a.set ? `<div><span class="k">Set</span><span class="v num">${esc(a.set)}</span></div>` : ''}
         </div>` : ''}
-        ${oggi.length ? `<div class="sp-scene">${oggi.map(chip).join('')}</div>`
-                      : `<div class="at-nulla">Nessuna scena indicata per oggi.</div>`}
-      </div>
+        ${oggi.length ? `<div class="sp-scene">${oggi.map(chip).join('')}</div>` : ''}
+      </div>` : ''}
       ${film ? `<div class="odg-sez">NEL FILM</div>
       <div class="card" style="padding:13px 15px">
         <div class="at-tot"><b class="num">${film.scene.length}</b> scene${tot ? ' su ' + tot : ''}</div>
         <div class="at-elenco">${film.scene.slice(0, 60).map(esc).join(' · ')}${film.scene.length > 60 ? ' …' : ''}</div>
       </div>` : ''}
-      <a class="odg-btn at-imdb" href="${odgImdb(a.interprete)}" target="_blank" rel="noopener">Apri su IMDb</a>
+      ${a.interprete ? `<a class="odg-btn at-imdb" href="${odgImdb(a.interprete)}" target="_blank" rel="noopener">Apri su IMDb</a>`
+        : `<p class="cast-nota">L&rsquo;interprete comparirà qui quando arriverà un ordine del giorno che lo convoca.</p>`}
     </div>`);
 
+  if (!a.interprete) return;
   wikiAttore(a.interprete).then(w => {
     const box = document.getElementById('atWiki');
     if (!box || !w) return;
