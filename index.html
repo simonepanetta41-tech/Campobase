@@ -10393,9 +10393,12 @@ function odgFrazione(n) {
  * 7 4/8. Il numero dichiarato invece e' uno solo e lo ha scritto chi
  * compila il piano. */
 function odgTotalePagine(testo) {
-  // Le tre forme, dalla piu' completa alla piu' secca: "3 4/8", "7/8", "4".
-  // L'ordine conta: cercando prima l'intero, in "7/8" si prendeva il 7 e
-  // si buttavano gli ottavi.
+  /* Le tre forme, dalla piu' completa alla piu' secca: "3 4/8", "7/8", "4".
+     L'ordine conta: cercando prima l'intero, in "7/8" si prendeva il 7 e
+     si buttavano gli ottavi.
+     Di "Tot. pag." nel documento ce n'e' piu' d'uno — la giornata, e in
+     fondo l'anteprima di domani — e si prende il primo: la tabella del
+     giorno viene prima di quella del giorno dopo. */
   const m = String(testo || '').match(new RegExp(
     'Tot\\s*\\.?\\s*pag\\s*\\.?\\s*:?\\s*(?:'
     + '(\\d{1,3})\\s+(\\d{1,2})\\s*/\\s*(\\d{1,2})'   // 3 4/8
