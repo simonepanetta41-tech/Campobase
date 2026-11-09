@@ -683,6 +683,14 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .at-imdb{display:flex;width:100%;max-width:none;margin-top:20px;text-decoration:none}
 .sp-sc.ferma{background:none;border-style:dashed;color:var(--muted);cursor:default;
   display:inline-flex;align-items:center;justify-content:center}
+#troupeSection{padding:14px 16px 96px}
+.tr-spiega{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--muted)}
+.tr-qr{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px;
+  background:var(--surface);border:1px solid var(--border);border-radius:13px}
+.tr-qr svg{width:200px;height:200px;display:block;background:#fff;padding:9px;border-radius:9px}
+.tr-qr svg rect{fill:#0A0B0D}
+.tr-qr svg rect:first-child{fill:#fff}
+.tr-qr .c{font-size:19px;letter-spacing:.22em;color:var(--yellow)}
 /* Pagina Cast */
 #castSection{padding:14px 16px 96px}
 #castContent{max-width:700px;margin:0 auto;padding:0}
@@ -1902,6 +1910,9 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
           vuoi in evidenza: le altre restano, in fondo e in grigio.</p>
       </div>
 
+      <!-- LA TROUPE DEL FILM -->
+      <div id="troupeSection" style="display:none"><div id="troupeCorpo"></div></div>
+
       <!-- La scheda di una scena dello spoglio -->
       <div id="spScena" style="display:none"></div>
 
@@ -1910,6 +1921,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div class="altro-el">
           <button onclick="switchResultTab('script')"><span class="t">Script</span><span class="s">Il testo della sceneggiatura</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('analisi')"><span class="t">Analisi</span><span class="s">Il tuo reparto e cosa vedi nello spoglio</span><span class="ch">›</span></button>
+          <button onclick="switchResultTab('troupe')"><span class="t">Troupe</span><span class="s">Chi c'è nel film, e come farli entrare</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('cast')"><span class="t">Cast</span><span class="s">Personaggi e interpreti</span><span class="ch">›</span></button>
           <button onclick="switchResultTab('wrap')"><span class="t">Wrap</span><span class="s">Locali e indirizzi di fine giornata</span><span class="ch">›</span></button>
           <!-- Gennaro e' nascosto per i primi test: il codice resta, la voce no. -->
@@ -2510,6 +2522,7 @@ async function loginWithGoogle() {
 }
 
 async function logout() {
+  filmDimentica();
   await sb.auth.signOut();
 }
 
@@ -2544,7 +2557,9 @@ async function showApp() {
   // L'ordine del giorno di ieri sera deve esserci stamattina: la bozza
   // sta sul telefono, il cloud la conferma. Prima questa non la chiamava
   // nessuno e a ogni chiusura dell'app l'OdG spariva.
-  odgRipristina();
+  // Il codice d'invito arrivato da un QR si consuma prima di tutto: se
+  // c'e', il film e' quello e l'ordine del giorno va riletto dal suo.
+  filmDallIndirizzo().finally(odgRipristina);
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -3103,8 +3118,11 @@ function renderHistoryGrid(items) {
 }
 
 async function loadFromHistory(id) {
-  const { data, error } = await sb.from('analyses').select('data, notes').eq('id', id).single();
+  const { data, error } = await sb.from('analyses').select('data, notes, project_id').eq('id', id).single();
   if (error || !data) { alert('Errore caricamento analisi'); return; }
+  // Da qui in poi il film corrente e' questo: ci si appende la troupe,
+  // l'ordine del giorno e, piu' avanti, la casella della posta.
+  if (data.project_id) filmCarica(data.project_id);
   pdfB64Array = []; modalPdfDoc = null;
   currentAnalysisId = id;
   hideHomeShowResults();
@@ -3230,6 +3248,7 @@ async function saveAnalysis(data) {
     data: { ...data, _owner_id: currentUser.id }
   }).select('id').single();
   currentAnalysisId = saved?.id || null;
+  if (projectId) filmCarica(projectId);
 
   // Upload PDF to Supabase Storage (best effort, don't block on failure)
   if (saved?.id && pdfB64Array.length > 0) {
@@ -5750,10 +5769,10 @@ const RT_SEZIONI = {
   odg:'odgSection', spoglio:'spoglioSection', ore:'timetableSection',
   piano:'pdlSection', altro:'altroSection',
   cast:'castSection', wrap:'wrapSection', script:'scriptSection',
-  analisi:'analisiSection'
+  analisi:'analisiSection', troupe:'troupeSection'
 };
 const RT_FLEX = ['ore','wrap','script'];      // sezioni a colonna
-const RT_SOTTO_ALTRO = ['cast','wrap','script','analisi'];
+const RT_SOTTO_ALTRO = ['cast','wrap','script','analisi','troupe'];
 
 function switchResultTab(tab) {
   for (const [k, id] of Object.entries(RT_SEZIONI)) {
@@ -5779,6 +5798,7 @@ function switchResultTab(tab) {
   if (tab === 'wrap')    initWrap();
   if (tab === 'script')  initScriptViewer();
   if (tab === 'analisi') analisiRender();
+  if (tab === 'troupe')  troupeRender();
 
   const barra = { odg:'tabOdg', spoglio:'tabSpoglio', ore:'tabTimetable',
                   piano:'tabPdl', altro:'tabAltro' };
@@ -8539,20 +8559,225 @@ function odgPasso(t) {
  * Come per gli orari: prima sul telefono, poi sul cloud. L'OdG serve la
  * mattina presto, spesso in un posto senza campo, e deve esserci comunque.
  */
+/* ══ IL FILM E LA SUA TROUPE ═══════════════════════════════════════
+ *
+ * Un film esiste gia' come progetto, creato quando si analizza una
+ * sceneggiatura. Da qui in poi ha anche un codice d'invito e una
+ * troupe: chi inquadra il QR entra, e da quel momento l'ordine del
+ * giorno che carica uno lo leggono tutti.
+ *
+ * Il film corrente sta sul telefono perche' serve prima che il cloud
+ * risponda — all'avvio, offline, nel mezzo di una giornata di riprese.
+ */
+const CB_FILM = 'cb_film';
+
+function filmCorrente(){
+  try { return JSON.parse(localStorage.getItem(CB_FILM) || 'null'); } catch (_) { return null; }
+}
+
+function filmImposta(f){
+  try {
+    if (f) localStorage.setItem(CB_FILM, JSON.stringify(f));
+    else localStorage.removeItem(CB_FILM);
+  } catch (_) {}
+}
+
+/* Il codice d'invito: otto cifre esadecimali. Qualcuno lo leggera' ad
+   alta voce sul set, quindi corto; e il QR ne fa comunque le veci. */
+function filmNuovoCodice(){
+  const b = new Uint8Array(4);
+  (crypto.getRandomValues ? crypto : { getRandomValues: a => a.forEach((_,i)=>a[i]=Math.floor(Math.random()*256)) })
+    .getRandomValues(b);
+  return [...b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+async function filmCarica(projectId){
+  if (!projectId || !currentUser) return null;
+  try {
+    const { data } = await sb.from('projects')
+      .select('id,titolo,codice,casella').eq('id', projectId).maybeSingle();
+    if (!data) return null;
+    // Un film aperto prima che i codici esistessero non ne ha uno.
+    if (!data.codice) {
+      const codice = filmNuovoCodice();
+      const { error } = await sb.from('projects').update({ codice }).eq('id', data.id);
+      if (!error) data.codice = codice;
+    }
+    filmImposta({ id: data.id, titolo: data.titolo, codice: data.codice });
+    return data;
+  } catch (e) { console.log('[film] non caricato:', e.message); return null; }
+}
+
+/* L'invito. Il QR e il link portano alla stessa cosa: aprire l'app con
+   il codice addosso. Chi ce l'ha gia' installata la apre, chi no vede
+   il sito e poi entra. */
+function filmLink(codice){
+  const u = new URL(location.origin + location.pathname.replace(/[^/]*$/, ''));
+  u.searchParams.set('film', codice);
+  return u.toString();
+}
+
+/* Si entra solo col codice: il database non lascia aggiungere nessuno a
+   un film per altre vie, nemmeno se se ne conosce l'identificativo. */
+async function filmEntra(codice){
+  if (!currentUser) return null;
+  try {
+    const { data, error } = await sb.rpc('entra_nel_film', { codice_invito: codice });
+    if (error) throw new Error(error.message);
+    const f = Array.isArray(data) ? data[0] : data;
+    if (!f) return null;
+    filmImposta({ id: f.id, titolo: f.titolo, codice: String(codice).toUpperCase() });
+    return f;
+  } catch (e) { console.log('[film] ingresso fallito:', e.message); return null; }
+}
+
+/* Il codice arriva nell'indirizzo, da un QR o da un messaggio.
+ *
+ * Quasi sempre arriva prima dell'accesso: si inquadra il QR, si apre
+ * l'app, e li' c'e' la schermata di ingresso. Quindi il codice si mette
+ * da parte subito e si usa dopo, quando c'e' qualcuno da far entrare.
+ * Dall'indirizzo sparisce comunque: un link con dentro l'invito, vivo a
+ * ogni ricaricamento, finisce per sbaglio in uno screenshot. */
+const CB_INVITO = 'cb_invito';
+
+function filmInvitoInAttesa(){
+  let c = null;
+  try { c = new URL(location.href).searchParams.get('film'); } catch (_) {}
+  // Prima si mette da parte, poi si pulisce l'indirizzo: il contrario, e un
+  // replaceState che fallisce (succede) porterebbe via l'invito con se'.
+  if (c) { try { localStorage.setItem(CB_INVITO, c.trim()); } catch (_) {} }
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.has('film')) {
+      u.searchParams.delete('film');
+      history.replaceState(null, '', u.toString());
+    }
+  } catch (_) {}
+  try { return localStorage.getItem(CB_INVITO) || (c ? c.trim() : null); } catch (_) { return c ? c.trim() : null; }
+}
+
+async function filmDallIndirizzo(){
+  const c = filmInvitoInAttesa();
+  if (!c || !currentUser) return;
+  try { localStorage.removeItem(CB_INVITO); } catch (_) {}
+  const f = await filmEntra(c);
+  if (f) {
+    showToast('Sei dentro: ' + f.titolo);
+    await odgRipristina();
+  } else {
+    showToast('Codice non valido o scaduto.');
+  }
+}
+
+async function troupeMembri(){
+  const f = filmCorrente();
+  if (!f || !currentUser) return [];
+  try {
+    const { data } = await sb.from('film_membri')
+      .select('user_id,ruolo,created_at').eq('project_id', f.id).order('created_at');
+    if (!data || !data.length) return [];
+    const { data: p } = await sb.from('profiles')
+      .select('id,nome,cognome,reparto').in('id', data.map(x => x.user_id));
+    const per = new Map((p || []).map(x => [x.id, x]));
+    return data.map(m => ({ ...m, ...(per.get(m.user_id) || {}) }));
+  } catch (e) { console.log('[troupe] non letta:', e.message); return []; }
+}
+
+async function troupeRender(){
+  const box = document.getElementById('troupeCorpo');
+  if (!box) return;
+  const f = filmCorrente();
+  if (!f) {
+    box.innerHTML = `<div class="sp-vuoto">Nessun film aperto.<br>
+      Analizza una sceneggiatura, oppure fatti mandare l'invito da chi ci lavora.</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="sp-testa"><span class="t">${esc(f.titolo || 'Il film')}</span></div>
+    <p class="tr-spiega">Chi inquadra questo codice entra nel film. Da quel momento
+      l'ordine del giorno che carica uno lo leggono tutti, senza ricaricare niente.</p>
+    <div class="tr-qr"><div id="troupeQr"></div><div class="c num">${esc(f.codice || '')}</div></div>
+    <div class="sp-azioni">
+      <button onclick="troupeCondividi()">Manda l'invito</button>
+      <button onclick="troupeCopia()">Copia il link</button>
+    </div>
+    <div class="odg-sez" style="margin-top:22px">IN QUESTO FILM</div>
+    <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
+  troupeQr(f.codice);
+  const m = await troupeMembri();
+  const el = document.getElementById('troupeElenco');
+  if (!el) return;
+  el.innerHTML = m.length ? m.map(x => `<div class="odg-att">
+      <span class="c"><span class="t">${esc([x.nome, x.cognome].filter(Boolean).join(' ') || 'Senza nome')}</span>
+      ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
+      ${x.ruolo === 'capo' ? '<span class="cast-m">ha aperto il film</span>' : ''}
+    </div>`).join('')
+    : `<div class="sp-vuoto" style="padding:18px">Per ora ci sei solo tu.</div>`;
+}
+
+/* Il QR si disegna sul telefono, non lo si va a chiedere a un servizio:
+   sul set il campo non c'e', e un invito che non si apre senza rete non
+   serve a niente. Il disegnatore si carica solo qui, la prima volta. */
+let qrPronto = null;
+function qrCarica(){
+  if (window.qrcode) return Promise.resolve();
+  if (!qrPronto) qrPronto = new Promise((ok, no) => {
+    const t = document.createElement('script');
+    t.src = 'qr.js'; t.onload = ok; t.onerror = no;
+    document.head.appendChild(t);
+  });
+  return qrPronto;
+}
+
+async function troupeQr(codice){
+  const box = document.getElementById('troupeQr');
+  if (!box || !codice) return;
+  try {
+    await qrCarica();
+    const g = qrcode(0, 'M');
+    g.addData(filmLink(codice));
+    g.make();
+    box.innerHTML = g.createSvgTag({ cellSize: 6, margin: 1, scalable: true });
+  } catch (_) {
+    box.innerHTML = '<div class="sp-vuoto" style="padding:0">Codice da dettare a voce.</div>';
+  }
+}
+
+async function troupeCondividi(){
+  const f = filmCorrente(); if (!f) return;
+  const testo = `Entra in ${f.titolo} su Campobase: ${filmLink(f.codice)}`;
+  if (navigator.share) { try { await navigator.share({ text: testo }); return; } catch (_) { return; } }
+  troupeCopia();
+}
+
+async function troupeCopia(){
+  const f = filmCorrente(); if (!f) return;
+  try { await navigator.clipboard.writeText(filmLink(f.codice)); showToast('Link copiato.'); }
+  catch (_) { showToast(filmLink(f.codice)); }
+}
+
 const ODG_LOCALE = 'cb_odg';
 
 function odgFilm() {
   return (document.getElementById('tt-film')?.value || '').trim();
 }
 
+/* L'ordine del giorno e' del film, non di chi l'ha caricato.
+ *
+ * Esce una volta e vale per sessanta persone: se resta attaccato a chi
+ * l'ha messo dentro, il microfonista accanto deve ricaricarsi gli stessi
+ * tre PDF per conto suo. Dove c'e' un film si salva sul film e lo legge
+ * la troupe; senza film, come prima, resta di chi l'ha caricato. */
 async function odgSalva(d) {
   try { localStorage.setItem(ODG_LOCALE, JSON.stringify(d)); } catch (_) {}
   if (!currentUser || !d.data) return;
+  const f = filmCorrente();
   try {
-    const { error } = await sb.from('odg').upsert({
-      user_id: currentUser.id, film: odgFilm(), data: d.data,
-      numero: d.numero || null, dati: d, updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id,film,data' });
+    const riga = { user_id: currentUser.id, film: odgFilm(), data: d.data,
+      numero: d.numero || null, dati: d, updated_at: new Date().toISOString() };
+    if (f) riga.project_id = f.id;
+    const { error } = await sb.from('odg').upsert(riga,
+      { onConflict: f ? 'project_id,data' : 'user_id,film,data' });
     if (error) throw new Error(error.message);
   } catch (e) { console.log('[odg] non salvato sul cloud:', e.message); }
 }
@@ -8564,8 +8789,11 @@ async function odgRipristina() {
   } catch (_) {}
   if (currentUser) {
     try {
-      const { data } = await sb.from('odg').select('dati,data')
-        .eq('user_id', currentUser.id).order('data', { ascending: false }).limit(1);
+      const f = filmCorrente();
+      const q = sb.from('odg').select('dati,data');
+      // Sul film: anche quello caricato da un altro della troupe.
+      const { data } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
+        .order('data', { ascending: false }).limit(1);
       const r = data && data[0];
       // Il cloud vince solo se ha una giornata piu' avanti di quella locale:
       // l'OdG di domani e' sempre quello che serve.
@@ -8575,6 +8803,10 @@ async function odgRipristina() {
   odgRicalcola();
   odgRender();
 }
+
+/* Un film si chiude quando si esce dall'account: il prossimo che entra
+   su questo telefono non deve trovarsi dentro la troupe di un altro. */
+function filmDimentica(){ filmImposta(null); }
 
 /* Quello che si ricava dal testo non si congela.
  *

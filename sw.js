@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v40';
+const CACHE = 'campobase-v41';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -8,6 +8,7 @@ const STATIC = [
   '/index.html',
   '/manifest.json',
   '/installa.html',
+  '/qr.js',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
