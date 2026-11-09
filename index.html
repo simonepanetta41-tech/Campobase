@@ -8916,9 +8916,20 @@ async function postaControlla(){
   if (postaInCorso || odgInCorso || !currentUser || !f || !f.id) return;
   postaInCorso = true;
   try {
+    /* Anche quelli gia' presi in carico.
+     *
+     * L'analisi dura decine di secondi, e un telefono che va in tasca nel
+     * frattempo la ferma a meta': il pacchetto resta 'in analisi' e, se si
+     * guardassero solo i nuovi, non lo riaprirebbe piu' nessuno. A dire di
+     * no ci pensa il gettone, che rifiuta i presi da meno di dieci minuti:
+     * qui si chiede, la' si decide.
+     *
+     * Gli errori no: un PDF illeggibile resta illeggibile, e ritentarlo a
+     * ogni apertura vuol dire pagare un'analisi ogni volta per lo stesso
+     * guasto. */
     const { data, error } = await sb.from('posta')
       .select('id,oggetto,allegati,ricevuta')
-      .eq('project_id', f.id).eq('stato', 'nuova')
+      .eq('project_id', f.id).in('stato', ['nuova', 'in analisi'])
       .order('ricevuta', { ascending: true }).limit(3);
     if (error || !data || !data.length) return;
     for (const p of data) await postaApri(p);
@@ -8944,7 +8955,9 @@ async function postaApri(p){
   } catch (e) { console.log('[posta] gettone:', e.message); }
   if (!preso) return;
 
-  showToast('È arrivato un pacchetto dalla produzione.');
+  // Si dice anche di restare: l'analisi dura, e un'app mandata in secondo
+  // piano a meta' lavoro viene congelata dal telefono.
+  showToast('Pacchetto dalla produzione: lo apro, tieni l\'app davanti.', 'default', 6000);
   try {
     const files = [];
     for (const a of tenuti) {
