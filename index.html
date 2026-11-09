@@ -10022,10 +10022,27 @@ async function odgPrevisione(d){
   const val = (arr) => idx.map(i => arr && arr[i]).filter(v => v != null);
   const temp = val(h.temperature_2m), pio = val(h.precipitation_probability),
         ven  = val(h.wind_speed_10m), cod = val(h.weather_code);
-  // Il codice che conta e' il peggiore della giornata: se alle 15 piove,
-  // lo si vuole sapere la mattina.
-  const peggio = cod.length ? cod.reduce((a,b)=>Math.max(a,b)) : null;
-  const [parola, segno] = odgCielo(peggio);
+  /* Com'e' la giornata, non com'e' l'ora peggiore.
+   *
+   * Prendendo il codice piu' alto, una sola ora di pioviggine al 35% su
+   * nove ore di sole faceva scrivere "Pioggia" in cima alla scheda. Chi
+   * legge si porta la cerata per una giornata serena, e la volta dopo non
+   * crede piu' a quello che c'e' scritto.
+   *
+   * Quindi: la parola e' quella della condizione piu' frequente. La
+   * pioggia prende il sopravvento solo se tiene almeno un terzo delle ore
+   * di lavoro — allora e' la giornata a essere piovosa, non un momento — e
+   * in quel caso si nomina la piu' forte, che e' quella per cui ci si
+   * copre. La percentuale sta comunque li' sotto, nel suo riquadro. */
+  const quante = new Map();
+  cod.forEach(c => quante.set(c, (quante.get(c) || 0) + 1));
+  const piuSpesso = [...quante.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+  const bagnato = c => c >= 51 && c <= 99;
+  const ore = cod.filter(bagnato);
+  const scelto = ore.length >= Math.max(2, Math.ceil(cod.length / 3))
+    ? Math.max(...ore)
+    : (piuSpesso ? piuSpesso[0] : null);
+  const [parola, segno] = odgCielo(scelto);
   return {
     v: ODG_METEO_V, chiesta: new Date().toISOString(),
     comune: c.nome, cielo: parola, segno,
@@ -10050,7 +10067,7 @@ async function odgPrevisione(d){
  * della scena. Corretto il modo di trovare il posto, la previsione
  * sbagliata restava li': era salvata, e chi la chiedeva trovava gia' una
  * risposta e non ne chiedeva un'altra. */
-const ODG_METEO_V = 2;
+const ODG_METEO_V = 3;   // 3: la parola descrive la giornata, non l'ora peggiore
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;

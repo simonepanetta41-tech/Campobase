@@ -146,11 +146,29 @@ function coordinateDa(testo) {
   return null;
 }
 
+/* Il nome del posto, se il link ne ha uno.
+ *
+ * Quando il link e' stato fatto da un puntino sulla mappa invece che da un
+ * luogo con un nome, Google ci mette le coordinate scritte in gradi. Sulla
+ * scheda comparivano cosi': 40%C2%B033'34.6"N. Meglio niente: chi chiama
+ * restera' con l'etichetta dell'ordine del giorno, che dice "Campo base" e
+ * si capisce. */
+const SEMBRA_COORDINATE = /^\s*-?\d{1,3}[.\u00b0]/;
+
 function nomeDa(indirizzo) {
   const m = /\/maps\/place\/([^/@]+)/.exec(String(indirizzo || ''));
   if (!m) return null;
-  try { return decodeURIComponent(m[1]).replace(/\+/g, ' ').trim() || null; }
-  catch (_) { return null; }
+  let n = m[1];
+  // Puo' arrivare codificato due volte: si sbuccia finche' cambia.
+  for (let i = 0; i < 3; i++) {
+    let d;
+    try { d = decodeURIComponent(n); } catch (_) { break; }
+    if (d === n) break;
+    n = d;
+  }
+  n = n.replace(/\+/g, ' ').trim();
+  if (!n || SEMBRA_COORDINATE.test(n)) return null;
+  return n;
 }
 
 async function handleMappa(request, env) {
