@@ -787,8 +787,12 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
   border:1px dashed rgba(var(--viaggio-rgb),0.55) !important;
 }
 .cal-cell.is-viaggio .cal-cell-giorno { color:var(--viaggio); }
-.cal-cell-viaggio { font-size:8px;font-weight:700;color:var(--viaggio);margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere; }
-@media (max-width:600px){ .cal-cell-viaggio { font-size:7px; } }
+.cal-cell-viaggio { font-size:9px;color:var(--viaggio);margin-top:2px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere; }
+/* In alto a destra, fuori dalla colonna del testo: una casella da 55
+   pixel ha posto per il giorno e l'ora, e il pulmino in fondo veniva
+   tagliato via proprio nelle giornate in cui serve. */
+.cal-cell-bus { position:absolute;top:3px;right:3px;font-size:12px;line-height:1; }
+.cal-cell.tocca { cursor:pointer; }
 /* Lo stato della giornata e' un bordo, non un riempimento: il colore di
    fondo dice gia' quanto pesa, e due tinte nella stessa casella da 55
    pixel diventano una macchia. */
@@ -829,7 +833,13 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .pdl-fondo button { min-height:46px;padding:0 26px;border-radius:12px;background:var(--yellow);
   border:none;color:#0A0B0D;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
   font-weight:600;cursor:pointer; }
-.pdl-transfer { display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 10px;background:rgba(100,180,255,0.08);border:1px solid rgba(100,180,255,0.25);border-radius:7px;font-family:'DM Mono',monospace;font-size:10px;color:rgba(100,180,255,0.9);letter-spacing:0.04em; }
+.pdl-transfer { display:flex;align-items:center;gap:9px;margin-top:10px;padding:11px 13px;
+  background:rgba(var(--viaggio-rgb),0.1);border:1px solid rgba(var(--viaggio-rgb),0.35);
+  border-radius:11px;font-family:'Space Grotesk',sans-serif;font-size:14px;color:var(--viaggio); }
+.pdl-transfer .b { font-size:16px;line-height:1 }
+.pdl-transfer .c { flex:1;min-width:0 }
+.pdl-transfer .t { display:block;font-size:12px;color:var(--muted) }
+.pdl-transfer .v { display:block;font-size:14.5px;color:var(--viaggio);margin-top:1px }
 .pdl-transfer-cal { font-size:9px;color:rgba(100,180,255,0.8);background:rgba(100,180,255,0.1);border-radius:4px;padding:1px 5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 /* Le scene nella scheda della giornata.
  *
@@ -1929,6 +1939,23 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <div class="fl">Campo<em>base</em></div>
       <div class="fr">by ohsfaccimmarosound</div>
     </footer>
+  </div>
+</div>
+
+<!-- IL TRASFERIMENTO DI UNA GIORNATA DI SOLO VIAGGIO -->
+<div class="pdl-overlay" id="pdlViaggioModal">
+  <div class="pdl-modal">
+    <div class="pdl-modal-header">
+      <div>
+        <div class="pdl-modal-title">Trasferimento <span>troupe</span></div>
+        <div class="pdl-modal-sub" id="pdlViaggioData">—</div>
+      </div>
+      <button style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;line-height:1" onclick="chiudiViaggio()">✕</button>
+    </div>
+    <div class="card" style="margin:0"><a class="odg-posto" id="pdlViaggioLuogo" href="#" target="_blank" rel="noopener">
+      <span class="i" style="font-size:20px;text-align:center">🚌</span>
+      <span class="c"><span class="t">—</span><span class="s">Non si gira: si sposta tutta la troupe</span></span>
+      <span class="go">Mappa ›</span></a></div>
   </div>
 </div>
 
@@ -6904,6 +6931,18 @@ function pdlViaggioBreve(label) {
   return label.slice(m.index + m[0].length).trim() || m[0].trim();
 }
 
+/* Il posto dove si va. Dal piano arriva come "TRASFERIMENTO A NAPOLI":
+   via la parola del vocabolario, via la preposizione che la segue, e
+   l'iniziale maiuscola invece del maiuscolo urlato del piano. */
+function pdlViaggioLuogo(label) {
+  const dest = PDL_VIAGGIO_DEST.exec(String(label || ''));
+  let t = (dest ? dest[1] : pdlViaggioBreve(label)).trim();
+  if (!t) return '';
+  return t === t.toUpperCase()
+    ? t.toLowerCase().replace(/(^|[\s'’\-])([a-zà-ÿ])/g, (_, a, b) => a + b.toUpperCase())
+    : t;
+}
+
 /*
  * Trova gli spostamenti e decide a quale giorno appartengono.
  *
@@ -9570,15 +9609,20 @@ function renderPdlCalendar() {
         // solo nella versione da schermo grande, cioe' mancava proprio dove
         // il piano si guarda davvero, sul telefono.
         el.innerHTML = '<div class="cal-cell-day">' + day + '</div><div class="cal-cell-giorno" style="font-size:8px;opacity:0.8">D' + g.numero_giorno + oraStr + '</div>' +
-          (g.trasferimento ? '<div class="cal-cell-viaggio">\u{1F68C} ' + escapeHtml(pdlViaggioBreve(g.trasferimento)) + '</div>' : '');
+          (g.trasferimento ? '<div class="cal-cell-bus">\u{1F68C}</div>' : '');
       } else {
-        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">D${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
+        el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-giorno">D${g.numero_giorno} ${g.ora_inizio&&g.ora_inizio!='TBD'?'<span style="color:'+(g.ora_incerta?'var(--orange)':'inherit')+'">'+(g.ora_inizio)+(g.ora_incerta?' ?':'')+'</span>':''}</div><div class="cal-cell-loc">${g.location_principale||''}</div><div class="cal-cell-scenes">${(g.scene||[]).slice(0,4).map(sc=>{const stato=(sd.scenes||{})[sc.numero]||'pending';const col=stato==='done'?'rgba(110,231,183,0.6)':stato==='standby'?'rgba(245,166,35,0.6)':'rgba(255,255,255,0.2)';const crit=isSceneCritical(sc.numero);return`<div class="cal-cell-sc" style="background:${col};${crit?'box-shadow:0 0 0 1.5px #e53e3e':''}">${sc.numero}</div>`;}).join('')}${sceneTotal>4?`<div class="cal-cell-sc" style="background:rgba(255,255,255,0.1)">+${sceneTotal-4}</div>`:''}</div>${g.trasferimento?`<div class="cal-cell-bus">🚌</div>`:''}${sd.notes?`<div class="cal-cell-note">${sd.notes}</div>`:''}`;
       }
     } else if (viaggiMap[dateStr]) {
       // Giornata di solo viaggio: non e' una giornata di riprese, quindi
       // non ha un numero ne' un orario, ma non e' nemmeno un giorno vuoto.
-      el.className=`cal-cell is-viaggio ${isToday?'is-today':''}`;
-      el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(window.innerWidth<=600?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
+      /* Il nome della destinazione in una casella da 55 pixel si taglia a
+         meta' e non si legge. Resta la macchinina, che si vede da lontano,
+         e il posto si legge toccando. */
+      el.className=`cal-cell is-viaggio tocca ${isToday?'is-today':''}`;
+      el.title = viaggiMap[dateStr];
+      el.addEventListener('click', ()=>apriViaggio(dateStr, viaggiMap[dateStr]));
+      el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-bus">\u{1F68C}</div>`;
     } else {
       el.className=`cal-cell vuota ${isToday?'is-today':''}`;
       el.innerHTML=`<div class="cal-cell-day">${day}</div>`;
@@ -9661,12 +9705,14 @@ function renderPdlCalendarWeekly() {
         ${locHtml}
         <div class="cal-cell-scenes">${sceneHtml}</div>
         ${g.unita_secondarie?.length ? `<div style="font-size:8px;color:var(--muted);margin-top:3px;letter-spacing:0.05em">2° UNIT</div>` : ''}
-        ${g.trasferimento?`<div class="cal-cell-viaggio">🚌 ${escapeHtml(g.trasferimento)}</div>`:''}
+        ${g.trasferimento?`<div class="cal-cell-bus">🚌</div>`:''}
         ${sd.notes ? `<div class="cal-cell-note">${sd.notes}</div>` : ''}`;
     } else if (viaggiMap[dateStr]) {
-      el.className = `cal-cell is-viaggio ${isToday?'is-today':''}`;
+      el.className = `cal-cell is-viaggio tocca ${isToday?'is-today':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
-      el.innerHTML = `<div class="cal-cell-day">${d.getDate()}</div><div class="cal-cell-viaggio">\u{1F68C} ${escapeHtml(isMobile?pdlViaggioBreve(viaggiMap[dateStr]):viaggiMap[dateStr])}</div>`;
+      el.title = viaggiMap[dateStr];
+      el.addEventListener('click', ()=>apriViaggio(dateStr, viaggiMap[dateStr]));
+      el.innerHTML = `<div class="cal-cell-day">${d.getDate()}</div><div class="cal-cell-bus">\u{1F68C}</div><div class="cal-cell-viaggio">${escapeHtml(pdlViaggioBreve(viaggiMap[dateStr]))}</div>`;
     } else {
       el.className = `cal-cell vuota ${isToday?'is-today':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
@@ -9751,11 +9797,34 @@ function renderPdlModalChips(g) {
     const transferDiv = document.createElement('div');
     transferDiv.id = 'pdlModalTransfer';
     transferDiv.className = 'pdl-transfer';
-    transferDiv.innerHTML = `<span style="font-size:14px">🚌</span><span>${g.trasferimento}</span>`;
+    transferDiv.innerHTML = `<span class="b">🚌</span><span class="c">
+      <span class="t">Trasferimento troupe</span>
+      <span class="v">${escapeHtml(pdlViaggioLuogo(g.trasferimento))}</span></span>`;
     document.getElementById('pdlModalChips').after(transferDiv);
   }
 
   updatePdlModalStatus(g);
+}
+
+/* Una giornata di solo viaggio non ha scene, orari o convocazione: ha una
+   data e un posto. Tanto vale dirli grossi e dare la mappa. */
+function apriViaggio(dataIso, etichetta) {
+  const d = dataIso ? new Date(dataIso + 'T12:00:00') : null;
+  document.getElementById('pdlViaggioData').textContent = d && !isNaN(d)
+    ? d.toLocaleDateString('it-IT', { weekday:'long', day:'2-digit', month:'long', year:'numeric' })
+    : '';
+  // Il posto se il piano lo scrive; altrimenti la riga com'e', che e'
+  // comunque piu' di niente.
+  const luogo = pdlViaggioLuogo(etichetta);
+  const a = document.getElementById('pdlViaggioLuogo');
+  a.querySelector('.t').textContent = luogo || String(etichetta || '').trim() || 'Destinazione non indicata';
+  a.href = luogo ? odgMaps(luogo) : '#';
+  a.querySelector('.go').style.display = luogo ? '' : 'none';
+  document.getElementById('pdlViaggioModal').classList.add('open');
+}
+
+function chiudiViaggio() {
+  document.getElementById('pdlViaggioModal').classList.remove('open');
 }
 
 function cyclePdlSceneModal(scNum) {
@@ -9866,6 +9935,7 @@ async function deletePdl() {
 
 function closePdlDayModal() { document.getElementById('pdlDayModal').classList.remove('open'); pdlModalDayNum=null; }
 document.getElementById('pdlDayModal').addEventListener('click',e=>{if(e.target===document.getElementById('pdlDayModal'))closePdlDayModal();});
+document.getElementById('pdlViaggioModal').addEventListener('click',e=>{if(e.target===e.currentTarget)chiudiViaggio();});
 </script>
 <script>
 // ══════════════════════════════════════════════
