@@ -183,6 +183,8 @@ function corpoDecodificato(buf, da, a, codifica) {
  */
 function scendi(buf, da, a, raccolto, profondita = 0) {
   if (profondita > 12) return;
+  const segna = (t, n) => raccolto.struttura.push(
+    '  '.repeat(profondita) + t + (n ? ' «' + n + '»' : ''));
 
   let fineInt = trovaByte(buf, CRLF2, da);
   let salto = 4;
@@ -199,6 +201,7 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
   if (profondita === 0) raccolto.intestazioni = int;
 
   if (ct.tipo.startsWith('multipart/') && ct.par.boundary) {
+    segna(ct.tipo);
     const sep = '--' + ct.par.boundary;
     const sepByte = Array.from(sep, c => c.charCodeAt(0));
     let p = trovaByte(buf, sepByte, inizioCorpo);
@@ -220,6 +223,7 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
   }
 
   if (ct.tipo === 'message/rfc822') {
+    segna(ct.tipo);
     const dentro = corpoDecodificato(buf, inizioCorpo, a, codifica);
     scendi(dentro, 0, dentro.length, raccolto, profondita + 1);
     return;
@@ -227,6 +231,8 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
 
   const nome = decodificaParole(cd.par.filename || ct.par.name || '');
   const allegato = cd.tipo === 'attachment' || (!!nome && ct.tipo !== 'text/plain' && ct.tipo !== 'text/html');
+
+  segna(ct.tipo, nome);
 
   if (allegato) {
     const byte = corpoDecodificato(buf, inizioCorpo, a, codifica);
@@ -247,7 +253,7 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
 }
 
 export function leggiMessaggio(buf) {
-  const raccolto = { allegati: [], testo: '', intestazioni: new Map() };
+  const raccolto = { allegati: [], testo: '', intestazioni: new Map(), struttura: [] };
   scendi(buf, 0, buf.length, raccolto);
   const int = raccolto.intestazioni;
   return {
@@ -258,6 +264,11 @@ export function leggiMessaggio(buf) {
     messageId: (int.get('message-id') || '').replace(/^<|>$/g, ''),
     testo:     raccolto.testo.trim(),
     allegati:  raccolto.allegati,
+    /* L'albero dei pezzi, uno per riga. Serve a capire cosa e' arrivato
+       davvero quando un pacchetto non da' gli allegati che dovrebbe: ogni
+       produzione impacchetta la posta a modo suo, e senza questo si
+       tirerebbe a indovinare. */
+    struttura: raccolto.struttura,
     intestazione: n => int.get(String(n).toLowerCase()) || ''
   };
 }

@@ -168,7 +168,21 @@ export async function riceviPosta(message, env, ctx) {
     }
     riga.allegati = elenco;
 
-    if (!elenco.some(v => v.tenuto)) riga.stato = 'senza allegati';
+    /* Una riga di diario per ogni pacchetto. Nei log di Cloudflare si vede
+       cosa e' arrivato e cosa si e' tenuto, senza dover aprire il database.
+       Quando non si tiene niente si stampa anche l'albero dei pezzi: e' il
+       solo modo per capire come impacchetta la posta una produzione nuova,
+       e succede a ogni produzione nuova. */
+    console.log('posta ' + casella + ' <- ' + riga.mittente + ' | ' +
+      (riga.oggetto || '(senza oggetto)') + ' | ' +
+      (elenco.length ? elenco.map(v => `${v.nome} [${v.tipo} ${v.byte}B ${v.tenuto ? 'tenuto' : 'scartato'}]`).join(' + ')
+                     : 'nessun allegato'));
+
+    if (!elenco.some(v => v.tenuto)) {
+      riga.stato = 'senza allegati';
+      riga.nota = 'pezzi: ' + (m.struttura || []).join(' / ');
+      console.log('posta: niente da tenere. Albero:\n' + (m.struttura || []).join('\n'));
+    }
   } catch (e) {
     // La riga si scrive lo stesso. Una mail arrivata e non capita e' un
     // caso da guardare; una mail sparita e' un caso che non si scopre.
