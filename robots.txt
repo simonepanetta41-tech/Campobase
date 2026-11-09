@@ -1,0 +1,12 @@
+# Esiste per un motivo preciso: senza un file vero qui, la regola
+# single-page-application rispondeva a /robots.txt con index.html, cioe'
+# serviva una pagina HTML a chi si aspettava due righe di testo.
+#
+# L'app vera sta dietro l'accesso e non e' leggibile da un crawler. Quello
+# che si vuole fuori dagli indici sono i link condivisi: li si manda a una
+# persona, non al mondo.
+
+User-agent: *
+Disallow: /share/
+Disallow: /api/
+Allow: /
