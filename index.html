@@ -7905,9 +7905,35 @@ function odgDopo(testo, et, lunghezza = 90) {
   return p === null ? null : testo.slice(p, p + lunghezza);
 }
 
+/* L'ora dopo un'etichetta, anche quando non le sta attaccata.
+ *
+ * Undici produzioni, undici modi di separarle:
+ *   "CONVOCAZIONE TROUPE SUL SET   ORE:   19 : 00"   (Alla Festa della Rivoluzione)
+ *   "CONVOCAZIONE   ‣   1 4 : 3 0"                     (Bentornati al Sud)
+ *   "PRONTI A GIRARE:   10 :15"                     (Suburra)
+ *
+ * Quindi si salta quello che c'e' in mezzo — ma solo se e' fatto di parole
+ * e segni. Al primo numero che non e' un'ora ci si ferma: in un ordine del
+ * giorno dopo l'etichetta puo' esserci la data, e prendere l'ora che viene
+ * dopo quella vorrebbe dire prenderla da un altro campo. */
 function odgOraDopo(testo, et) {
-  const t = odgDopo(testo, et, 24);
-  return t ? odgOra(t) : null;
+  /* La stessa etichetta compare piu' volte: una come intestazione di
+     colonna, da sola, e una davanti all'ora vera. In Spirit c'e' prima
+     "CONVOCAZIONE" nuda e poi "CONVOCAZIONE   18:00", e prendendo la prima
+     si finiva per raccogliere un orario di trucco trovato piu' avanti.
+     Si provano tutte e vince quella che ha l'ora piu' vicina: un'etichetta
+     orfana non ne ha nessuna attaccata. */
+  const re = new RegExp(odgEtichetta(et) + '(?:\\s*:)?\\s*', 'gi');
+  let m, meglio = null, distanza = Infinity;
+  while ((m = re.exec(testo)) !== null) {
+    if (m[0].length === 0) { re.lastIndex++; continue; }
+    const dopo = testo.slice(m.index + m[0].length, m.index + m[0].length + 46);
+    const o = dopo.match(/^([^0-9]{0,34}?)(\d\s?\d?\s*[.:]\s*\d\s?\d)/);
+    if (!o) continue;
+    if (o[1].length < distanza) { distanza = o[1].length; meglio = o[2]; }
+    if (distanza === 0) break;
+  }
+  return meglio ? odgOra(meglio) : null;
 }
 
 /* Un valore testuale: si ferma alla prossima etichetta in maiuscolo seguita
@@ -7968,14 +7994,26 @@ const ODG_POSTI = [
 function odgLuoghi(testo) {
   const t = String(testo || '');
   const out = [], visti = new Set();
-  // L'etichetta e' in maiuscolo e sta attaccata ai due punti prima del link.
-  const re = /([A-ZÀ-Ù][A-ZÀ-Ù0-9\s.\/'-]{0,28}?)\s*:\s*(https?:\/\/\S+)/g;
+  /* Si parte dal link e si guarda indietro.
+     Cercando in avanti dall'etichetta non si sapeva dove farla finire: fra
+     il nome del posto e il suo link c'e' spesso l'indirizzo per esteso
+     ("CAMPO BASE:   Via Tiberina 831, Roma   https://..."), e l'etichetta
+     finiva per ridursi a una lettera sola. Dal link invece si torna
+     indietro e si prende l'ultima etichetta che si incontra: e' la sua.
+     Non tutti usano Google — Bentornati al Sud manda su Apple Mappe. */
+  const re = /https?:\/\/\S+/g;
   let m;
   while ((m = re.exec(t)) !== null) {
-    const url = m[2].replace(/[.,;:]+$/, '');
+    const url = m[0].replace(/[.,;:]+$/, '');
     if (visti.has(url)) continue;
     visti.add(url);
-    const grezza = m[1].replace(/\s+/g, ' ').trim();
+    const prima = t.slice(Math.max(0, m.index - 130), m.index);
+    // L'ultima etichetta in maiuscolo prima del link, con o senza due punti.
+    const et = [...prima.matchAll(/([A-ZÀ-Ù][A-ZÀ-Ù0-9 .#\/'’-]{1,28})\s*:/g)];
+    const nuda = [...prima.matchAll(/(?:^|\s{2,})([A-ZÀ-Ù][A-ZÀ-Ù0-9 .#\/'’-]{2,28}?)\s{2,}/g)];
+    const ultima = et.length ? et[et.length - 1][1] : nuda.length ? nuda[nuda.length - 1][1] : '';
+    const grezza = ultima.replace(/\s+/g, ' ').trim();
+    if (!grezza) continue;
     // Si guarda la coda dell'etichetta: "LOCATION / MEZZI TECNICI" e'
     // comunque i mezzi tecnici.
     const noto = ODG_POSTI.find(([k]) =>
@@ -10468,8 +10506,8 @@ function odgTotalePagine(testo) {
      fondo l'anteprima di domani — e si prende il primo: la tabella del
      giorno viene prima di quella del giorno dopo. */
   const m = String(testo || '').match(new RegExp(
-    'Tot\\s*\\.?\\s*pag\\s*\\.?\\s*:?\\s*(?:'
-    + '(\\d{1,3})\\s+(\\d{1,2})\\s*/\\s*(\\d{1,2})'   // 3 4/8
+    'Tot\\s*\\.?\\s*(?:pag|pgs)\\s*\\.?\\s*:?\\s*(?:'
+    + '(\\d{1,3})\\s*[-\u2013]?\\s*(\\d{1,2})\\s*/\\s*(\\d{1,2})'   // "3 4/8", e "1 - 6/8" come lo scrive Bentornati al Sud
     + '|(\\d{1,2})\\s*/\\s*(\\d{1,2})'                 // 7/8
     + '|(\\d{1,3})(?!\\s*/)'                             // 4
     + ')', 'i'));

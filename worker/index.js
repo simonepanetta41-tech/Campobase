@@ -125,7 +125,7 @@ async function handlePdl(request, env, ctx) {
  * ripetitore che chiama qualsiasi indirizzo gli si passi, compresi quelli
  * interni che un Worker puo' raggiungere e il mondo no.
  */
-const MAPPE_AMMESSE = /^(?:maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]{2,7}|www\.google\.[a-z.]{2,7})$/i;
+const MAPPE_AMMESSE = /^(?:maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]{2,7}|www\.google\.[a-z.]{2,7}|maps\.apple(?:\.com)?|maps\.apple)$/i;
 
 // Le coordinate compaiono in piu' forme a seconda di dove si viene
 // rimandati: nell'indirizzo finale, oppure dentro la pagina.
