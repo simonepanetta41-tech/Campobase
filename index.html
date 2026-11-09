@@ -10027,6 +10027,7 @@ async function odgPrevisione(d){
   const peggio = cod.length ? cod.reduce((a,b)=>Math.max(a,b)) : null;
   const [parola, segno] = odgCielo(peggio);
   return {
+    v: ODG_METEO_V, chiesta: new Date().toISOString(),
     comune: c.nome, cielo: parola, segno,
     min: temp.length ? Math.round(Math.min(...temp)) : null,
     max: temp.length ? Math.round(Math.max(...temp)) : null,
@@ -10036,18 +10037,41 @@ async function odgPrevisione(d){
   };
 }
 
-/* Si chiede dopo aver disegnato: la scheda non deve aspettare la rete. */
+/* Si chiede dopo aver disegnato: la scheda non deve aspettare la rete.
+ *
+ * E si richiede, a due condizioni. La prima: una previsione di tre ore fa
+ * non e' piu' una previsione, e l'ordine del giorno di domani uno lo apre
+ * la sera e poi di nuovo all'alba. La seconda: quando cambia il modo di
+ * trovare il posto cambia il numero qui sotto, e quello che era salvato
+ * non vale piu'.
+ *
+ * La seconda e' nata da un guasto vero. Il meteo era stato preso per
+ * Paese, in provincia di Treviso, leggendo "CASA PAESE" dall'ambiente
+ * della scena. Corretto il modo di trovare il posto, la previsione
+ * sbagliata restava li': era salvata, e chi la chiedeva trovava gia' una
+ * risposta e non ne chiedeva un'altra. */
+const ODG_METEO_V = 2;
+
 async function odgCaricaMeteo(){
   const d = odgCorrente;
-  if (!d || d.previsione || d.previsioneFallita) return;
+  if (!d) return;
+  const vecchia = d.previsione;
+  const buona = vecchia && vecchia.v === ODG_METEO_V && vecchia.chiesta
+             && (Date.now() - Date.parse(vecchia.chiesta)) < 3 * 60 * 60 * 1000;
+  if (buona) return;
+  // Anche la rinuncia vale solo per il modo di cercare con cui si e'
+  // rinunciato: se no un posto che oggi si trova resterebbe senza meteo.
+  if (d.previsioneFallita === ODG_METEO_V) return;
+  if (!vecchia || vecchia.v !== ODG_METEO_V) d.posto = null;
   try {
     const p = await odgPrevisione(d);
-    if (!p) { d.previsioneFallita = true; return; }
+    if (!p) { d.previsioneFallita = ODG_METEO_V; return; }
     d.previsione = p;
+    delete d.previsioneFallita;
     odgRender();
     odgSalva(d);
   } catch (e) {
-    d.previsioneFallita = true;
+    d.previsioneFallita = ODG_METEO_V;
     console.log('[odg] meteo non disponibile:', e.message);
   }
 }
