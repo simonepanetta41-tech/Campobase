@@ -3072,7 +3072,12 @@ async function loadHistory() {
       .order('created_at', { ascending: false })
       .limit(30);
     if (error) throw error;
-    renderHistoryGrid(data || []);
+    /* Anche i film in cui si e' entrati col QR.
+       Chi entra nella troupe di un altro non ha nessuna analisi sua — lo
+       spoglio l'ha caricato il capo — e la lista, che guarda solo le
+       analisi, gli restava vuota: dentro il film nel database, fuori
+       dall'app. */
+    renderHistoryGrid(data || [], await filmDaMembri(data || []));
     // Quante giornate ha il film e a che punto e': sta nel piano di
     // lavorazione, non nell'analisi. Si chiede dopo aver disegnato, in
     // una query sola per tutti i progetti, e la lista si completa da se'.
@@ -3122,13 +3127,45 @@ function homeNuovo(){
   if(!aperto)setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),60);
 }
 
-function renderHistoryGrid(items) {
+/* I film di cui si fa parte e che non sono gia' nella lista.
+   Si escludono i propri: quelli compaiono con la loro analisi. */
+async function filmDaMembri(analisi) {
+  if (!currentUser) return [];
+  try {
+    const { data, error } = await sb.from('film_membri')
+      .select('project_id, projects(id,titolo,codice,casella,user_id)')
+      .eq('user_id', currentUser.id);
+    if (error) throw new Error(error.message);
+    const gia = new Set((analisi || []).map(a => a.data?.titolo).filter(Boolean));
+    return (data || [])
+      .map(r => Array.isArray(r.projects) ? r.projects[0] : r.projects)
+      .filter(p => p && p.id && p.user_id !== currentUser.id && !gia.has(p.titolo));
+  } catch (e) { console.log('[film] lista non caricata:', e.message); return []; }
+}
+
+/* Aprire un film di cui si e' solo membri: non c'e' un'analisi da
+   caricare, c'e' l'ordine del giorno della giornata. */
+async function apriFilm(id) {
+  await filmCarica(id);
+  hideHomeShowResults();
+  switchResultTab('odg');
+  await odgRipristina();
+  postaControlla();
+}
+
+function renderHistoryGrid(items, film) {
   const grid = document.getElementById('historyGrid');
-  if (!items.length) {
+  film = film || [];
+  if (!items.length && !film.length) {
     grid.innerHTML = '<div class="prog-vuoto">Nessun progetto. Il primo nasce caricando una sceneggiatura.</div>';
     return;
   }
-  grid.innerHTML = items.map(h => {
+  const schede = film.map(f => `<div class="prog" data-film="${esc(f.id)}" onclick="apriFilm('${esc(f.id)}')">
+      <span class="c"><span class="t">${esc(f.titolo || 'Film')}</span>
+      <span class="s num">nella troupe</span></span>
+      <span class="ch">›</span>
+    </div>`).join('');
+  grid.innerHTML = schede + items.map(h => {
     const d = new Date(h.created_at);
     const quando = d.toLocaleDateString('it-IT', { day:'numeric', month:'short', year:
       d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
