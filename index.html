@@ -9164,9 +9164,35 @@ function odgTipoDoc(t){
      senza troupe e senza pick-up.
      Le etichette dell'ordine del giorno pero' gli stralci non le hanno: se
      ce ne sono almeno due, comanda l'ordine del giorno. */
+  /* Un'etichetta conta solo se ha il suo valore accanto: due punti, una
+     freccia, un orario. Cercando la parola e basta, un piano ambientato in
+     ospedale passava per ordine del giorno — "OSPEDALE" ci compare otto
+     volte, ma come ambiente delle scene, non come campo. */
   const etichette = ['CONVOCAZIONE', 'PRONTI A GIRARE', 'FINE RIPRESE',
-                     'FINE LAVORAZIONE', 'OSPEDALE', 'CESTINI', 'CATERING']
-    .filter(e => new RegExp(odgEtichetta(e), 'i').test(u)).length;
+                     'FINE LAVORAZIONE', 'CESTINI', 'CATERING']
+    .filter(e => new RegExp(odgEtichetta(e)
+              + '(?![A-ZÀ-Ù])[ \\t]*(?::|\\u2023|\\u00bb|\\d\\s?\\d?\\s*[.:]\\s*\\d)', 'i').test(u)).length;
+
+  /* Il piano di lavorazione, prima degli stralci.
+   *
+   * Un piano e' fatto di intestazioni di scena — sono le stesse righe,
+   * elencate giornata per giornata — quindi contandole finirebbe per
+   * stralci. A distinguerlo e' che chiude le giornate, una dopo l'altra, e
+   * nessun altro documento lo fa. Ogni produzione lo scrive a modo suo:
+   *
+   *   "FINE 1a SETTIMANA"            (Missione San Gennaro)
+   *   "FINE PRIMA SETTIMANA DI RIPRESE"   (Il sogno)
+   *   "---- Fine del giorno # 12 -"  (Bentornati al Sud)
+   *   "Fine giornata riprese"        (PDL8)
+   *
+   * Tre di queste chiusure bastano: un ordine del giorno ne ha al massimo
+   * una, e "FINE RIPRESE" e "FINE LAVORAZIONE" non assomigliano a nessuna.
+   */
+  const chiusure = (u.match(
+    /FINE\s+(?:DEL\s+)?(?:GIORN|SETTIMAN|\d|PRIM|SECOND|TERZ|QUART|QUINT|SEST|OTTAV|NON|DECIM)/g) || []).length;
+  const titoloPiano = /PIANO DI LAVORAZIONE|SHOOTING SCHEDULE/.test(u);
+  if (etichette < 2 && (chiusure >= 3 || titoloPiano)) return 'pdl';
+
   if (etichette >= 2) return 'odg';
 
   if (slug >= 2) return 'stralci';
@@ -9228,7 +9254,10 @@ function odgAggiustaPagine(d) {
   }
 }
 
+let odgUltimiLetti = [];
+
 async function odgLavora(files, opzioni) {
+  odgUltimiLetti = [];
   const esigiOdg = !!(opzioni && opzioni.esigiOdg);
   if (!files.length || odgInCorso) return false;
   odgInCorso = true;
@@ -9245,7 +9274,7 @@ async function odgLavora(files, opzioni) {
       const chiave = odgChiaveFile(f.name);
       const salvato = await cbFileSalva(chiave, await f.arrayBuffer());
       const r = await odgTestoDaPdf(f, true);
-      letti.push({ nome: f.name, testo: r.testo, piatto: r.piatto,
+      letti.push({ nome: f.name, vero: f, testo: r.testo, piatto: r.piatto,
                    colonne: r.colonne, righe: r.righe,
                    tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null });
     }
@@ -9261,6 +9290,10 @@ async function odgLavora(files, opzioni) {
        ordine del giorno: ne usciva un OdG incompleto che prendeva il
        posto di quello buono della giornata. Dalla posta, se un ordine del
        giorno non c'e', non si tocca niente. */
+    /* Quello che si e' letto resta a disposizione di chi ha chiamato: se
+       qui dentro non c'e' un ordine del giorno magari c'e' un piano, e
+       riaprire i PDF una seconda volta per scoprirlo sarebbe uno spreco. */
+    odgUltimiLetti = letti;
     const dichiarato = letti.find(x => x.tipo === 'odg');
     if (esigiOdg && !dichiarato) {
       odgErrore = 'Nel pacchetto non c\'è un ordine del giorno.';
@@ -9769,10 +9802,24 @@ async function postaApri(p){
       files.push(new File([blob], a.nome, { type: a.tipo || 'application/pdf' }));
     }
     // Dalla posta si pretende un ordine del giorno vero.
-    const fatto = await odgLavora(files, { esigiOdg: true });
-    // Non fatto vuol dire che dentro non c'era un ordine del giorno: non
+    let fatto = await odgLavora(files, { esigiOdg: true });
+    let che = 'ordine del giorno';
+
+    /* Se non c'era, puo' esserci un piano di lavorazione: le produzioni
+       mandano le versioni nuove per posta come tutto il resto. Aggiorna la
+       sezione Piano e lascia stare la giornata, che e' un'altra cosa. */
+    if (!fatto) {
+      const piano = (odgUltimiLetti || []).find(x => x.tipo === 'pdl' && x.vero);
+      if (piano) {
+        try { fatto = await pdlAggiorna(piano.vero); che = 'piano di lavorazione'; }
+        catch (e) { console.log('[posta] piano non aggiornato:', e.message); odgErrore = e.message; }
+      }
+    }
+
+    // Non fatto vuol dire che dentro non c'era ne' l'uno ne' l'altro: non
     // e' un guasto, e' una mail qualsiasi. Si segna e non si ritenta.
-    await postaSegna(p.id, fatto ? 'fatta' : 'scartata', fatto ? null : (odgErrore || 'non e\' un ordine del giorno'));
+    await postaSegna(p.id, fatto ? 'fatta' : 'scartata',
+                     fatto ? che : (odgErrore || 'non e\' un ordine del giorno'));
   } catch (e) {
     console.log('[posta] apertura fallita:', e.message);
     await postaSegna(p.id, 'errore', e.message);
@@ -11233,8 +11280,18 @@ async function loadPdlFile(input) {
 async function loadUpdatedPdlFile(input) {
   const f = input.files[0]; if(!f) return; input.value='';
   const btn = input.parentElement;
+  const prima = btn.innerHTML;
   btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="vertical-align:middle;margin-right:6px;animation:spin 1s linear infinite"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" stroke-width="1.5" opacity="0.2"/><path d="M10 2a8 8 0 018 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Analisi in corso...';
-  try {
+  try { await pdlAggiorna(f); }
+  catch(err) { alert('\u26a0 ' + err.message); }
+  finally { btn.innerHTML = prima; }
+}
+
+/* L'aggiornamento del piano, staccato dal tasto che lo scatenava: lo
+   stesso PDF puo' arrivare dal dito di qualcuno o per posta dalla
+   produzione, e da qui in poi il lavoro e' identico. */
+async function pdlAggiorna(f) {
+  {
     const buf=await f.arrayBuffer(); const bytes=new Uint8Array(buf);
     let bin=''; const chunk=8192;
     for(let i=0;i<bytes.byteLength;i+=chunk) bin+=String.fromCharCode(...bytes.subarray(i,i+chunk));
@@ -11264,8 +11321,9 @@ async function loadUpdatedPdlFile(input) {
     if(currentAnalysisId) savePdlToSupabase();
     extractAndApplyTrasferimenti(b64);
     processPdlCast(b64);
-    showToast('PDL aggiornato — '+(pdlData.versione||'nuova versione'), 'yellow', 4000);
-  } catch(err) { alert('⚠ '+err.message); }
+    showToast('Piano di lavorazione aggiornato — '+(pdlData.versione||'nuova versione'), 'yellow', 4000);
+    return true;
+  }
   btn.innerHTML='<svg width="13" height="13" viewBox="0 0 56 64" fill="none" style="vertical-align:middle;margin-right:5px"><rect x="0" y="8" width="56" height="56" rx="4" stroke="currentColor" stroke-width="4"/><rect x="0" y="8" width="56" height="14" rx="4" fill="currentColor"/><rect x="0" y="16" width="56" height="6" fill="currentColor"/><circle cx="8" cy="15" r="4" fill="var(--yellow,#f0e040)"/><circle cx="48" cy="15" r="4" fill="var(--yellow,#f0e040)"/><line x1="18" y1="22" x2="18" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="32" y1="22" x2="32" y2="64" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="34" x2="56" y2="34" stroke="currentColor" stroke-width="2" opacity="0.3"/><line x1="0" y1="46" x2="56" y2="46" stroke="currentColor" stroke-width="2" opacity="0.3"/><rect x="19" y="23" width="12" height="10" rx="1" fill="var(--yellow,#f0e040)" opacity="0.9"/><rect x="33" y="35" width="12" height="10" rx="1" fill="var(--yellow,#f0e040)" opacity="0.9"/></svg> Carica PDL aggiornato<input type="file" accept=".pdf" style="display:none" onchange="loadUpdatedPdlFile(this)">';
 }
 
