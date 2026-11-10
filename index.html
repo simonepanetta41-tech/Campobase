@@ -546,6 +546,18 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   min-height:52px;margin-top:4px;background:none;border:1px dashed var(--border-l);
   border-radius:12px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;
   font-size:14.5px;font-weight:500;cursor:pointer}
+/* Entrare in un film di qualcun altro: tasto piu' sobrio di quello per
+   aprire un film nuovo, perche' si usa una volta per produzione. */
+.prog-codice{min-height:44px;margin-top:8px;border-style:solid;
+  color:var(--white-dim);font-size:13.5px}
+.cod-box{display:none;gap:8px;margin-top:8px}
+.cod-box.on{display:flex}
+.cod-box input{flex:1;min-width:0;padding:12px 14px;background:var(--bg);
+  border:1px solid var(--border);border-radius:11px;color:var(--white);
+  font-family:'DM Mono',monospace;font-size:16px;letter-spacing:.18em;text-transform:uppercase}
+.cod-box button{flex:none;padding:0 18px;min-height:44px;background:var(--yellow);
+  border:none;border-radius:11px;color:#0A0B0D;font-family:'Space Grotesk',sans-serif;
+  font-size:14px;font-weight:600;cursor:pointer}
 /* ── Accesso ───────────────────────────────────────────────────────── */
 /* Marchio, frase e tasti sono un blocco solo, centrato. Prima i tasti
    erano spinti in fondo allo schermo e fra la frase e il primo tocco
@@ -1260,6 +1272,14 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
            volta per film, mentre la lista si guarda tutti i giorni. -->
       <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
         ＋ Nuovo progetto da sceneggiatura</button>
+      <button class="prog-nuovo prog-codice" id="progCodice" onclick="codiceMostra()">
+        Entra in un film con il codice</button>
+      <div class="cod-box" id="codBox">
+        <input id="codInput" maxlength="9" autocapitalize="characters" autocomplete="off"
+               spellcheck="false" placeholder="C59C90CE"
+               onkeydown="if(event.key==='Enter')codiceEntra()">
+        <button onclick="codiceEntra()">Entra</button>
+      </div>
       <div class="panel" id="uploadPanel" style="display:none;margin-top:12px">
         <div class="panel-label">Nuova Analisi</div>
 
@@ -3144,11 +3164,47 @@ async function filmDaMembri(analisi) {
   } catch (e) { console.log('[film] lista non caricata:', e.message); return []; }
 }
 
+/* Entrare in un film digitando il codice.
+ *
+ * Il QR resta, ma da solo non basta: inquadrandolo si apre il browser,
+ * non l'app installata sulla schermata home, e chi lo usa si ritrova a
+ * fare l'accesso due volte — una nel browser dove e' entrato nel film, e
+ * una nell'app dove il film non c'e'. Il codice sotto il QR invece si
+ * detta a voce sul set e si digita dentro l'app, dove si e' gia' entrati.
+ */
+function codiceMostra() {
+  const b = document.getElementById('codBox');
+  if (!b) return;
+  b.classList.toggle('on');
+  if (b.classList.contains('on')) document.getElementById('codInput').focus();
+}
+
+async function codiceEntra() {
+  const el = document.getElementById('codInput');
+  const c = (el.value || '').trim().toUpperCase().replace(/\s+/g, '');
+  if (c.length < 6) { showToast('Il codice è di otto caratteri.', 'red'); return; }
+  const b = document.querySelector('#codBox button');
+  if (b) { b.disabled = true; b.textContent = '…'; }
+  const f = await filmEntra(c);
+  if (b) { b.disabled = false; b.textContent = 'Entra'; }
+  if (!f) { showToast('Codice non valido. Controlla con chi te l\'ha dato.', 'red', 5000); return; }
+  el.value = '';
+  document.getElementById('codBox').classList.remove('on');
+  await apriFilm(f.id);
+}
+
 /* Aprire un film di cui si e' solo membri: non c'e' un'analisi da
    caricare, c'e' l'ordine del giorno della giornata. */
 async function apriFilm(id) {
   await filmCarica(id);
   hideHomeShowResults();
+  /* Accendere la pagina, non solo spegnere la home.
+     Chi entra da un film invece che da un'analisi non passa per
+     renderResults, che e' il posto dove questa riga c'e' sempre stata:
+     la home spariva, i risultati non comparivano, e restava lo schermo
+     vuoto. */
+  document.getElementById('resultsPage').classList.add('on');
+  try { cbTestata(); } catch (_) {}
   switchResultTab('odg');
   await odgRipristina();
   postaControlla();
@@ -9138,7 +9194,8 @@ async function odgScegliFile(input) {
  *
  * Torna true se l'ordine del giorno e' stato letto e salvato. Serve a chi
  * chiama dalla posta, per sapere se il pacchetto si puo' segnare fatto. */
-async function odgLavora(files) {
+async function odgLavora(files, opzioni) {
+  const esigiOdg = !!(opzioni && opzioni.esigiOdg);
   if (!files.length || odgInCorso) return false;
   odgInCorso = true;
   odgRender();
@@ -9162,7 +9219,20 @@ async function odgLavora(files) {
     // l'OdG e' sempre il documento piu' corposo dei tre. Prima si prendeva
     // il primo della selezione, che su iPhone e' quello in ordine
     // alfabetico — di solito i giri auto.
-    const principale = letti.find(x => x.tipo === 'odg')
+    /* Quando i file li sceglie una persona, se nessuno si dichiara ordine
+       del giorno si prende il piu' lungo: li ha scelti lei, sa cosa sta
+       caricando. Quando invece arrivano per posta no.
+       La produzione manda anche comunicazioni — una scena modificata, con
+       allegati solo gli stralci — e quella regola le trattava come un
+       ordine del giorno: ne usciva un OdG incompleto che prendeva il
+       posto di quello buono della giornata. Dalla posta, se un ordine del
+       giorno non c'e', non si tocca niente. */
+    const dichiarato = letti.find(x => x.tipo === 'odg');
+    if (esigiOdg && !dichiarato) {
+      odgErrore = 'Nel pacchetto non c\'è un ordine del giorno.';
+      return false;
+    }
+    const principale = dichiarato
       || letti.slice().sort((a,b) => b.testo.length - a.testo.length)[0];
     const file = { name: principale.nome };
     const testo = principale.testo;
@@ -9663,7 +9733,8 @@ async function postaApri(p){
       if (error || !blob) throw new Error('allegato non scaricato: ' + a.nome);
       files.push(new File([blob], a.nome, { type: a.tipo || 'application/pdf' }));
     }
-    const fatto = await odgLavora(files);
+    // Dalla posta si pretende un ordine del giorno vero.
+    const fatto = await odgLavora(files, { esigiOdg: true });
     // Non fatto vuol dire che dentro non c'era un ordine del giorno: non
     // e' un guasto, e' una mail qualsiasi. Si segna e non si ritenta.
     await postaSegna(p.id, fatto ? 'fatta' : 'scartata', fatto ? null : (odgErrore || 'non e\' un ordine del giorno'));
