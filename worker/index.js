@@ -129,12 +129,35 @@ const MAPPE_AMMESSE = /^(?:maps\.app\.goo\.gl|goo\.gl|maps\.google\.[a-z.]{2,7}|
 
 // Le coordinate compaiono in piu' forme a seconda di dove si viene
 // rimandati: nell'indirizzo finale, oppure dentro la pagina.
+/* Un indirizzo puo' arrivare codificato, anche due volte.
+ *
+ * Quando Google rimanda alla pagina del consenso, l'indirizzo buono
+ * finisce dentro un parametro: consent.google.com/m?continue=https%3A%2F%2F
+ * www.google.com%2Fmaps%2Fplace%2F...%4040.49%2C17.33. Le coordinate ci
+ * sono, ma la chiocciola e' scritta %40 e la virgola %2C, quindi non si
+ * trovavano e l'app diceva "coordinate non trovate". */
+function sbuccia(testo) {
+  const out = [String(testo || '')];
+  for (let i = 0; i < 2; i++) {
+    let d;
+    try { d = decodeURIComponent(out[out.length - 1]); } catch (_) { break; }
+    if (d === out[out.length - 1]) break;
+    out.push(d);
+  }
+  return out;
+}
+
 function coordinateDa(testo) {
+  for (const t of sbuccia(testo)) { const c = coordinateIn(t); if (c) return c; }
+  return null;
+}
+
+function coordinateIn(testo) {
   const t = String(testo || '');
   const forme = [
     /@(-?\d{1,3}\.\d{3,}),(-?\d{1,3}\.\d{3,})/,
     /!3d(-?\d{1,3}\.\d{3,})!4d(-?\d{1,3}\.\d{3,})/,
-    /[?&](?:q|ll|daddr|center)=(-?\d{1,3}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/,
+    /[?&](?:q|ll|daddr|saddr|center|destination|coordinate)=(-?\d{1,3}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/,
     /\/(-?\d{1,3}\.\d{3,}),(-?\d{1,3}\.\d{3,})/
   ];
   for (const re of forme) {
@@ -156,7 +179,11 @@ function coordinateDa(testo) {
 const SEMBRA_COORDINATE = /^\s*-?\d{1,3}[.\u00b0]/;
 
 function nomeDa(indirizzo) {
-  const m = /\/maps\/place\/([^/@]+)/.exec(String(indirizzo || ''));
+  let m = null;
+  for (const t of sbuccia(indirizzo)) {
+    m = /\/maps\/place\/([^/@?&]+)/.exec(t);
+    if (m) break;
+  }
   if (!m) return null;
   let n = m[1];
   // Puo' arrivare codificato due volte: si sbuccia finche' cambia.
@@ -186,21 +213,41 @@ async function handleMappa(request, env) {
     return json({ error: 'Accetto solo link di Google Maps' }, 400);
   }
 
-  const r = await fetch(u.toString(), {
-    redirect: 'follow',
-    // Senza, Google risponde con una pagina ridotta che le coordinate non
-    // le ha.
-    headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
-  });
+  /* I rimandi si seguono a mano.
+   *
+   * Il primo rimando del link corto porta all'indirizzo lungo di Google
+   * Maps, che le coordinate ce le ha scritte dentro. Lasciando seguire i
+   * rimandi a fetch si arriva in fondo, e in fondo spesso c'e' la pagina
+   * del consenso: di quell'indirizzo lungo non resta piu' niente da
+   * leggere. Qui si guarda ogni tappa appena la si incontra. */
+  const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
+  let dove = u.toString(), c = null, nome = null, ultima = null;
+  for (let i = 0; i < 6 && dove; i++) {
+    let r;
+    try { r = await fetch(dove, { redirect: 'manual', headers: { 'user-agent': UA } }); }
+    catch (e) { return json({ error: 'Google non risponde: ' + e.message }, 502); }
+    c = c || coordinateDa(dove);
+    nome = nome || nomeDa(dove);
+    if (c) break;
+    const prossima = r.headers.get('location');
+    if (!prossima) { ultima = r; break; }
+    try { dove = new URL(prossima, dove).toString(); } catch (_) { break; }
+  }
 
-  let c = coordinateDa(r.url);
-  let nome = nomeDa(r.url);
-  if (!c) {
-    const html = await r.text();
+  // Niente nell'indirizzo: si guarda dentro la pagina.
+  if (!c && ultima) {
+    const html = await ultima.text();
     c = coordinateDa(html);
     if (!nome) nome = nomeDa(html);
   }
-  if (!c) return json({ error: 'Coordinate non trovate' }, 404);
+  /* L'errore dice dove si e' fermato: senza, dal telefono non c'era modo
+     di sapere se Google non avesse risposto o se la pagina non avesse le
+     coordinate. */
+  if (!c) {
+    let host = dove;
+    try { host = new URL(dove).hostname; } catch (_) {}
+    return json({ error: 'coordinate non trovate su ' + host }, 404);
+  }
 
   return json({ lat: c.lat, lon: c.lon, nome: nome || null });
 }

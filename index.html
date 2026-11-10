@@ -334,8 +334,6 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   color:#0A0B0D;border:none;border-radius:11px;font-family:'Space Grotesk',sans-serif;
   font-size:14px;font-weight:600;cursor:pointer}
 .odg-chi.uno .el{max-height:none}
-.odg-chi .alt{display:block;width:100%;background:none;border:none;border-top:1px solid var(--border);
-  padding:12px;min-height:46px;color:var(--muted);font-family:inherit;font-size:12.5px;cursor:pointer}
 .altro-el{padding:14px 16px;display:flex;flex-direction:column}
 .altro-el button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
   background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:9px;
@@ -510,7 +508,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border-top:1px solid var(--border);cursor:pointer;min-height:50px}
 .an-sp .box{width:22px;height:22px;flex:0 0 22px;margin-top:1px;border-radius:6px;
   border:1.5px solid var(--border-l);display:grid;place-items:center;font-size:13px;color:transparent}
-.an-sp.on .box{background:var(--yellow);border-color:var(--yellow);color:#0A0B0D}
+.an-sp.on .box{background:var(--yellow);border-color:var(--yellow);color:var(--bg)}
 .an-sp .c{flex:1;min-width:0}
 .an-sp .t{display:block;font-size:14.5px;color:var(--white)}
 .an-sp .d{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
@@ -643,6 +641,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-chi button:last-child{border-bottom:none}
 .odg-chi .n{display:block;font-size:14px;color:var(--white)}
 .odg-chi .r{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+.odg-chi .riga{padding:11px 16px}
+.odg-chi .sino{display:flex;gap:9px;padding:11px 12px 12px;border-top:1px solid var(--border)}
+.odg-chi .sino button{flex:1;width:auto;text-align:center;border:1px solid var(--border);
+  border-radius:10px;padding:12px 10px;font-size:14px;font-weight:600;min-height:46px}
+.odg-chi .sino .si{flex:2;background:var(--yellow);border-color:var(--yellow);color:var(--bg)}
+.odg-chi .sino .no{color:var(--white-dim)}
 
 #odgSection .card,.at-corpo .card{margin-top:11px;background:var(--surface);border:1px solid var(--border);
   border-radius:13px;overflow:hidden}
@@ -8732,16 +8736,59 @@ function eLuogo(s){
   return p.length >= 2 && p.every(w => w === w.toUpperCase() && /[A-Z]/.test(w));
 }
 function eMezzo(s){ return MEZZO_RE.exec(s); }
+/* Un numero di telefono ha almeno nove cifre. Senza questo conto, una
+   fila di numeri di scena — "21 24 25 27" — passava per un telefono. */
+function eTel(s){ return TEL_RE.test(s) && (String(s).match(/\d/g)||[]).length >= 9; }
+
+/* Il telefono dell'autista non sta sempre subito sotto il suo nome.
+ *
+ * Nei giri auto di mercoledi' 11 il furgone di Stefano Nardelli ha in
+ * mezzo il primo passeggero e l'albergo:
+ *
+ *   Stefano Nardelli Van
+ *   G.Manfra   TURSPORT HOTEL RESIDENCE
+ *   347 335 9815
+ *
+ * Guardando solo il pezzo immediatamente successivo il numero restava
+ * vuoto — e a chi alle sette del mattino deve chiamare l'autista serve
+ * proprio quello. Si cerca piu' avanti, ma ci si ferma al furgone dopo:
+ * quel numero e' di un altro autista, e dare il numero sbagliato e'
+ * peggio che non darne nessuno.
+ */
+/* E spesso il numero non e' nemmeno un pezzo solo: nel foglio e' stampato
+   distanziato, e pdf.js lo restituisce come "347", "335", "9815". Si
+   rimette insieme, ma solo partendo da un prefisso che puo' essere un
+   numero italiano — tre cifre che cominciano per 3 o per 0 — se no una
+   fila di numeri di scena si sommava fino a sembrare un telefono. */
+const PREFISSO_TEL = /^\+?(?:39)?[03]\d{2}$/;
+const GRUPPO_TEL = /^\d{2,5}$/;
+
+function telVicino(P, da){
+  let cifre = '';
+  for (let j = da + 1; j < P.length && j <= da + 8; j++) {
+    if (eMezzo(P[j])) break;
+    if (eTel(P[j])) return P[j].replace(/[^\d+]/g, '');
+    const pezzo = String(P[j]).trim();
+    if (cifre ? GRUPPO_TEL.test(pezzo) : PREFISSO_TEL.test(pezzo)) {
+      cifre += pezzo.replace(/\D/g, '');
+      if (cifre.length >= 9) return cifre;
+    } else if (cifre) cifre = '';
+  }
+  return null;
+}
 
 /* I nomi dei passeggeri. pdf.js spezza "D.De Angelis" in due colonne
    quando il cognome ha una particella, e vanno riuniti. */
+// Lo spazio che pdf.js infila prima del punto: "G .Manfra".
+function pulisciNome(s){ return String(s).replace(/\s+\./g, '.').replace(/\s{2,}/g, ' ').trim(); }
+
 function unisciNomi(nomi){
   const out = [];
   for (let i = 0; i < nomi.length; i++) {
     if (PARTICELLE.test(nomi[i]) && i + 1 < nomi.length) { out.push(nomi[i] + ' ' + nomi[++i]); }
     else out.push(nomi[i]);
   }
-  return out;
+  return out.map(pulisciNome);
 }
 
 /* Le tratte della giornata, una per gruppo di persone. */
@@ -8755,15 +8802,18 @@ function odgTratte(testo){
   while (i < P.length) {
     const mz = eMezzo(P[i]);
     if (mz) {
-      autista = mz[1].trim(); tel = null;
-      if (i+1 < P.length && TEL_RE.test(P[i+1])) tel = P[++i].replace(/[^\d+]/g,'');
+      autista = mz[1].trim();
+      tel = telVicino(P, i);
+      if (i+1 < P.length && eTel(P[i+1])) i++;      // se e' qui, si consuma
       i++; continue;
     }
     if (!eOra(P[i])) { i++; continue; }
 
     const partenza = normOra(P[i]); i++;
     const nomi = [];
-    while (i < P.length && !eOra(P[i]) && !eLuogo(P[i]) && !eMezzo(P[i]) && !testata.test(P[i]))
+    // Un telefono non e' un passeggero.
+    while (i < P.length && !eOra(P[i]) && !eLuogo(P[i]) && !eMezzo(P[i])
+           && !testata.test(P[i]) && !eTel(P[i]))
       nomi.push(P[i++]);
     const luoghi = [];
     while (i < P.length && eLuogo(P[i])) luoghi.push(P[i++]);
@@ -8798,6 +8848,13 @@ function correggiLuogo(nome, tutti){
     const t = senzaAccenti(a).toUpperCase();
     if (t.length > n.length && t.endsWith(n) && t.length - n.length <= 3) best = a;
   }
+  /* Lo stesso posto con uno spazio di troppo in mezzo: pdf.js stacca la
+     prima lettera e viene fuori "T URSPORT HOTEL RESIDENCE". Fra le
+     scritture dello stesso nome vince quella con meno lettere sole. */
+  const squash = s => senzaAccenti(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const sole = s => String(s).split(/\s+/).filter(w => w.length === 1).length;
+  const q = squash(best);
+  for (const a of tutti) if (squash(a) === q && sole(a) < sole(best)) best = a;
   return best;
 }
 
@@ -9947,12 +10004,29 @@ async function postaSegna(id, stato, nota){
  * riportava a galla l'orario che il lettore sbagliava il giorno in cui
  * era stato caricato. Il testo dei giri auto invece e' salvato: rileggerlo
  * costa niente e vale anche per chi scrive il proprio nome dopo. */
+/* Quando cambia il modo di leggere il nome dei posti, questo numero sale
+   e gli ordini del giorno gia' salvati si rileggono da soli. Senza, la
+   correzione valeva solo sul prossimo OdG — e quello di domani sera uno
+   ce l'ha gia' in tasca con il nome sbagliato. */
+const ODG_LUOGHI_V = 1;
+
 function odgRicalcola() {
   const d = odgCorrente;
   if (!d) return;
   if (d.giriTesto) {
     const p = odgPickUp(d.giriTesto, profilo());
     if (p) d.pickup = p;
+  }
+  if (d.testo && d.luoghiV !== ODG_LUOGHI_V) {
+    const l = odgLuoghi(d.testo);
+    if (l.length) {
+      d.luoghi = l;
+      // Il posto era stato cercato partendo dal nome sbagliato: si
+      // ricomincia, previsione compresa.
+      d.posto = null;
+      delete d.previsione; delete d.previsioneFallita; delete d.previsioneNota;
+    }
+    d.luoghiV = ODG_LUOGHI_V;
   }
 }
 
@@ -11116,14 +11190,21 @@ function odgBadgeHtml(d, io) {
     }
 
     if (i >= 0) {
+      /* La riga trovata si mostra e non si tocca: la risposta sono due
+         tasti sotto, con il si' in evidenza. Prima la riga era essa stessa
+         il tasto del si', e non si capiva che toccarla voleva dire
+         "confermo che sono io". */
       const p = t[i];
       return `<div class="odg-chi uno">
         <div class="t">Sei tu?</div>
-        <div class="el"><button onclick="odgSceltoIo(${i})">
+        <div class="el"><div class="riga">
           <span class="n">${esc(p.nome || '')}</span>
           <span class="r">${[p.ruolo, p.reparto, p.set ? 'set ' + p.set : ''].filter(Boolean).map(esc).join(' · ')}</span>
-        </button></div>
-        <button class="alt" onclick="odgElencoIntero()">Non sono io, mostrami tutti</button>
+        </div></div>
+        <div class="sino">
+          <button class="si" onclick="odgSceltoIo(${i})">Sì, sono io</button>
+          <button class="no" onclick="odgElencoIntero()">No</button>
+        </div>
       </div>`;
     }
 
