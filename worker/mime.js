@@ -7,29 +7,32 @@
  * quando nessuno guarda. Di un messaggio di produzione serve poco: gli
  * allegati, l'oggetto, il mittente. Quel poco sta in trecento righe.
  *
- * Si lavora sui byte, non su una stringa. Convertire tutto in testo prima
- * di aver tolto il base64 rovina gli allegati: un PDF letto come UTF-8
- * torna indietro pieno di U+FFFD e non si apre piu'.
+ * Si lavora sui byte, non su una stringa di testo. Convertire tutto in
+ * UTF-8 prima di aver tolto il base64 rovina gli allegati: un PDF letto
+ * cosi' torna indietro pieno di U+FFFD e non si apre piu'.
+ *
+ * Pero' una copia in latin1 si tiene, ed e' quella che fa la differenza
+ * fra funzionare e no. In latin1 un byte e' un carattere: le posizioni
+ * nella stringa e nei byte sono le stesse, quindi si puo' cercare con
+ * indexOf — che e' codice nativo — invece che con un ciclo scritto a
+ * mano, e poi tagliare i byte veri alle posizioni trovate.
+ *
+ * Non e' un dettaglio di stile. Il primo pacchetto da otto megabyte era
+ * costato un secondo di CPU; il secondo, piu' grosso, ha sforato il
+ * limite di Cloudflare e la mail e' stata respinta. Il ciclo byte per
+ * byte ripassava il messaggio da capo a ogni pezzo cercato, e sono
+ * decine di passaggi su megabyte.
  */
 
-const CRLF   = [13, 10];
-const CRLF2  = [13, 10, 13, 10];
-const LF2    = [10, 10];
+const LATIN1 = new TextDecoder('latin1');
 
-function trovaByte(buf, ago, da = 0) {
-  outer:
-  for (let i = da; i <= buf.length - ago.length; i++) {
-    for (let j = 0; j < ago.length; j++) if (buf[i + j] !== ago[j]) continue outer;
-    return i;
-  }
-  return -1;
+// Lo stesso messaggio, visto come stringa. Un byte, un carattere.
+function comeTesto(buf) {
+  return LATIN1.decode(buf);
 }
 
-// Le intestazioni sono ASCII per definizione: qui si puo' convertire.
 function testo(buf, da, a) {
-  let s = '';
-  for (let i = da; i < a; i++) s += String.fromCharCode(buf[i]);
-  return s;
+  return LATIN1.decode(buf.subarray(da, a));
 }
 
 /*
@@ -139,12 +142,10 @@ function decodifica2231(s) {
 }
 
 function daBase64(buf, da, a) {
-  let pulito = '';
-  for (let i = da; i < a; i++) {
-    const c = buf[i];
-    if (c === 13 || c === 10 || c === 32 || c === 9) continue;
-    pulito += String.fromCharCode(c);
-  }
+  /* Prima questa riga costruiva la stringa un carattere per volta: per un
+     allegato da cinque megabyte sono cinque milioni di concatenazioni, ed
+     era il pezzo piu' caro di tutto il Worker. */
+  const pulito = LATIN1.decode(buf.subarray(da, a)).replace(/[^A-Za-z0-9+/=]+/g, '');
   const bin = atob(pulito);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
@@ -181,17 +182,20 @@ function corpoDecodificato(buf, da, a, codifica) {
  * un allegato che e' a sua volta una mail. Senza questo, di un inoltro si
  * vedrebbe un solo allegato .eml e zero PDF.
  */
-function scendi(buf, da, a, raccolto, profondita = 0) {
+function scendi(buf, txt, da, a, raccolto, profondita = 0) {
   if (profondita > 12) return;
   const segna = (t, n) => raccolto.struttura.push(
     '  '.repeat(profondita) + t + (n ? ' «' + n + '»' : ''));
 
-  let fineInt = trovaByte(buf, CRLF2, da);
+  /* Le intestazioni finiscono alla prima riga vuota. Si cerca con indexOf
+     sulla copia in latin1 e con un limite: prima si scorreva fino in
+     fondo al messaggio anche per un pezzo lungo tre righe. */
+  let fineInt = txt.indexOf('\r\n\r\n', da);
   let salto = 4;
-  if (fineInt < 0 || fineInt > a) { fineInt = trovaByte(buf, LF2, da); salto = 2; }
+  if (fineInt < 0 || fineInt > a) { fineInt = txt.indexOf('\n\n', da); salto = 2; }
   if (fineInt < 0 || fineInt > a) { fineInt = a; salto = 0; }
 
-  const int = leggiIntestazioni(testo(buf, da, fineInt));
+  const int = leggiIntestazioni(txt.slice(da, fineInt));
   const inizioCorpo = Math.min(fineInt + salto, a);
 
   const ct = leggiParametri(int.get('content-type') || 'text/plain');
@@ -203,20 +207,19 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
   if (ct.tipo.startsWith('multipart/') && ct.par.boundary) {
     segna(ct.tipo);
     const sep = '--' + ct.par.boundary;
-    const sepByte = Array.from(sep, c => c.charCodeAt(0));
-    let p = trovaByte(buf, sepByte, inizioCorpo);
+    let p = txt.indexOf(sep, inizioCorpo);
     while (p >= 0 && p < a) {
       // Dopo il separatore c'e' un a capo, oppure '--' e il multipart finisce.
-      let q = p + sepByte.length;
+      let q = p + sep.length;
       if (buf[q] === 45 && buf[q + 1] === 45) break;
       while (buf[q] === 13 || buf[q] === 10) q++;
-      const prossimo = trovaByte(buf, sepByte, q);
+      const prossimo = txt.indexOf(sep, q);
       const fine = prossimo < 0 || prossimo > a ? a : prossimo;
       // L'a capo prima del separatore appartiene al separatore, non al pezzo.
       let f = fine;
       if (buf[f - 1] === 10) f--;
       if (buf[f - 1] === 13) f--;
-      scendi(buf, q, f, raccolto, profondita + 1);
+      scendi(buf, txt, q, f, raccolto, profondita + 1);
       p = prossimo;
     }
     return;
@@ -225,7 +228,7 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
   if (ct.tipo === 'message/rfc822') {
     segna(ct.tipo);
     const dentro = corpoDecodificato(buf, inizioCorpo, a, codifica);
-    scendi(dentro, 0, dentro.length, raccolto, profondita + 1);
+    scendi(dentro, comeTesto(dentro), 0, dentro.length, raccolto, profondita + 1);
     return;
   }
 
@@ -254,7 +257,7 @@ function scendi(buf, da, a, raccolto, profondita = 0) {
 
 export function leggiMessaggio(buf) {
   const raccolto = { allegati: [], testo: '', intestazioni: new Map(), struttura: [] };
-  scendi(buf, 0, buf.length, raccolto);
+  scendi(buf, comeTesto(buf), 0, buf.length, raccolto);
   const int = raccolto.intestazioni;
   return {
     oggetto:   decodificaParole(int.get('subject') || ''),
