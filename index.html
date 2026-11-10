@@ -8149,8 +8149,10 @@ function odgPulisci(campo, v) {
 
   if (campo === 'location') {
     // Nella colonna accanto ci sono i contatti della produzione: un
-    // numero di telefono non e' un posto dove andare.
+    // numero di telefono non e' un posto dove andare, e nemmeno il
+    // mestiere di chi ci lavora — "Location Manager" non e' una location.
     if (/(\+39|\b3\d{2})[\s.]?\d{3}[\s.]?\d{4}|\b\d{9,}\b/.test(t)) return null;
+    if (/manager|coordinat|assistent|ispettor|segretar|coord\.|coordinament/i.test(t)) return null;
   }
 
   if (campo === 'ambiente' || campo === 'location') {
@@ -8160,6 +8162,19 @@ function odgPulisci(campo, v) {
     return t;
   }
   return t;
+}
+
+/* Prima per righe, e quello che resta vuoto si ricerca per colonne.
+   Le due letture della stessa pagina non si contraddicono: la seconda
+   parla solo dove la prima non ha trovato niente. */
+function odgIntestazioneDa(doc, nomeFile) {
+  const a = odgIntestazione(doc.testo, nomeFile);
+  if (!doc.colonne) return a;
+  const b = odgIntestazione(doc.colonne, nomeFile);
+  const manca = v => v === null || v === undefined || v === '' || v === 0
+                     || (Array.isArray(v) && !v.length);
+  for (const k of Object.keys(b)) if (manca(a[k]) && !manca(b[k])) a[k] = b[k];
+  return a;
 }
 
 function odgIntestazione(testo, nomeFile) {
@@ -8391,10 +8406,12 @@ Ometti i campi che il documento non ha, con stringa vuota. Non inventare righe. 
 
 /* Estrae un ordine del giorno dal testo di un PDF.
    L'intestazione non costa niente; le tabelle sono una chiamata sola. */
-async function odgEstrai(testo, onPasso) {
+async function odgEstrai(doc, onPasso) {
   const passo = onPasso || (() => {});
+  const d = typeof doc === 'string' ? { testo: doc } : doc;
+  const testo = d.testo;
   passo('Lettura dell\'intestazione');
-  const testa = odgIntestazione(testo);
+  const testa = odgIntestazioneDa(d);
 
   passo('Scene, cast e troupe');
   let tab = { scene: [], domani: null, cast: [], troupe: [], contatti: [] };
@@ -8712,6 +8729,111 @@ function odgStralcioDi(stralci, n) {
  * dove non serve — quella distinzione si perde e la scena diventa un
  * blocco unico illeggibile. Qui si tengono le coordinate.
  */
+/* Le righe di una pagina: pezzi vicini di altezza, messi in fila da
+   sinistra a destra.
+   Unendoli senza guardare dove stanno, "INGEGNER RANIERI" diventa
+   "INGEGNERRANIERI": lo spazio fra due parole nel PDF e' distanza, non un
+   carattere. Si rimette quando c'e' uno stacco — e uno stacco largo
+   diventa tre spazi, perche' e' un salto di colonna e non uno spazio. */
+function odgRigheDa(pezzi, toll, pagina) {
+  /* Con tolleranza zero si raggruppa per altezza arrotondata, come si e'
+     sempre fatto. Serve alla sceneggiatura: li' il rientro e' significato
+     — chi parla sta piu' a destra della didascalia — e accorpare due
+     righe vicine lo distrugge. Per l'intestazione invece la tolleranza
+     serve, perche' un'etichetta e il suo orario non stanno mai alla
+     stessa altezza esatta. */
+  const bande = [];
+  for (const it of [...pezzi].sort((a, b) => b.transform[5] - a.transform[5])) {
+    const y = it.transform[5];
+    const u = bande[bande.length - 1];
+    const stessa = toll > 0 ? (u && Math.abs(u.y - y) <= toll)
+                            : (u && Math.round(u.y) === Math.round(y));
+    if (stessa) { u.parti.push(it); u.x = Math.min(u.x, it.transform[4]); }
+    else bande.push({ y, x: it.transform[4], parti: [it] });
+  }
+  const fuori = [];
+  for (const r of bande) {
+    const parti = r.parti.sort((a, b) => a.transform[4] - b.transform[4]);
+    let t = '';
+    parti.forEach((it, k) => {
+      if (k) {
+        const pre = parti[k - 1];
+        const vuoto = it.transform[4] - (pre.transform[4] + (pre.width || 0));
+        if (vuoto > 14 && !/\s$/.test(t)) t += '   ';
+        else if (vuoto > 0.8 && !/\s$/.test(t) && !/^\s/.test(it.str)) t += ' ';
+      }
+      t += it.str;
+    });
+    t = t.replace(/[ \t]{4,}/g, '   ').trim();
+    if (t) fuori.push({ x: Math.round(r.x), p: pagina, t });
+  }
+  return fuori;
+}
+
+/* La stessa pagina letta per colonne invece che per righe.
+ *
+ * Serve quando l'impaginazione spezza l'etichetta stessa: nella Famiglia
+ * Panini "FINE" sta sopra e "LAVORAZIONE" otto punti sotto, dentro una
+ * cella stretta, e in mezzo — nella colonna accanto — c'e' "16:00".
+ * Letta per righe quell'etichetta non esiste; letta per colonne, le due
+ * parole tornano una di seguito all'altra.
+ *
+ * Le colonne si trovano cercando i corridoi bianchi: tratti di larghezza
+ * dove non passa nessun carattere per tutta l'altezza del foglio.
+ */
+function odgColonneDa(tutti, toll, pagina) {
+  if (tutti.length < 20) return [];
+  const PASSO = 2, MINCORRIDOIO = 11;
+
+  /* Solo la parte alta del foglio.
+     Sotto c'e' la tabella delle scene, che e' larga quanto la pagina e
+     non lascia passare nessun corridoio: cercandoli su tutto il foglio,
+     nella Famiglia Panini non se ne trovava nemmeno uno, e le colonne che
+     stanno in testa — dove sono gli orari — restavano invisibili.
+     In testa invece ci sono, ed e' li' che servono. */
+  let altoY = -Infinity, bassoY = Infinity;
+  for (const it of tutti) {
+    altoY = Math.max(altoY, it.transform[5]);
+    bassoY = Math.min(bassoY, it.transform[5]);
+  }
+  const soglia = altoY - (altoY - bassoY) * 0.45;
+  const pezzi = tutti.filter(it => it.transform[5] >= soglia);
+  if (pezzi.length < 20) return [];
+
+  let minX = Infinity, maxX = -Infinity;
+  for (const it of pezzi) {
+    minX = Math.min(minX, it.transform[4]);
+    maxX = Math.max(maxX, it.transform[4] + (it.width || 0));
+  }
+  const n = Math.ceil((maxX - minX) / PASSO) + 2;
+  const pieno = new Uint8Array(n);
+  for (const it of pezzi) {
+    const a = Math.max(0, Math.floor((it.transform[4] - minX) / PASSO));
+    const b = Math.min(n - 1, Math.ceil((it.transform[4] + (it.width || 0) - minX) / PASSO));
+    for (let i = a; i <= b; i++) pieno[i] = 1;
+  }
+  const tagli = [];
+  let vuoto = 0;
+  for (let i = 0; i < n; i++) {
+    if (!pieno[i]) { vuoto++; continue; }
+    if (vuoto * PASSO >= MINCORRIDOIO) tagli.push(minX + (i - vuoto / 2) * PASSO);
+    vuoto = 0;
+  }
+  /* Nessun corridoio: la pagina e' un blocco solo, non c'e' niente da
+     separare. Troppi: non sono colonne, e' una tabella fitta — tagliarla
+     in trenta strisce fa piu' danno che altro, perche' ogni riga della
+     tabella finirebbe spezzata in trenta pezzi. */
+  if (!tagli.length || tagli.length > 20) return [];
+
+  const bordi = [-Infinity, ...tagli, Infinity];
+  const fuori = [];
+  for (let c = 0; c < bordi.length - 1; c++) {
+    const dentro = pezzi.filter(it => it.transform[4] >= bordi[c] && it.transform[4] < bordi[c + 1]);
+    if (dentro.length) fuori.push(...odgRigheDa(dentro, toll, pagina));
+  }
+  return fuori;
+}
+
 /* Il testo di un PDF, rimesso in righe.
  *
  * Prima l'intestazione si leggeva da questo:
@@ -8729,47 +8851,33 @@ function odgStralcioDi(stralci, n) {
 async function odgTestoDaPdf(file, conRighe) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const pagine = [], piatte = [], righe = [];
+  const pagine = [], piatte = [], colonne = [], righe = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const p = await pdf.getPage(i);
     const c = await p.getTextContent();
-    const daQui = righe.length;
-    // Gli elementi arrivano sparsi: si raggruppano per riga guardando la
-    // coordinata verticale, arrotondata perche' non e' mai identica.
-    const per = new Map();
-    for (const it of c.items) {
-      if (!it.str || !it.str.trim()) continue;
-      const y = Math.round(it.transform[5]);
-      const k = y;
-      if (!per.has(k)) per.set(k, { y, x: it.transform[4], parti: [] });
-      const r = per.get(k);
-      r.x = Math.min(r.x, it.transform[4]);
-      r.parti.push(it);
-    }
-    [...per.values()].sort((a,b) => b.y - a.y).forEach(r => {
-      // Unendo i pezzi senza guardare dove stanno, "INGEGNER RANIERI"
-      // diventa "INGEGNERRANIERI": lo spazio fra due parole nel PDF e'
-      // distanza, non un carattere. Si rimette quando c'e' uno stacco.
-      const parti = r.parti.sort((a,b) => a.transform[4] - b.transform[4]);
-      let t = '';
-      parti.forEach((it, k) => {
-        if (k) {
-          const pre = parti[k-1];
-          const fine = pre.transform[4] + (pre.width || 0);
-          const vuoto = it.transform[4] - fine;
-          /* Uno stacco largo e' un salto di colonna, non uno spazio fra
-             parole. Si segna con piu' spazi, perche' e' l'unico appiglio
-             che resta per capire dove finisce un campo e ne comincia un
-             altro quando nessuno dei due ha i due punti. */
-          if (vuoto > 14 && !/\s$/.test(t)) t += '   ';
-          else if (vuoto > 0.8 && !/\s$/.test(t) && !/^\s/.test(it.str)) t += ' ';
-        }
-        t += it.str;
-      });
-      t = t.replace(/[ \t]{4,}/g, '   ').trim();
-      if (t) righe.push({ x: Math.round(r.x), p: i, t });
-    });
-    pagine.push(righe.slice(daQui).map(r => r.t).join('\n'));
+    /* Gli elementi arrivano sparsi e si raggruppano per riga, ma la
+       coordinata verticale di due parole affiancate non e' mai identica:
+       in Vita mia "FINE LAVORAZIONE :" sta a 484.2 e il suo "17:30" a
+       485.9. Arrotondando all'intero finivano in due righe diverse e
+       l'orario spariva.
+       Quindi si accorpa per vicinanza, con una tolleranza presa
+       dall'altezza del carattere invece che fissa: un documento stampato
+       in corpo grande ha righe piu' distanti, e un numero fisso andrebbe
+       bene per uno e male per l'altro. */
+    const pezzi = c.items.filter(it => it.str && it.str.trim());
+    // La tolleranza viene dall'altezza del carattere, non da un numero
+    // fisso: un documento in corpo grande ha righe piu' distanti, e un
+    // numero buono per uno sarebbe sbagliato per l'altro.
+    const alture = pezzi.map(it => Math.abs(it.transform[3]) || it.height || 0)
+                        .filter(Boolean).sort((a, b) => a - b);
+    const corpo = alture.length ? alture[Math.floor(alture.length / 2)] : 10;
+    const toll = Math.max(1.5, corpo * 0.35);
+
+    // Due letture della stessa pagina: le righe fedeli per la
+    // sceneggiatura, quelle accorpate per l'intestazione.
+    righe.push(...odgRigheDa(pezzi, 0, i));
+    pagine.push(odgRigheDa(pezzi, toll, i).map(r => r.t).join('\n'));
+    colonne.push(odgColonneDa(pezzi, toll, i).map(r => r.t).join('\n'));
     piatte.push(c.items.map(x => x.str).join(' '));
   }
   /* Si tiene anche la vecchia forma, tutta di seguito.
@@ -8778,7 +8886,8 @@ async function odgTestoDaPdf(file, conRighe) {
      rimetterle in colonna le separa invece di unirle. Il lettore dei giri
      e' stato provato sul documento vero e funziona su quella forma: gli si
      lascia la sua finche' non viene riscritto apposta. */
-  const fuori = { testo: pagine.join('\n'), piatto: piatte.join('\n'), righe };
+  const fuori = { testo: pagine.join('\n'), piatto: piatte.join('\n'),
+                  colonne: colonne.join('\n'), righe };
   return conRighe ? fuori : fuori.testo;
 }
 
@@ -8854,7 +8963,8 @@ async function odgLavora(files) {
       const chiave = odgChiaveFile(f.name);
       const salvato = await cbFileSalva(chiave, await f.arrayBuffer());
       const r = await odgTestoDaPdf(f, true);
-      letti.push({ nome: f.name, testo: r.testo, piatto: r.piatto, righe: r.righe,
+      letti.push({ nome: f.name, testo: r.testo, piatto: r.piatto,
+                   colonne: r.colonne, righe: r.righe,
                    tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
@@ -8874,7 +8984,10 @@ async function odgLavora(files) {
              + 'come una scansione o una foto. Chiedi il file originale.',
         dettaglio: file.name + '\n' + testo.replace(/\s+/g,'').length + ' caratteri estratti' });
     }
-    const dati = await odgEstrai(testo, p => odgPasso(p));   // da qui non si sa quanto manca
+    // Si passa la pagina letta in tutti e due i modi: per righe, e per
+    // colonne per i campi che le righe non trovano.
+    const dati = await odgEstrai({ testo, colonne: principale.colonne },
+                                 p => odgPasso(p));   // da qui non si sa quanto manca
     if (!dati.numero && !dati.convocazione && !(dati.scene || []).length) {
       throw new Error('Non ho riconosciuto un ordine del giorno in questo file.');
     }
