@@ -9803,18 +9803,26 @@ async function postaApri(p){
     }
     // Dalla posta si pretende un ordine del giorno vero.
     let fatto = await odgLavora(files, { esigiOdg: true });
-    let che = 'ordine del giorno';
+    const fatti = fatto ? ['ordine del giorno'] : [];
 
-    /* Se non c'era, puo' esserci un piano di lavorazione: le produzioni
-       mandano le versioni nuove per posta come tutto il resto. Aggiorna la
-       sezione Piano e lascia stare la giornata, che e' un'altra cosa. */
-    if (!fatto) {
-      const piano = (odgUltimiLetti || []).find(x => x.tipo === 'pdl' && x.vero);
-      if (piano) {
-        try { fatto = await pdlAggiorna(piano.vero); che = 'piano di lavorazione'; }
-        catch (e) { console.log('[posta] piano non aggiornato:', e.message); odgErrore = e.message; }
+    /* E poi il piano, che e' un'altra sezione.
+     *
+     * Nella stessa mail puo' esserci di tutto — ordine del giorno, giri
+     * auto, stralci e il piano aggiornato — e non sono in concorrenza:
+     * l'ordine del giorno riguarda domani, il piano riguarda il mese.
+     * Prima il piano, in quel caso, veniva ignorato senza dire niente.
+     * Si guarda fra i documenti gia' letti, quindi non costa una seconda
+     * apertura dei PDF. */
+    const piano = (odgUltimiLetti || []).find(x => x.tipo === 'pdl' && x.vero);
+    if (piano) {
+      try {
+        if (await pdlAggiorna(piano.vero)) { fatto = true; fatti.push('piano di lavorazione'); }
+      } catch (e) {
+        console.log('[posta] piano non aggiornato:', e.message);
+        if (!fatto) odgErrore = e.message;
       }
     }
+    const che = fatti.join(' + ');
 
     // Non fatto vuol dire che dentro non c'era ne' l'uno ne' l'altro: non
     // e' un guasto, e' una mail qualsiasi. Si segna e non si ritenta.
