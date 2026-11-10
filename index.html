@@ -7893,7 +7893,9 @@ function odgOra(s) {
  * ("PRONTI A GIRARE 08.30", "OSPEDALE SAN GIUSEPPE").
  */
 function odgDopo(testo, et, lunghezza = 90) {
-  const re = new RegExp(odgEtichetta(et) + '(\\s*:)?\\s*', 'gi');
+  /* Dopo l'etichetta non puo' continuare una parola: "OSPEDALE" trovato
+     dentro "OSPEDALETTO DA CAMPO" lasciava come valore "tto da campo". */
+  const re = new RegExp(odgEtichetta(et) + '(?![A-Za-zÀ-ÿ])(\\s*:)?\\s*', 'gi');
   let primo = null, conDuePunti = null, m;
   while ((m = re.exec(testo)) !== null) {
     const p = m.index + m[0].length;
@@ -7923,7 +7925,7 @@ function odgOraDopo(testo, et) {
      si finiva per raccogliere un orario di trucco trovato piu' avanti.
      Si provano tutte e vince quella che ha l'ora piu' vicina: un'etichetta
      orfana non ne ha nessuna attaccata. */
-  const re = new RegExp(odgEtichetta(et) + '(?:\\s*:)?\\s*', 'gi');
+  const re = new RegExp(odgEtichetta(et) + '(?![A-Za-zÀ-ÿ])(?:\\s*:)?\\s*', 'gi');
   let m, meglio = null, distanza = Infinity;
   while ((m = re.exec(testo)) !== null) {
     if (m[0].length === 0) { re.lastIndex++; continue; }
@@ -8105,6 +8107,61 @@ function odgCorreggiDalNome(r, nome) {
   return r;
 }
 
+/* Un valore deve assomigliare a quello che dovrebbe essere.
+ *
+ * Finche' si cercava un'etichetta in una pagina schiacciata in una riga
+ * sola, qualunque controllo era inutile: arrivava spazzatura comunque.
+ * Ora che i valori stanno su una riga si puo' chiedere il minimo — e
+ * buttare quello che non regge, invece di mostrarlo.
+ *
+ * Il criterio di tutta l'app: meglio un campo vuoto che un ospedale che e'
+ * un orario. Su un campo vuoto uno guarda il PDF; su un campo sbagliato
+ * no, e ci crede.
+ */
+const ODG_TEMPO = /seren|nuvol|piogg|rovesc|temporal|sole|solegg|copert|vento|nebbia|nev[ei]|variabil|schiarit|velat|mite|afos|piovas|clear|sunny|rain|cloud/i;
+
+function odgPulisci(campo, v) {
+  let t = String(v || '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  // Resta di un'etichetta, non un valore: "Effemeridi:", "piu' vicino:".
+  if (/[:;]$/.test(t)) return null;
+  if (t.length < 3) return null;
+  if (!/[A-Za-zÀ-ÿ]{3}/.test(t)) return null;
+
+  if (campo === 'meteo')  return ODG_TEMPO.test(t) ? t : null;
+
+  if (campo === 'regia') {
+    // Un nome di persona: due o tre parole, niente numeri, e niente
+    // mestieri — "Regia di" acchiappava il direttore di produzione.
+    if (/\d/.test(t)) return null;
+    if (/produzion|direttor|organizz|scenograf|costum|fotograf|aiuto|p\.?\s*iva|c\.?\s*f\./i.test(t)) return null;
+    const parole = t.split(' ').filter(Boolean);
+    if (parole.length < 2 || parole.length > 4) return null;
+    return t;
+  }
+
+  if (campo === 'ospedale') {
+    // Dev'esserci un nome, non solo la preposizione rimasta attaccata.
+    if (/^(pi[uù]|il|lo|la|di|da|al|nel|vicino|presso)\b/i.test(t)) return null;
+    if (t.length < 6) return null;
+    return t;
+  }
+
+  if (campo === 'location') {
+    // Nella colonna accanto ci sono i contatti della produzione: un
+    // numero di telefono non e' un posto dove andare.
+    if (/(\+39|\b3\d{2})[\s.]?\d{3}[\s.]?\d{4}|\b\d{9,}\b/.test(t)) return null;
+  }
+
+  if (campo === 'ambiente' || campo === 'location') {
+    // Il pistolotto sulle molestie e la sostenibilita' non sono un luogo.
+    if (/ostil|intimidator|molest|discriminator|sostenibil|segnalare|comportament/i.test(t)) return null;
+    if (t.length > 90) return null;
+    return t;
+  }
+  return t;
+}
+
 function odgIntestazione(testo, nomeFile) {
   const t = String(testo || '');
   const r = {};
@@ -8162,6 +8219,9 @@ function odgIntestazione(testo, nomeFile) {
   // Regia e produzione, utili per intitolare il progetto
   r.regia = odgValoreDopo(t, 'Regia di', ['MAD', 'Piazza', 'S.p.A', 'Produttore']);
 
+  for (const c of ['meteo', 'regia', 'ospedale', 'ambiente', 'location']) {
+    if (r[c] != null) r[c] = odgPulisci(c, r[c]);
+  }
   return odgCorreggiDalNome(r, nomeFile);
 }
 
