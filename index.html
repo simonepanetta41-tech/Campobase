@@ -7941,6 +7941,11 @@ function odgOraDopo(testo, et) {
 function odgValoreDopo(testo, et, stop) {
   let t = odgDopo(testo, et, 160);
   if (!t) return null;
+  /* Un valore finisce con la sua riga. Da quando il testo ha righe vere,
+     questo e' il confine piu' affidabile che ci sia: prima un campo poteva
+     prendersi mezza pagina perche' la pagina era tutta una riga. */
+  const aCapo = t.indexOf('\n');
+  if (aCapo >= 0) t = t.slice(0, aCapo);
   const elenco = '(' + stop.map(odgEtichetta).join('|') + ')';
   /* L'etichetta seguente puo' stare attaccata a questa: nell'ordine del
      giorno di Missione San Gennaro "LOCATION:" e' seguito subito da
@@ -8647,15 +8652,28 @@ function odgStralcioDi(stralci, n) {
  * dove non serve — quella distinzione si perde e la scena diventa un
  * blocco unico illeggibile. Qui si tengono le coordinate.
  */
+/* Il testo di un PDF, rimesso in righe.
+ *
+ * Prima l'intestazione si leggeva da questo:
+ *     c.items.map(x => x.str).join(' ')
+ * cioe' tutta la pagina schiacciata in una riga sola, nell'ordine in cui
+ * pdf.js sputa fuori i pezzi — che non e' l'ordine in cui si legge. Da li'
+ * nasceva quasi tutta la spazzatura: "LOCATION" seguito dal numero di
+ * telefono del direttore di produzione, perche' nel documento stanno in
+ * due colonne diverse e nel testo finivano attaccati.
+ *
+ * Adesso le righe sono righe: stessa altezza sulla pagina, stessa riga nel
+ * testo. Un campo non puo' piu' prendersi un valore che sta dall'altra
+ * parte del foglio.
+ */
 async function odgTestoDaPdf(file, conRighe) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const pagine = [], righe = [];
+  const pagine = [], piatte = [], righe = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const p = await pdf.getPage(i);
     const c = await p.getTextContent();
-    pagine.push(c.items.map(x => x.str).join(' '));
-    if (!conRighe) continue;
+    const daQui = righe.length;
     // Gli elementi arrivano sparsi: si raggruppano per riga guardando la
     // coordinata verticale, arrotondata perche' non e' mai identica.
     const per = new Map();
@@ -8678,15 +8696,30 @@ async function odgTestoDaPdf(file, conRighe) {
         if (k) {
           const pre = parti[k-1];
           const fine = pre.transform[4] + (pre.width || 0);
-          if (it.transform[4] - fine > 0.8 && !/\s$/.test(t) && !/^\s/.test(it.str)) t += ' ';
+          const vuoto = it.transform[4] - fine;
+          /* Uno stacco largo e' un salto di colonna, non uno spazio fra
+             parole. Si segna con piu' spazi, perche' e' l'unico appiglio
+             che resta per capire dove finisce un campo e ne comincia un
+             altro quando nessuno dei due ha i due punti. */
+          if (vuoto > 14 && !/\s$/.test(t)) t += '   ';
+          else if (vuoto > 0.8 && !/\s$/.test(t) && !/^\s/.test(it.str)) t += ' ';
         }
         t += it.str;
       });
-      t = t.replace(/\s+/g,' ').trim();
+      t = t.replace(/[ \t]{4,}/g, '   ').trim();
       if (t) righe.push({ x: Math.round(r.x), p: i, t });
     });
+    pagine.push(righe.slice(daQui).map(r => r.t).join('\n'));
+    piatte.push(c.items.map(x => x.str).join(' '));
   }
-  return conRighe ? { testo: pagine.join('\n'), righe } : pagine.join('\n');
+  /* Si tiene anche la vecchia forma, tutta di seguito.
+     I giri auto si leggono cosi': in quella tabella una riga logica — chi
+     parte, da dove, a che ora, con chi — sta su piu' righe fisiche, e
+     rimetterle in colonna le separa invece di unirle. Il lettore dei giri
+     e' stato provato sul documento vero e funziona su quella forma: gli si
+     lascia la sua finche' non viene riscritto apposta. */
+  const fuori = { testo: pagine.join('\n'), piatto: piatte.join('\n'), righe };
+  return conRighe ? fuori : fuori.testo;
 }
 
 let odgCorrente = null;       // l'OdG mostrato adesso
@@ -8761,7 +8794,7 @@ async function odgLavora(files) {
       const chiave = odgChiaveFile(f.name);
       const salvato = await cbFileSalva(chiave, await f.arrayBuffer());
       const r = await odgTestoDaPdf(f, true);
-      letti.push({ nome: f.name, testo: r.testo, righe: r.righe,
+      letti.push({ nome: f.name, testo: r.testo, piatto: r.piatto, righe: r.righe,
                    tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
@@ -8800,8 +8833,8 @@ async function odgLavora(files) {
     dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo, file: x.file }));
     const giri = extra.find(x => x.tipo === 'giri');
     if (giri) {
-      dati.giriTesto = giri.testo;
-      dati.pickup = odgPickUp(giri.testo, profilo());
+      dati.giriTesto = giri.piatto || giri.testo;
+      dati.pickup = odgPickUp(dati.giriTesto, profilo());
     }
     const str = extra.find(x => x.tipo === 'stralci');
     if (str) {
