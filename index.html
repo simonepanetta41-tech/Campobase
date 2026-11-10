@@ -2576,6 +2576,7 @@ async function showApp() {
   // nessuno e a ogni chiusura dell'app l'OdG spariva.
   // Il codice d'invito arrivato da un QR si consuma prima di tutto: se
   // c'e', il film e' quello e l'ordine del giorno va riletto dal suo.
+  profiloRiallinea();
   filmDallIndirizzo()
     .then(filmDaMembro)                       // entrato altrove? il film lo si ritrova
     .finally(() => odgRipristina().finally(postaControlla));
@@ -8370,6 +8371,21 @@ function profiloCompleto() {
   const p = profilo();
   return !!(p.nome && p.cognome);
 }
+/* Il profilo compilato prima di entrare resta sul telefono.
+   La schermata di benvenuto chiede nome e reparto, e se qualcuno la
+   compila prima di fare l'accesso quel profilo non arriva da nessuna
+   parte: lui si vede, la sua troupe lo vede "senza nome". Quindi al
+   primo accesso si rimanda su. */
+async function profiloRiallinea() {
+  const p = profilo();
+  if (!currentUser || !p.nome || !p.cognome) return;
+  try {
+    const { data } = await sb.from('profiles').select('nome,cognome')
+      .eq('id', currentUser.id).maybeSingle();
+    if (!data || !data.nome || !data.cognome) await profiloSalva(p);
+  } catch (e) { console.log('[profilo] non riallineato:', e.message); }
+}
+
 async function profiloSalva(p) {
   try { localStorage.setItem(CB_PROFILO, JSON.stringify(p)); } catch (_) {}
   if (!currentUser) return;
@@ -9383,13 +9399,17 @@ async function troupeMembri(){
   const f = filmCorrente();
   if (!f || !currentUser) return [];
   try {
-    const { data } = await sb.from('film_membri')
-      .select('user_id,ruolo,created_at').eq('project_id', f.id).order('created_at');
-    if (!data || !data.length) return [];
-    const { data: p } = await sb.from('profiles')
-      .select('id,nome,cognome,reparto').in('id', data.map(x => x.user_id));
-    const per = new Map((p || []).map(x => [x.id, x]));
-    return data.map(m => ({ ...m, ...(per.get(m.user_id) || {}) }));
+    /* Si passa da una funzione invece di leggere profiles.
+       I profili sono chiusi a chiave, e giustamente: li' dentro c'e'
+       anche l'indirizzo email di tutti. Leggendoli direttamente la troupe
+       compariva senza nomi — le righe c'erano, i profili no. Aprire
+       profiles al film avrebbe voluto dire dare a ogni produzione
+       l'elenco delle mail dei suoi, che non serve a nessuno e poi non si
+       toglie piu'. La funzione restituisce nome, cognome e reparto delle
+       persone dello stesso film, e l'email non esce. */
+    const { data, error } = await sb.rpc('troupe_del_film', { p_film: f.id });
+    if (error) throw new Error(error.message);
+    return (data || []).map(m => ({ ...m, created_at: m.entrato }));
   } catch (e) { console.log('[troupe] non letta:', e.message); return []; }
 }
 
