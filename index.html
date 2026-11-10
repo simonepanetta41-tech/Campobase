@@ -10847,7 +10847,9 @@ async function odgPrevisione(d){
  * della scena. Corretto il modo di trovare il posto, la previsione
  * sbagliata restava li': era salvata, e chi la chiedeva trovava gia' una
  * risposta e non ne chiedeva un'altra. */
-const ODG_METEO_V = 3;   // 3: la parola descrive la giornata, non l'ora peggiore
+// 3: la parola descrive la giornata, non l'ora peggiore
+// 4: i posti hanno il nome giusto, e una rinuncia dice perche'
+const ODG_METEO_V = 4;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
