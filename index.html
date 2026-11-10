@@ -657,6 +657,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-luce .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .odg-luce .v{display:block;font-size:14px;color:var(--white-dim);margin-top:3px}
 .odg-meteo{padding:12px 16px;font-size:13.5px;color:var(--white-dim)}
+.odg-meteo .t{display:block}
+.odg-meteo .s{display:block;margin-top:3px;font-size:11.5px;opacity:.55}
 
 .odg-sez{margin:20px 0 0;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
 .odg-posto{display:flex;align-items:center;gap:12px;padding:13px 16px;text-decoration:none;color:inherit}
@@ -8071,6 +8073,34 @@ const ODG_STOP = ['LOCATION', 'AMBIENTE', 'METEO', 'DAWN', 'ALBA', 'TRAMONTO', '
 const ODG_MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio',
               'agosto','settembre','ottobre','novembre','dicembre'];
 
+/* Il seguito di un valore andato a capo dentro la sua cella.
+ *
+ * "AMBIENTE: TANA DELLA VOLPE / ROTONDA AI" e la riga dopo comincia con
+ * "CADUTI": nel foglio e' una cella sola, nel testo sono due righe, e
+ * l'ambiente del giorno veniva fuori mozzato.
+ *
+ * Si attacca il seguito solo quando il valore resta appeso a una
+ * preposizione o a un articolo, che da solo non vuol dire niente: e' il
+ * caso in cui si e' certi che la frase non e' finita. Un valore che
+ * finisce con una parola piena si lascia com'e'. */
+const ODG_APPESO = /(?:^|\s)(?:AI|AL|ALLA|ALLE|AGLI|ALL|DI|DEL|DELL|DELLA|DELLE|DEI|DEGLI|DA|DAL|DALLA|IN|NEL|NELLA|SU|SUL|SULLA|CON|PER|TRA|FRA|E|ED|LA|IL|LO|GLI|LE|UN|UNA)$/i;
+
+function odgSeguito(testo, et, valore) {
+  if (!valore || !ODG_APPESO.test(valore)) return valore;
+  const righe = String(testo || '').split('\n');
+  const re = new RegExp(odgEtichetta(et) + '(?![A-Za-zÀ-ÿ])', 'i');
+  const i = righe.findIndex(r => re.test(r));
+  if (i < 0 || i + 1 >= righe.length) return valore;
+  // Solo la prima cella della riga sotto: il resto appartiene alle altre
+  // colonne della testata.
+  const cella = righe[i + 1].split(/\s{2,}/)[0].trim();
+  if (!cella || cella.length > 30) return valore;
+  if (!/^[A-ZÀ-Ù][A-ZÀ-Ù0-9 .'’\/-]*$/.test(cella)) return valore;
+  if (ODG_STOP.some(s => new RegExp('^' + odgEtichetta(s), 'i').test(cella))) return valore;
+  if (odgCampoTestata(cella)) return valore;
+  return valore + ' ' + cella;
+}
+
 /* I posti della giornata, con il loro nome.
  *
  * Nell'ordine del giorno i link alle mappe hanno davanti l'etichetta di
@@ -8092,6 +8122,28 @@ const ODG_POSTI = [
   ['OSPEDALE',       'Ospedale']
 ];
 
+/* Un'etichetta che nomina un posto. Si guarda la coda: "LOCATION / MEZZI
+   TECNICI" sono comunque i mezzi tecnici. */
+function odgNomePosto(grezza) {
+  const noto = ODG_POSTI.find(([k]) =>
+    new RegExp('(^|[\\s/|-])' + odgEtichetta(k) + '$', 'i').test(grezza));
+  return noto ? noto[1] : null;
+}
+
+// I campi della testata: hanno la forma di un'etichetta ma non sono posti.
+const ODG_CAMPI_TESTATA = ['PAUSA', 'METEO', 'DAWN', 'ALBA', 'TRAMONTO', 'DUSK',
+  'CONVOCAZIONE', 'CONVOCAZIONE TROUPE', 'PRONTI A GIRARE', 'PRONTI',
+  'FINE RIPRESE', 'FINE LAVORAZIONE', 'AMBIENTE', 'CESTINI', 'NOTE', 'REGIA',
+  'ODG', 'TOT. PAG.', 'SC.'];
+
+/* Il nome del campo si cerca dentro l'etichetta, non solo in coda: nel
+   call sheet di Studio Due Mani Franche le etichette sono "PRONTI A GIRARE
+   SPLIT" e "YUTA PAUSA SPLIT", e cercando solo in coda passavano per posti. */
+function odgCampoTestata(grezza) {
+  return ODG_CAMPI_TESTATA.some(k =>
+    new RegExp('(^|[\\s/|-])' + odgEtichetta(k) + '($|[\\s/|-])', 'i').test(grezza));
+}
+
 function odgLuoghi(testo) {
   const t = String(testo || '');
   const out = [], visti = new Set();
@@ -8108,18 +8160,46 @@ function odgLuoghi(testo) {
     const url = m[0].replace(/[.,;:]+$/, '');
     if (visti.has(url)) continue;
     visti.add(url);
-    const prima = t.slice(Math.max(0, m.index - 130), m.index);
-    // L'ultima etichetta in maiuscolo prima del link, con o senza due punti.
-    const et = [...prima.matchAll(/([A-ZÀ-Ù][A-ZÀ-Ù0-9 .#\/'’-]{1,28})\s*:/g)];
+    /* Dentro un indirizzo web non c'e' nessuna etichetta: si cancellano
+       prima di cercarle. In Bentornati al Sud un link senza etichetta
+       prendeva il nome da un pezzo del link precedente. */
+    const prima = t.slice(Math.max(0, m.index - 130), m.index).replace(/https?:\/\/\S+/g, ' ');
+    // Le etichette in maiuscolo prima del link, con o senza due punti.
+    /* Due maiuscole per cominciare, e poi anche minuscole: nel call sheet
+       di Studio Due Mani Franche le etichette sono "LOCATION Main 1:",
+       "MEZZI TECNICI Main 2:", "CAMPO BASE Main:", e accettando solo il
+       tutto-maiuscolo non venivano viste — restava quella dell'orario
+       accanto, e i posti si chiamavano "Convocazione troupe" e "K9 pausa".
+       Le due maiuscole iniziali tengono fuori le righe della troupe
+       ("Fonico: Denny De Angelis"), che un posto non sono. */
+    const et = [...prima.matchAll(/([A-ZÀ-Ù]{2}[A-Za-zÀ-ÿ0-9 .#\/'’-]{0,27})\s*:/g)];
     const nuda = [...prima.matchAll(/(?:^|\s{2,})([A-ZÀ-Ù][A-ZÀ-Ù0-9 .#\/'’-]{2,28}?)\s{2,}/g)];
-    const ultima = et.length ? et[et.length - 1][1] : nuda.length ? nuda[nuda.length - 1][1] : '';
-    const grezza = ultima.replace(/\s+/g, ' ').trim();
-    if (!grezza) continue;
-    // Si guarda la coda dell'etichetta: "LOCATION / MEZZI TECNICI" e'
-    // comunque i mezzi tecnici.
-    const noto = ODG_POSTI.find(([k]) =>
-      new RegExp('(^|[\\s/|-])' + odgEtichetta(k) + '$', 'i').test(grezza));
-    out.push({ nome: noto ? noto[1] : odgCap(grezza), url });
+    const cand = (et.length ? et : nuda).map(x => x[1].replace(/\s+/g, ' ').trim()).filter(Boolean);
+    /* Senza etichetta il link si lascia stare: un posto senza nome nel
+       Dove non serve a niente, e un link qualunque in fondo al foglio —
+       il sito della produzione — un posto non e'.
+       (Bentornati al Sud la testata ce l'ha a colonne vere: le etichette
+       su una riga, gli indirizzi sotto, i link sotto ancora. Per abbinare
+       li' il nome al link serve la posizione sul foglio, non il testo.) */
+    if (!cand.length) continue;
+    /* Fra le etichette che precedono il link si prende l'ultima che nomina
+       un posto, non l'ultima in assoluto.
+       Nell'ordine del giorno 22 di Missione San Gennaro il link sta due
+       righe sotto la sua etichetta, perche' la testata e' su due colonne e
+       in mezzo ci finisce altra roba:
+         CB / MEZZI TECNICI:   DAWN: 06:36 ALBA: 07:03
+         PAUSA:   Rotazione 20'
+         https://maps.app.goo.gl/...
+       L'ultima etichetta e' PAUSA, e nel Dove compariva un posto chiamato
+       "Pausa" con il link giusto. Pausa, dawn e alba non sono posti: si
+       salta quello che e' un campo della testata e si tiene il posto. */
+    let nome = null;
+    for (let i = cand.length - 1; i >= 0; i--) {
+      if (odgCampoTestata(cand[i])) continue;        // un orario, non un posto
+      nome = odgNomePosto(cand[i]) || odgCap(cand[i]);
+      break;
+    }
+    out.push({ nome: nome || 'Mappa della produzione', url });
   }
   return out;
 }
@@ -8369,7 +8449,7 @@ function odgIntestazione(testo, nomeFile) {
   r.dusk     = odgOraDopo(t, 'DUSK');
 
   // Luoghi e testi
-  r.ambiente = odgValoreDopo(t, 'AMBIENTE', ODG_STOP);
+  r.ambiente = odgSeguito(t, 'AMBIENTE', odgValoreDopo(t, 'AMBIENTE', ODG_STOP));
   r.location = odgValoreDopo(t, 'LOCATION', ODG_STOP);
   r.meteo    = odgValoreDopo(t, 'METEO', ODG_STOP);
   r.ospedale = odgValoreDopo(t, 'OSPEDALE', ODG_STOP);
@@ -10669,18 +10749,30 @@ async function odgCoordDaLink(url){
 async function odgPosto(d){
   if (d.posto) return d.posto;                        // gia' sciolto una volta
   const peso = l => { const i = ODG_POSTO_PESO.indexOf(l.nome); return i < 0 ? 9 : i; };
+  /* Perche' non si e' trovato il posto.
+     Una previsione che manca non vale un avviso, ma la ragione per cui
+     manca si tiene: senza, dal telefono non c'e' modo di sapere se il
+     link non si e' sciolto, se l'OdG non aveva indirizzi o se era il
+     geocoder a non conoscere il paese. */
+  const motivi = [];
   for (const l of [...(d.luoghi || [])].sort((a, b) => peso(a) - peso(b))) {
     try {
       const c = await odgCoordDaLink(l.url);
       d.posto = { ...c, nome: c.nome || l.nome };
       return d.posto;
-    } catch (e) { console.log('[odg] link non sciolto:', l.nome, e.message); }
+    } catch (e) { motivi.push(l.nome + ': ' + e.message); }
   }
   // Gli ordini del giorno all'antica scrivono l'indirizzo per esteso.
   const comune = odgComune(d.location);
-  if (!comune) return null;
-  try { d.posto = await odgCoordinate(comune); return d.posto; }
-  catch (e) { console.log('[odg] comune non trovato:', comune, e.message); return null; }
+  if (!comune) {
+    if (!(d.luoghi || []).length) motivi.push('nell\'OdG non c\'è né un link né un indirizzo');
+  } else {
+    try { d.posto = await odgCoordinate(comune); return d.posto; }
+    catch (e) { motivi.push(comune + ': ' + e.message); }
+  }
+  d.motivoPosto = motivi.join(' · ');
+  console.log('[odg] posto non trovato:', d.motivoPosto);
+  return null;
 }
 
 async function odgPrevisione(d){
@@ -10770,14 +10862,22 @@ async function odgCaricaMeteo(){
   if (!vecchia || vecchia.v !== ODG_METEO_V) d.posto = null;
   try {
     const p = await odgPrevisione(d);
-    if (!p) { d.previsioneFallita = ODG_METEO_V; return; }
+    if (!p) {
+      d.previsioneFallita = ODG_METEO_V;
+      d.previsioneNota = d.motivoPosto || 'non ho trovato il posto';
+      odgRender(); odgSalva(d, { nonMostrare: true });
+      return;
+    }
     d.previsione = p;
     delete d.previsioneFallita;
+    delete d.previsioneNota;
     odgRender();
     odgSalva(d);
   } catch (e) {
     d.previsioneFallita = ODG_METEO_V;
+    d.previsioneNota = e.message;
     console.log('[odg] meteo non disponibile:', e.message);
+    odgRender(); odgSalva(d, { nonMostrare: true });
   }
 }
 
@@ -10888,7 +10988,10 @@ function odgPienoHtml(d) {
       ${d.previsione.pioggia!=null?`<div><span class="k">pioggia</span><span class="v num">${d.previsione.pioggia}%</span></div>`:''}
       ${d.previsione.vento!=null?`<div><span class="k">vento</span><span class="v num">${d.previsione.vento} km/h</span></div>`:''}
     </div></div>`
-   : d.meteo ? `<div class="card odg-meteo">${esc(d.meteo)}</div>` : ''}
+   : (d.meteo || d.previsioneNota) ? `<div class="card odg-meteo">
+       <span class="t">${esc(d.meteo || 'Meteo non indicato nell\'OdG')}</span>
+       ${d.previsioneNota ? `<span class="s">previsione non disponibile · ${esc(d.previsioneNota)}</span>` : ''}
+     </div>` : ''}
 
   ${d.pickup ? `<div class="odg-sez">IL TUO PASSAGGIO</div>
   <div class="card odg-pick">
