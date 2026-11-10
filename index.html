@@ -9343,8 +9343,23 @@ async function odgLavora(files, opzioni) {
       dati.stralci = odgStralci(str.testo);                 // ripiego a testo
       dati.sceneggiatura = stralciDaRighe(str.righe || []); // con i rientri
     }
+    /* Comanda la data.
+     *
+     * Un ordine del giorno vecchio — una mail reinoltrata, un archivio
+     * che si rimanda — va salvato lo stesso, perche' e' la giornata di
+     * quel giorno e sul cloud ci sta bene. Ma non deve prendere il posto
+     * di quello di domani sullo schermo: chi apre l'app alle sei vuole
+     * vedere oggi, non il quindici del mese scorso. */
+    const vecchio = odgCorrente && odgCorrente.data && dati.data
+                 && dati.data < odgCorrente.data;
+    await odgSalva(dati, { nonMostrare: vecchio });
+    if (vecchio) {
+      showToast('Ordine del giorno del ' + odgDataEstesa(dati.data)
+              + ' archiviato. Sullo schermo resta quello del '
+              + odgDataEstesa(odgCorrente.data) + '.', 'default', 6000);
+      return true;
+    }
     odgCorrente = dati;
-    await odgSalva(dati);
     // I fogli della giornata prima non servono piu' a nessuno.
     cbFileCancella('odg/', letti.map(x => x.file).filter(Boolean));
     showToast('Ordine del giorno caricato.');
@@ -9684,8 +9699,12 @@ function odgFilm() {
  * l'ha messo dentro, il microfonista accanto deve ricaricarsi gli stessi
  * tre PDF per conto suo. Dove c'e' un film si salva sul film e lo legge
  * la troupe; senza film, come prima, resta di chi l'ha caricato. */
-async function odgSalva(d) {
-  try { localStorage.setItem(ODG_LOCALE, JSON.stringify(d)); } catch (_) {}
+async function odgSalva(d, opzioni) {
+  // Un ordine del giorno vecchio si salva sul cloud ma non diventa quello
+  // che il telefono riapre domattina.
+  if (!(opzioni && opzioni.nonMostrare)) {
+    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(d)); } catch (_) {}
+  }
   if (!currentUser || !d.data) return;
   const f = filmCorrente();
   try {
@@ -11295,6 +11314,34 @@ async function loadUpdatedPdlFile(input) {
   finally { btn.innerHTML = prima; }
 }
 
+/* Quale dei due piani e' piu' avanti.
+ *
+ * La versione la scrivono tutte le produzioni: "PdL #7 03.11.2026". Da li'
+ * si prendono il numero e la data, e il numero vale piu' della data perche'
+ * capita di rifare la stessa versione lo stesso giorno.
+ *
+ * Serve perche' l'unione non e' simmetrica: il piano nuovo porta le
+ * giornate da qui in avanti e si tengono le vecchie da quelle gia' girate.
+ * Dando in pasto un piano vecchio, le giornate nuove sparirebbero tutte —
+ * e nessuno se ne accorgerebbe prima di cercare una data fra tre
+ * settimane. Un ordine del giorno sbagliato si vede subito; un piano
+ * tornato indietro no.
+ */
+function pdlQuantoAvanti(v) {
+  const t = String(v || '');
+  // Il numero dev'essere attaccato alla sigla e non far parte di una data:
+  // in "PDL del 30.10.2026" il trenta e' il giorno, non la versione.
+  const n = t.match(/PDL\s*#?\s*(\d{1,3})(?![\d.\/-])/i);
+  return { numero: n ? +n[1] : null, data: odgDataDaNome(t) };
+}
+
+function pdlPiuVecchio(nuovo, vecchio) {
+  const a = pdlQuantoAvanti(nuovo), b = pdlQuantoAvanti(vecchio);
+  if (a.numero != null && b.numero != null && a.numero !== b.numero) return a.numero < b.numero;
+  if (a.data && b.data && a.data !== b.data) return a.data < b.data;
+  return false;        // nel dubbio si lascia passare
+}
+
 /* L'aggiornamento del piano, staccato dal tasto che lo scatenava: lo
    stesso PDF puo' arrivare dal dito di qualcuno o per posta dalla
    produzione, e da qui in poi il lavoro e' identico. */
@@ -11305,6 +11352,12 @@ async function pdlAggiorna(f) {
     for(let i=0;i<bytes.byteLength;i+=chunk) bin+=String.fromCharCode(...bytes.subarray(i,i+chunk));
     const b64=btoa(bin);
     const { pdl: newPdl, testo: pdlTesto, metodo } = await pdlAnalizza(b64);
+    if (pdlData && pdlPiuVecchio(newPdl.versione, pdlData.versione)) {
+      showToast('Questo piano è più vecchio di quello che hai ('
+              + (newPdl.versione || '?') + ' contro ' + (pdlData.versione || '?')
+              + '): lo lascio stare.', 'red', 6000);
+      return false;
+    }
     window._pdlTesto = pdlTesto;
     window._pdlMetodo = metodo;
     const oldGiorni=getPdlAllGiorni();
