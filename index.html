@@ -8566,7 +8566,8 @@ Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
  "troupe":[{"reparto":"","ruolo":"","nome":"","partenza":"","set":""}],
  "contatti":[{"nome":"","ruolo":"","tel":""}]}
 
-scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola. pag: come scritto ("4 1/8").
+scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola.
+pag: SOLO l'ultima colonna, PAG: "1/8", "3 3/8", "2". DAY e PAG sono due colonne diverse e vicine: DAY e' il numero della giornata di lavorazione ed e' lo stesso per tutte le scene del giorno, PAG sono gli ottavi di pagina di quella scena. Non attaccarle: una riga "ID 1, 19 | DAY 4 | PAG 1/8" ha pag "1/8", non "4 1/8". Se la somma dei pag delle scene non somiglia al "Tot. pag." in fondo alla tabella, hai preso dentro la colonna DAY.
 Fra una scena e l'altra la tabella puo' avere una riga senza numero, con una scritta sola in maiuscolo (TRASFERIMENTO, DRONE UNIT, SECOND UNIT, PRANZO, SPOSTAMENTO): e' uno stacco nella giornata, non una scena. Rendila come {"n":"","nota":"TRASFERIMENTO"} al posto suo nell'elenco, senza attaccarla alla scena prima o dopo.
 domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null.
 cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP. set: l'ultima colonna, SET.
@@ -9194,6 +9195,39 @@ async function odgScegliFile(input) {
  *
  * Torna true se l'ordine del giorno e' stato letto e salvato. Serve a chi
  * chiama dalla posta, per sapere se il pacchetto si puo' segnare fatto. */
+/* La rete sotto, per le pagine delle scene.
+ *
+ * DAY e PAG sono due colonne vicine, e per un po' sono arrivate attaccate:
+ * una scena da un ottavo risultava di quattro pagine e un ottavo, dove il
+ * quattro era il numero della giornata. Adesso in fondo alla tabella si
+ * legge anche il totale dichiarato, e quello permette di accorgersene: se
+ * la somma delle scene non torna, e togliendo il primo numero intero da
+ * ciascuna torna, quel numero era la colonna sbagliata.
+ *
+ * Non salva tutti i casi — se il valore e' arrivato storto in altro modo,
+ * la somma non tornera' comunque e si lascia stare. Ma non peggiora mai
+ * niente: si cambia solo quando il conto quadra. */
+function odgAggiustaPagine(d) {
+  const scene = (d && d.scene) || [];
+  if (!d || !d.pagine || scene.length < 2) return;
+  const somma = l => l.reduce((a, x) => a + odgPagine(x.pag), 0);
+  if (Math.abs(somma(scene) - d.pagine) < 0.01) return;
+  // Si toglie il primo numero intero solo se quello che resta e' ancora
+  // una pagina scritta per bene: "4 1/8" -> "1/8", "4 3 3/8" -> "3 3/8".
+  const togli = v => {
+    const t = String(v || '').trim();
+    const m = t.match(/^\d+\s+(.+)$/);
+    if (!m) return t;
+    const r = m[1].trim();
+    return /^\d+(?:\s+\d+)?\s*\/\s*\d+$/.test(r) ? r : t;
+  };
+  const senza = scene.map(x => ({ pag: togli(x.pag) }));
+  if (Math.abs(somma(senza) - d.pagine) < 0.01) {
+    scene.forEach((x, i) => { x.pag = senza[i].pag; });
+    console.log('[odg] tolta la colonna DAY dalle pagine delle scene');
+  }
+}
+
 async function odgLavora(files, opzioni) {
   const esigiOdg = !!(opzioni && opzioni.esigiOdg);
   if (!files.length || odgInCorso) return false;
@@ -9259,6 +9293,7 @@ async function odgLavora(files, opzioni) {
        sovrascrive mai del tutto — un file rinominato a mano direbbe la sua
        su un documento che invece sa chi e'. */
     odgCorreggiDalNome(dati, file.name);
+    odgAggiustaPagine(dati);
     dati.file = principale.file || null;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
