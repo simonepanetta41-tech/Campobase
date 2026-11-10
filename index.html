@@ -8168,13 +8168,75 @@ function odgPulisci(campo, v) {
    Le due letture della stessa pagina non si contraddicono: la seconda
    parla solo dove la prima non ha trovato niente. */
 function odgIntestazioneDa(doc, nomeFile) {
-  const a = odgIntestazione(doc.testo, nomeFile);
-  if (!doc.colonne) return a;
-  const b = odgIntestazione(doc.colonne, nomeFile);
   const manca = v => v === null || v === undefined || v === '' || v === 0
                      || (Array.isArray(v) && !v.length);
-  for (const k of Object.keys(b)) if (manca(a[k]) && !manca(b[k])) a[k] = b[k];
+  const a = odgIntestazione(doc.testo, nomeFile);
+
+  // Secondo giro: la stessa pagina letta per colonne.
+  if (doc.colonne) {
+    const b = odgIntestazione(doc.colonne, nomeFile);
+    for (const k of Object.keys(b)) if (manca(a[k]) && !manca(b[k])) a[k] = b[k];
+  }
+
+  // Terzo giro: gli altri modi di chiamare la stessa cosa.
+  for (const campo of Object.keys(ODG_ALTRINOMI)) {
+    if (!manca(a[campo])) continue;
+    for (const nome of ODG_ALTRINOMI[campo]) {
+      const o = odgOraVicina(doc.testo, nome)
+             || (doc.colonne ? odgOraVicina(doc.colonne, nome) : null);
+      if (o) { a[campo] = o; break; }
+    }
+  }
+
+  /* Quarto giro: sul foglio, non nel testo.
+     Per le etichette andate a capo dentro una cella, che nel testo non
+     esistono in nessun ordine. */
+  if (doc.pezzi && doc.pezzi.length) {
+    const sulFoglio = {
+      convocazione:    ['CONVOCAZIONE TROUPE', 'CONVOCAZIONE'],
+      prontiAGirare:   ['PRONTI A GIRARE'],
+      fineRiprese:     ['FINE RIPRESE'],
+      fineLavorazione: ['FINE LAVORAZIONE']
+    };
+    for (const campo of Object.keys(sulFoglio)) {
+      if (!manca(a[campo])) continue;
+      for (const nome of sulFoglio[campo]) {
+        const o = odgOraDaCelle(doc.pezzi, doc.corpo || 10, nome);
+        if (o) { a[campo] = o; break; }
+      }
+    }
+  }
   return a;
+}
+
+/* Gli altri modi di chiamare la stessa cosa.
+ *
+ * Si provano solo dove il primo giro non ha trovato niente: sono etichette
+ * piu' corte e piu' ambigue, e usarle per prime vorrebbe dire raccogliere
+ * i titoli delle colonne — "COSTUMI PRONTI", "PRONTI SET" — al posto
+ * dell'orario della giornata.
+ *
+ * Per questo l'ora dev'essere vicina: entro pochi caratteri dall'etichetta.
+ * In un'intestazione l'orario sta attaccato al suo nome; in una tabella
+ * no, perche' sta nella riga sotto.
+ */
+const ODG_ALTRINOMI = {
+  convocazione:    ['CREW CALL', 'CALL TIME', 'CONVOCAZIONE SUL SET', 'ORE CONVOCAZIONE'],
+  prontiAGirare:   ['PRONTI', 'SHOOTING CALL', 'READY TO SHOOT', 'FIRST SHOT'],
+  fineRiprese:     ['WRAP', 'CAMERA WRAP', 'FINE GIRATO'],
+  fineLavorazione: ['FINE GIORNATA', 'CREW WRAP', 'FINE LAVORO', 'FINE TURNO']
+};
+
+function odgOraVicina(testo, et) {
+  const re = new RegExp(odgEtichetta(et) + '(?![A-Za-zÀ-ÿ])(?:\\s*:)?\\s*', 'gi');
+  let m;
+  while ((m = re.exec(testo)) !== null) {
+    if (m[0].length === 0) { re.lastIndex++; continue; }
+    const dopo = testo.slice(m.index + m[0].length, m.index + m[0].length + 14);
+    const o = dopo.match(/^[^0-9\n]{0,6}(\d\s?\d?\s*[.:]\s*\d\s?\d)/);
+    if (o) return odgOra(o[1]);
+  }
+  return null;
 }
 
 function odgIntestazione(testo, nomeFile) {
@@ -8834,6 +8896,72 @@ function odgColonneDa(tutti, toll, pagina) {
   return fuori;
 }
 
+/* Le celle della testata, come stanno sul foglio.
+ *
+ * Un'etichetta dentro una cella stretta va a capo: nella Famiglia Panini
+ * "FINE" sta sopra e "LAVORAZIONE" otto punti sotto, incolonnate, e in
+ * mezzo — nella colonna accanto — c'e' "16:00". Nel testo, comunque lo si
+ * rimetta in fila, quell'etichetta non esiste: esiste solo sul foglio.
+ *
+ * Quindi si ricostruiscono le celle: pezzi incolonnati allo stesso x e
+ * attaccati in verticale diventano una cosa sola.
+ */
+function odgCelle(pezzi, corpo) {
+  const ordinati = [...pezzi].sort((a, b) => a.x - b.x || b.y - a.y);
+  const celle = [];
+  for (const it of ordinati) {
+    const c = celle.find(c =>
+      Math.abs(c.x - it.x) <= 4 &&              // stessa colonna
+      c.giu - it.y > -0.5 && c.giu - it.y <= corpo * 1.8);   // riga subito sotto
+    if (c) { c.t += ' ' + it.t; c.giu = it.y; c.w = Math.max(c.w, it.w); }
+    else celle.push({ t: it.t, x: it.x, y: it.y, giu: it.y, w: it.w });
+  }
+  return celle;
+}
+
+/* L'orario di un'etichetta, cercato sul foglio invece che nel testo:
+   il primo che sta alla sua destra, piu' o meno alla sua altezza. */
+function odgOraDaCelle(pezzi, corpo, et) {
+  const celle = odgCelle(pezzi, corpo);
+  /* La casella puo' dire qualcosa in piu' dell'etichetta — "CONVOCAZIONE
+     TROUPE SET", "FINE RIPRESE ORE" — ma non molto di piu': se dopo
+     l'etichetta c'e' mezza riga, quella casella parla d'altro. */
+  const re = new RegExp('^' + odgEtichetta(et) + '([\\s:]*[A-Za-zÀ-ÿ ]{0,14})?[\\s:]*$', 'i');
+  for (const c of celle.filter(c => re.test(c.t.replace(/\s+/g, ' ').trim()))) {
+    const centro = (c.y + c.giu) / 2;
+    const destra = c.x + (c.w || 0);
+    /* La fascia alla destra dell'etichetta, rimessa insieme.
+       Non si cerca un pezzo che sia tutto un orario: certe produzioni
+       stampano "16:00" come cinque pezzi separati, uno per carattere, e
+       nessuno di quelli e' un orario da solo. */
+    const banda = pezzi
+      .filter(p => p.x >= destra - 2 && p.x - destra <= 170
+                && Math.abs(p.y - centro) <= corpo * 1.2)
+      .sort((a, b) => a.x - b.x);
+    if (banda.length) {
+      const linea = banda.map(p => p.t).join(' ');
+      const o = linea.match(/^[^0-9]{0,8}?(\d\s?\d?\s*[.:]\s*\d\s?\d)/);
+      if (o) return odgOra(o[1]);
+    }
+
+    /* Se a destra non c'e' niente, si guarda sotto.
+       Certe testate sono caselle: il titolo in piccolo sopra e l'orario in
+       grande sotto, incolonnato. Si resta dentro la larghezza
+       dell'etichetta, se no si finisce a prendere il valore della casella
+       accanto. */
+    const sotto = pezzi
+      .filter(p => p.x + (p.w || 0) > c.x - 4 && p.x < destra + 4
+                && c.giu - p.y > corpo * 0.5 && c.giu - p.y < corpo * 4.5)
+      .sort((a, b) => b.y - a.y || a.x - b.x);
+    if (sotto.length) {
+      const linea = sotto.map(p => p.t).join(' ');
+      const o = linea.match(/^[^0-9]{0,8}?(\d\s?\d?\s*[.:]\s*\d\s?\d)/);
+      if (o) return odgOra(o[1]);
+    }
+  }
+  return null;
+}
+
 /* Il testo di un PDF, rimesso in righe.
  *
  * Prima l'intestazione si leggeva da questo:
@@ -8852,6 +8980,7 @@ async function odgTestoDaPdf(file, conRighe) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   const pagine = [], piatte = [], colonne = [], righe = [];
+  let posizioni = [], corpoPag = 10;
   for (let i = 1; i <= pdf.numPages; i++) {
     const p = await pdf.getPage(i);
     const c = await p.getTextContent();
@@ -8875,6 +9004,14 @@ async function odgTestoDaPdf(file, conRighe) {
 
     // Due letture della stessa pagina: le righe fedeli per la
     // sceneggiatura, quelle accorpate per l'intestazione.
+    if (i === 1) {
+      // Le posizioni servono solo per la testata, che sta sempre in prima
+      // pagina. Tenerle per tutte vorrebbe dire portarsi dietro migliaia
+      // di coordinate che nessuno guardera' mai.
+      posizioni = pezzi.map(it => ({ t: it.str, x: it.transform[4],
+                                     y: it.transform[5], w: it.width || 0 }));
+      corpoPag = corpo;
+    }
     righe.push(...odgRigheDa(pezzi, 0, i));
     pagine.push(odgRigheDa(pezzi, toll, i).map(r => r.t).join('\n'));
     colonne.push(odgColonneDa(pezzi, toll, i).map(r => r.t).join('\n'));
@@ -8887,7 +9024,8 @@ async function odgTestoDaPdf(file, conRighe) {
      e' stato provato sul documento vero e funziona su quella forma: gli si
      lascia la sua finche' non viene riscritto apposta. */
   const fuori = { testo: pagine.join('\n'), piatto: piatte.join('\n'),
-                  colonne: colonne.join('\n'), righe };
+                  colonne: colonne.join('\n'), righe,
+                  pezzi: posizioni, corpo: corpoPag };
   return conRighe ? fuori : fuori.testo;
 }
 
