@@ -560,7 +560,16 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* Marchio, frase e tasti sono un blocco solo, centrato. Prima i tasti
    erano spinti in fondo allo schermo e fra la frase e il primo tocco
    restava mezzo telefono di vuoto. */
-.acc{min-height:100dvh;box-sizing:border-box;max-width:420px;margin:0 auto;
+/* La larghezza serve, e serve dichiarata.
+ *
+ * Dopo il controllo dell'accesso il JavaScript mette display:flex su
+ * #authPage, e da quel momento questa scheda diventa un elemento
+ * flessibile: senza una larghezza propria si stringe sul contenuto. Su un
+ * telefono da 390 pixel veniva larga 241, quindi i due tasti erano 193 con
+ * una scritta da 162 — quindici pixel per lato, e si vedeva.
+ * Il CSS dice che #authPage e' un blocco, ma vale solo per il primo
+ * istante: quello che si guarda e' sempre lo stato dopo. */
+.acc{width:100%;min-height:100dvh;box-sizing:border-box;max-width:420px;margin:0 auto;
   display:flex;flex-direction:column;justify-content:center;
   padding:calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 28px)}
 .acc-alto{display:flex;flex-direction:column}
