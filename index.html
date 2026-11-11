@@ -549,6 +549,10 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .prog-codice{min-height:44px;margin-top:8px;border-style:solid;
   color:var(--white-dim);font-size:13.5px}
 .cod-box{display:none;gap:8px;margin-top:8px}
+/* Quando il browser porta il campo in vista, che lo faccia lasciando un
+   po' d'aria sopra e sotto invece di incollarlo al bordo. */
+.cod-box{scroll-margin:96px}
+#homePage.cod-aperto{padding-bottom:100vh}
 .cod-box.on{display:flex}
 .cod-box input{flex:1;min-width:0;padding:12px 14px;background:var(--bg);
   border:1px solid var(--border);border-radius:11px;color:var(--white);
@@ -3226,11 +3230,41 @@ async function filmDaMembri(analisi) {
  * una nell'app dove il film non c'e'. Il codice sotto il QR invece si
  * detta a voce sul set e si digita dentro l'app, dove si e' gia' entrati.
  */
+/* Il campo del codice e lo spazio sotto.
+ *
+ * Il campo sta in fondo alla lista dei progetti, e sotto c'erano quaranta
+ * pixel: appiccicato alla fine della pagina. Con la tastiera aperta iOS,
+ * a ogni carattere, rifa' il conto di dove sta il cursore e scorre per
+ * tenerlo visibile — e se sotto non c'e' spazio, "tenerlo visibile" vuol
+ * dire portare il documento al massimo. A ogni tasto. Su un telefono con
+ * pochi progetti la pagina non scorre proprio e non si vede niente: per
+ * questo il guasto compariva sul telefono di uno e non su quello
+ * dell'altro.
+ *
+ * Mentre il campo e' aperto si lascia mezzo schermo di spazio sotto,
+ * cosi' il campo puo' stare in mezzo e il browser non ha piu' motivo di
+ * muovere niente. Chiuso il campo, lo spazio se ne va. */
 function codiceMostra() {
   const b = document.getElementById('codBox');
+  const home = document.getElementById('homePage');
   if (!b) return;
   b.classList.toggle('on');
-  if (b.classList.contains('on')) document.getElementById('codInput').focus();
+  const aperto = b.classList.contains('on');
+  if (home) home.classList.toggle('cod-aperto', aperto);
+  if (!aperto) return;
+  document.getElementById('codInput').focus();
+  /* In alto, non al centro: la tastiera occupa la meta' bassa dello
+     schermo, e un campo al centro ci finisce sotto — allora il browser lo
+     risolleva, ed e' di nuovo lui a decidere dove sta la pagina. In alto
+     non si contendono niente, e sotto resta spazio in abbondanza. */
+  b.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function codiceChiudi() {
+  const b = document.getElementById('codBox');
+  const home = document.getElementById('homePage');
+  if (b) b.classList.remove('on');
+  if (home) home.classList.remove('cod-aperto');
 }
 
 async function codiceEntra() {
@@ -3243,7 +3277,9 @@ async function codiceEntra() {
   if (b) { b.disabled = false; b.textContent = 'Entra'; }
   if (!f) { showToast('Codice non valido. Controlla con chi te l\'ha dato.', 'red', 5000); return; }
   el.value = '';
-  document.getElementById('codBox').classList.remove('on');
+  // Anche lo spazio lasciato sotto: se resta, la home si apre con mezzo
+  // schermo di vuoto in fondo.
+  codiceChiudi();
   await apriFilm(f.id);
 }
 
