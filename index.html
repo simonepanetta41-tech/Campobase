@@ -1156,6 +1156,10 @@ footer { margin-top: 60px; padding: 20px 0 28px; border-top: 1px solid var(--bor
 footer .fl { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 800; }
 footer .fl em { font-style: normal; color: var(--yellow); }
 footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-height: 1.6; }
+/* La versione, piccola ma sempre a portata d'occhio. Due volte in un
+   giorno ci siamo chiesti se una modifica fosse arrivata sul telefono e
+   abbiamo tirato a indovinare: adesso basta guardare in fondo. */
+.cb-ver { font-family: 'DM Mono', monospace; font-size: 9px; opacity: .55; }
 
 @media print {
   body { background:#fff !important; color:#000 !important; font-family: Arial, sans-serif; }
@@ -2088,7 +2092,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
     <footer>
       <div class="fl">Campo<em>base</em></div>
-      <div class="fr">by ohsfaccimmarosound</div>
+      <div class="fr">by ohsfaccimmarosound<br><span id="cbVer" class="cb-ver"></span></div>
     </footer>
   </div>
 </div>
@@ -4856,6 +4860,26 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
     document.body.appendChild(ov);
   });
 }
+
+/*
+ * Quale versione hai in mano.
+ *
+ * Il secondo numero e' lo stesso della cache del service worker, che si
+ * alza a ogni rilascio: cosi' non ne esistono due che possono divergere,
+ * e un controllo nella suite verifica che i due file dicano lo stesso.
+ *
+ * Serve perche' una PWA installata sulla home puo' restare sospesa per
+ * ore e riaprirsi con la copia del mattino. Senza un numero scritto da
+ * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
+ * risponde a tentoni — ed e' successo due volte in un giorno solo.
+ */
+const CB_VERSIONE = '1.102';
+
+function cbMostraVersione() {
+  const el = document.getElementById('cbVer');
+  if (el) el.textContent = 'v' + CB_VERSIONE;
+}
+document.addEventListener('DOMContentLoaded', cbMostraVersione);
 
 /*
  * Un avviso che si legge davvero.
