@@ -9434,6 +9434,14 @@ let odgUltimiLetti = [];
 async function odgLavora(files, opzioni) {
   odgUltimiLetti = [];
   const esigiOdg = !!(opzioni && opzioni.esigiOdg);
+  /* Dove stanno i PDF sul cloud, quando arrivano dalla posta.
+     I byte finiscono nella memoria di QUESTO telefono, e quella non
+     viaggia: il percorso nel secchio invece si salva insieme all'ordine
+     del giorno, e cosi' gli altri telefoni della troupe sanno dove
+     andarselo a prendere. Caricando i file a mano non c'e' nessun
+     percorso, e va bene: in quel caso il foglio ce l'ha solo chi l'ha
+     caricato, come prima. */
+  const percorsi = (opzioni && opzioni.percorsi) || {};
   if (!files.length || odgInCorso) return false;
   odgInCorso = true;
   odgRender();
@@ -9451,7 +9459,8 @@ async function odgLavora(files, opzioni) {
       const r = await odgTestoDaPdf(f, true);
       letti.push({ nome: f.name, vero: f, testo: r.testo, piatto: r.piatto,
                    colonne: r.colonne, righe: r.righe,
-                   tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null });
+                   tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null,
+                   percorso: percorsi[f.name] || null });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
     // l'OdG e' sempre il documento piu' corposo dei tre. Prima si prendeva
@@ -9503,11 +9512,13 @@ async function odgLavora(files, opzioni) {
     odgCorreggiDalNome(dati, file.name);
     odgAggiustaPagine(dati);
     dati.file = principale.file || null;
+    dati.percorso = principale.percorso || null;
     dati.caricatoIl = new Date().toISOString();
     // Gli allegati che non sono l'OdG restano come testo, pronti per la
     // scheda scena: gli stralci sono la sceneggiatura del giorno, e i giri
     // auto hanno il pick-up di ognuno.
-    dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo, file: x.file }));
+    dati.allegati = extra.map(x => ({ nome: x.nome, tipo: x.tipo, testo: x.testo,
+                                      file: x.file, percorso: x.percorso || null }));
     const giri = extra.find(x => x.tipo === 'giri');
     if (giri) {
       dati.giriTesto = giri.piatto || giri.testo;
@@ -9990,13 +10001,17 @@ async function postaApri(p){
   try { if (typeof switchResultTab === 'function') switchResultTab('odg'); } catch (_) {}
   try {
     const files = [];
+    const percorsi = {};
     for (const a of tenuti) {
       const { data: blob, error } = await sb.storage.from('posta').download(a.percorso);
       if (error || !blob) throw new Error('allegato non scaricato: ' + a.nome);
       files.push(new File([blob], a.nome, { type: a.tipo || 'application/pdf' }));
+      percorsi[a.nome] = a.percorso;
     }
-    // Dalla posta si pretende un ordine del giorno vero.
-    let fatto = await odgLavora(files, { esigiOdg: true });
+    // Dalla posta si pretende un ordine del giorno vero. I percorsi nel
+    // secchio si passano perche' finiscano nell'ordine del giorno salvato:
+    // e' l'unico modo che hanno gli altri telefoni di trovare i PDF.
+    let fatto = await odgLavora(files, { esigiOdg: true, percorsi });
     const fatti = fatto ? ['ordine del giorno'] : [];
 
     /* E poi il piano, che e' un'altra sezione.
@@ -10917,10 +10932,11 @@ function odgVaiPagina(p, subito){
 async function odgApriFile(i){
   const d = odgCorrente; if (!d) return;
   const f = i < 0
-    ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo, file: d.file }
+    ? { nome: d.nomeFile || 'Ordine del giorno', testo: d.testo, file: d.file, percorso: d.percorso }
     : (d.allegati||[])[i];
   if (!f) return;
-  const buf = await cbFileLeggi(f.file);
+  // Come per gli stralci: in casa, e se non c'e' dal secchio della posta.
+  const buf = await odgByteDi(f);
   if (buf) {
     odgMostraPieno(`<div class="sc-top">
         <button class="sc-x" onclick="odgChiudiScena()">\u2039</button>
@@ -10948,6 +10964,64 @@ async function odgApriFile(i){
  * chi parla, battuta, didascalia, azione — e si scorre come sul foglio.
  * Toccando una scena ci si posiziona su quella.
  */
+/* I byte di un allegato: prima in casa, poi dal cloud.
+ *
+ * I PDF stanno nella memoria del telefono che li ha letti, e quella
+ * memoria non viaggia. Con il gettone della posta li legge un telefono
+ * solo — chi arriva primo — quindi fino a stamattina il foglio vero lo
+ * vedeva uno e tutti gli altri vedevano la ricostruzione dell'app. E quale
+ * fosse quell'uno cambiava ogni sera, a seconda di chi vinceva la corsa.
+ *
+ * I byte pero' sono gia' su Supabase, nel secchio della posta, e la
+ * troupe ha il permesso di leggerli: quando in casa non ci sono si
+ * scaricano da li' una volta e si mettono da parte, cosi' la volta dopo
+ * non si scaricano piu'. Sul set si guardano gli stralci in cinque: devono
+ * essere il foglio della produzione, con i suoi rientri e i suoi segni,
+ * non una nostra impaginazione.
+ */
+async function odgPercorsoDaPosta(nome){
+  const f = typeof filmCorrente === 'function' ? filmCorrente() : null;
+  if (!f || !nome) return null;
+  try {
+    const { data } = await sb.from('posta').select('allegati,ricevuta')
+      .eq('project_id', f.id).order('ricevuta', { ascending: false }).limit(8);
+    for (const p of data || [])
+      for (const a of (p.allegati || []))
+        if (a && a.percorso && a.nome === nome) return a.percorso;
+  } catch (e) { console.log('[stralci] percorso non cercato nella posta:', e.message); }
+  return null;
+}
+
+async function odgByteDi(att){
+  if (!att) return null;
+  if (att.file) {
+    const buf = await cbFileLeggi(att.file);
+    if (buf) return buf;
+  }
+  /* Il percorso, se l'ordine del giorno non ce l'ha scritto.
+     Gli ordini del giorno salvati prima di oggi non lo portano, e
+     aspettare il pacchetto di domani vorrebbe dire lasciare la troupe
+     senza il foglio vero per una giornata: si cerca allora nella posta del
+     film un allegato con lo stesso nome. Una domanda sola, e solo quando
+     il PDF in casa non c'e'. */
+  const percorso = att.percorso || await odgPercorsoDaPosta(att.nome);
+  if (!percorso) return null;
+  att.percorso = percorso;
+  try {
+    const { data: blob, error } = await sb.storage.from('posta').download(percorso);
+    if (error || !blob) throw new Error(error && error.message || 'non scaricato');
+    const buf = await blob.arrayBuffer();
+    // Da parte, per la prossima volta. Se la memoria e' piena si rinuncia
+    // a tenerlo e si va avanti: il foglio si apre comunque.
+    const chiave = att.file || odgChiaveFile(att.nome);
+    try { if (await cbFileSalva(chiave, buf)) att.file = chiave; } catch (_) {}
+    return buf;
+  } catch (e) {
+    console.log('[stralci] PDF non recuperato dal cloud:', e.message);
+    return null;
+  }
+}
+
 async function odgApriScena(n){
   const d = odgCorrente;
   const scene = (d && d.sceneggiatura && d.sceneggiatura.length) ? d.sceneggiatura : null;
@@ -10955,9 +11029,9 @@ async function odgApriScena(n){
   /* Il foglio vero, se ce l'abbiamo: e' quello che gira sul set, con i
      rientri della produzione e i suoi segni. La ricostruzione resta per
      quando i byte non ci sono. */
-  const att = (d && d.allegati || []).find(a => a.tipo === 'stralci' && a.file);
+  const att = (d && d.allegati || []).find(a => a.tipo === 'stralci' && (a.file || a.percorso));
   if (scene && att) {
-    const buf = await cbFileLeggi(att.file);
+    const buf = await odgByteDi(att);
     if (buf) {
       const scelte = scene.map(sc =>
         `<button class="sc-tab" data-n="${esc(sc.n)}" onclick="odgVaiScena('${esc(sc.n)}')">${esc(sc.n)}</button>`).join('');
