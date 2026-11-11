@@ -77,11 +77,19 @@ stable
 security definer
 set search_path = public
 as $$
+  /* Da una versione sola. Rianalizzando una sceneggiatura nasce una
+     versione nuova e il cast le viene copiato dietro: prendendo tutte le
+     versioni del film, la troupe vedrebbe ogni attore due volte. */
   select c.*
     from public.cast_list c
-    join public.analyses a on a.id = c.analysis_id
-   where a.project_id = p_film
-     and public.e_membro(p_film)
+   where public.e_membro(p_film)
+     and c.analysis_id = (
+       select a.id
+         from public.analyses a
+         join public.cast_list cc on cc.analysis_id = a.id
+        where a.project_id = p_film
+        order by a.created_at desc
+        limit 1)
    order by c.character_id;
 $$;
 

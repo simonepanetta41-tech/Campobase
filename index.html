@@ -3505,6 +3505,57 @@ function showCastPopup() {
   });
 }
 
+/* Il piano di lavorazione e il cast seguono il film, l'analisi no.
+ *
+ * Rianalizzare una sceneggiatura non sostituisce l'analisi: ne crea una
+ * versione nuova. Ma il piano e il cast stanno appesi all'id dell'analisi
+ * vecchia, quindi chi rianalizzava si ritrovava il cruscotto del piano
+ * vuoto, le giornate marcate perse e il cast sparito — senza che niente
+ * glielo dicesse, e con il piano ancora li' nel database a due righe di
+ * distanza.
+ *
+ * Si copiano sulla versione nuova. Copia e non spostamento: la versione
+ * vecchia resta apribile con il suo piano, che e' il senso di tenere le
+ * versioni.
+ */
+async function portaAvanti(projectId, nuovaId){
+  try {
+    const { data: vecchie } = await sb.from('analyses')
+      .select('id').eq('project_id', projectId).neq('id', nuovaId)
+      .order('created_at', { ascending: false }).limit(5);
+    if (!vecchie?.length) return;
+    const ids = vecchie.map(v => v.id);
+
+    const { data: piani } = await sb.from('pdl_versions')
+      .select('analysis_id, data, shooting_data').in('analysis_id', ids);
+    // La piu' recente fra quelle che un piano ce l'hanno davvero.
+    const p = piani?.length ? ids.map(i => piani.find(x => x.analysis_id === i)).find(Boolean) : null;
+    if (p && p.data) {
+      await sb.from('pdl_versions').upsert(
+        { analysis_id: nuovaId, user_id: currentUser.id, data: p.data, shooting_data: p.shooting_data || {} },
+        { onConflict: 'analysis_id' });
+    }
+
+    /* Il piano si riscrive sopra, il cast no: sono righe, e insert le
+       aggiunge. Rilanciando questa funzione sulla stessa versione il cast
+       verrebbe copiato due volte, e in troupe comparirebbe ogni attore in
+       doppio. Se c'e' gia', non si tocca. */
+    const { data: gia } = await sb.from('cast_list').select('id').eq('analysis_id', nuovaId).limit(1);
+    if (gia?.length) return;
+
+    const { data: cast } = await sb.from('cast_list').select('*').in('analysis_id', ids);
+    const daCui = cast?.length ? ids.find(i => cast.some(c => c.analysis_id === i)) : null;
+    if (daCui) {
+      // Via l'id e la data della riga vecchia: sono della riga, non del cast.
+      const righe = cast.filter(c => c.analysis_id === daCui)
+        .map(({ id, created_at, ...resto }) => ({ ...resto, analysis_id: nuovaId }));
+      if (righe.length) await sb.from('cast_list').insert(righe);
+    }
+  } catch (e) {
+    console.log('[analisi] piano e cast non portati avanti:', e.message);
+  }
+}
+
 async function saveAnalysis(data) {
   // Upsert project
   let projectId;
@@ -3527,6 +3578,7 @@ async function saveAnalysis(data) {
   }).select('id').single();
   currentAnalysisId = saved?.id || null;
   if (projectId) filmCarica(projectId);
+  if (saved?.id && projectId) await portaAvanti(projectId, saved.id);
 
   // Upload PDF to Supabase Storage (best effort, don't block on failure)
   if (saved?.id && pdfB64Array.length > 0) {
