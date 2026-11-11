@@ -1775,7 +1775,6 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
                 <button class="tt-tog-o active-o" id="tt-applG" onclick="ttSetApplicazione('giornaliero')">Giornaliero</button>
                 <button class="tt-tog-o" id="tt-applS" onclick="ttSetApplicazione('settimanale')">Settimanale</button>
               </div>
-              <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.5">La soglia vale una volta sola sul monte golden: dentro la singola giornata, oppure sul totale della settimana. Il 6° giorno resta fuori — oltre le 7h è sempre tutto doppio.</div>
             </div>
           </div>
           <div style="padding-top:12px;border-top:1px solid var(--border)">
@@ -11912,7 +11911,7 @@ function odgPienoHtml(d) {
       ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
-          <span class="s">${esc(d.location || 'Mappa della produzione')}</span></span>
+          ${d.location ? `<span class="s">${esc(d.location)}</span>` : ''}</span>
           <span class="go">Mappa ›</span></a>`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
