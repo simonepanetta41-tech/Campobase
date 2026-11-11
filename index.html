@@ -1770,6 +1770,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
                 <button class="tt-tog-o active-o" id="tt-applG" onclick="ttSetApplicazione('giornaliero')">Giornaliero</button>
                 <button class="tt-tog-o" id="tt-applS" onclick="ttSetApplicazione('settimanale')">Settimanale</button>
               </div>
+              <div style="font-size:9px;color:var(--muted);margin-top:6px;line-height:1.5">La soglia vale una volta sola sul monte golden: dentro la singola giornata, oppure sul totale della settimana. Il 6° giorno resta fuori — oltre le 7h è sempre tutto doppio.</div>
             </div>
           </div>
           <div style="padding-top:12px;border-top:1px solid var(--border)">
@@ -1838,18 +1839,6 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
               <div style="font-size:10px;color:var(--muted)">Un file per ogni tabella</div>
             </div>
             <button onclick="document.getElementById('tt-exportOv').style.display='none'" style="width:100%;padding:8px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:11px;border-radius:6px;cursor:pointer;margin-top:4px">Annulla</button>
-          </div>
-        </div>
-
-        <!-- SESTO GIORNO POPUP -->
-        <div id="tt-sestoOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:310;align-items:center;justify-content:center">
-          <div style="background:var(--surface);border:1px solid var(--orange);border-radius:12px;padding:22px;width:360px;max-width:92vw">
-            <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;margin-bottom:12px;color:var(--orange)">★ Straordinario 6° giorno</div>
-            <div id="tt-sestoInfo"></div>
-            <div style="display:flex;gap:8px;margin-top:16px">
-              <button onclick="if(ttSestoPopupCb)ttSestoPopupCb(true)" style="flex:1;padding:9px;background:var(--orange);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer">Sì, raddoppia</button>
-              <button onclick="if(ttSestoPopupCb)ttSestoPopupCb(false)" style="padding:9px 16px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer">No</button>
-            </div>
           </div>
         </div>
 
@@ -5644,7 +5633,7 @@ function buildTimetableContext() {
   ttTabelle.forEach((tab, ti) => {
     const workers = tab.workers.length > 0 ? tab.workers.join(', ') : 'Nessun lavoratore';
     lines.push(`\nTabella ${ti+1} — ${workers}:`);
-    const { days, tot } = ttCalcTab(tab.orari, tab.sestoRaddoppio);
+    const { days, tot } = ttCalcTab(tab.orari);
     TT_DAYS.forEach((d, i) => {
       const ini = tab.orari.inizio[i], fin = tab.orari.fine[i];
       if (!ini && !fin) return;
@@ -12996,7 +12985,6 @@ let ttScorporoSrcId=null,ttScorporoSel=new Set();
 let ttVista=localStorage.getItem('cb_tt_vista')||(window.innerWidth<760?'giorno':'settimana');
 let ttGiornoSel=Math.min(5,Math.max(0,(new Date().getDay()+6)%7));
 let ttInited=false;
-let ttSestoPopupCb=null; // callback per popup sesto giorno
 
 function initTimetable(){
   if(ttInited)return;
@@ -13305,17 +13293,61 @@ function ttApplyRd(v){
   const s=ttMeta.raddoppio*60;
   return v<=s?v:s+(v-s)*2;
 }
-// raddoppiaSesto: il contratto raddoppia lo straordinario del 6° giorno, ma
-// solo se l'utente lo conferma. Prima il flag veniva scritto e mai letto,
-// quindi "Si, raddoppia" non cambiava alcun numero.
-function ttCalcTab(orari,raddoppiaSesto){
+
+/*
+ * Il raddoppio vale sul monte golden complessivo.
+ *
+ * La soglia — "raddoppia dopo la seconda ora" — e' una sola, sul totale
+ * delle golden, non una per categoria. Con 3h di golden ordinaria e 3h di
+ * notturna in settimana e la soglia a 2h, contando per categoria si
+ * pagavano 2+1x2 ordinarie e 2+1x2 notturne: otto ore, cioe' la soglia
+ * concessa due volte. Sul monte — 6h di golden — si paga 2+4x2: dieci ore.
+ *
+ * Ordinaria e notturna hanno tariffe diverse, quindi il risultato va
+ * riportato nelle due voci separate. Le ore sotto soglia si consumano in
+ * ordine di calendario, che e' l'ordine in cui si lavorano: le prime due
+ * ore di golden della settimana restano semplici, chiunque le abbia fatte
+ * e in qualunque fascia cadano.
+ *
+ * La golden del 6° giorno resta fuori dal monte: e' doppia per intero, non
+ * ha una soglia da consumare e non ne consuma per le altre.
+ */
+function ttRaddoppiaMonte(minuti){
+  if(ttMeta.raddoppio===0)return minuti.slice();
+  let resto=ttMeta.raddoppio*60;
+  return minuti.map(m=>{
+    const v=m||0;
+    const semplici=Math.min(v,resto);
+    resto-=semplici;
+    return semplici+(v-semplici)*2;
+  });
+}
+
+function ttCalcTab(orari){
   const sestoIdx=ttGetSestoIdx(orari);
   const days=TT_DAYS.map((_,i)=>ttCalcDay(i,orari,i===sestoIdx));
-  if(raddoppiaSesto&&sestoIdx>=0&&days[sestoIdx].golden6)days[sestoIdx].golden6*=2;
+  /* Il 6° giorno e' sempre doppio per tutto quello che supera le 7h di
+     lavoro: e' il contratto, non una scelta. Prima lo si chiedeva con un
+     popup — e la risposta "No" produceva un conto che nessuno avrebbe
+     firmato. */
+  if(sestoIdx>=0&&days[sestoIdx].golden6)days[sestoIdx].golden6*=2;
+  /* Nel giorno la golden finisce tutta in una voce sola (ttCalcDay assegna
+     gMin a ordinaria o notturna, mai a entrambe), quindi per giornata il
+     monte e' quella voce. */
   if(ttMeta.raddoppio>0&&ttMeta.applicazione==='giornaliero')
-    days.forEach(d=>{if(d.goldenOrd)d.goldenOrd=ttApplyRd(d.goldenOrd);if(d.goldenNott)d.goldenNott=ttApplyRd(d.goldenNott);if(d.golden6)d.golden6=ttApplyRd(d.golden6);});
+    days.forEach(d=>{if(d.goldenOrd)d.goldenOrd=ttApplyRd(d.goldenOrd);if(d.goldenNott)d.goldenNott=ttApplyRd(d.goldenNott);});
   const tot={oreViaggio:ttSum(days.map(d=>d.oreViaggio)),nottOrd:ttSum(days.map(d=>d.nottOrd)),nottStr:ttSum(days.map(d=>d.nottStr)),goldenOrd:ttSum(days.map(d=>d.goldenOrd)),goldenNott:ttSum(days.map(d=>d.goldenNott)),golden6:ttSum(days.map(d=>d.golden6))};
-  if(ttMeta.raddoppio>0&&ttMeta.applicazione==='settimanale'){tot.goldenOrd=ttApplyRd(tot.goldenOrd);tot.goldenNott=ttApplyRd(tot.goldenNott);tot.golden6=ttApplyRd(tot.golden6);}
+  if(ttMeta.raddoppio>0&&ttMeta.applicazione==='settimanale'){
+    // Un elenco in ordine di giorno, due voci per giorno: la soglia scorre
+    // una volta sola su tutto e poi si risomma per categoria.
+    const voci=[];
+    days.forEach(d=>{voci.push(['goldenOrd',d.goldenOrd||0],['goldenNott',d.goldenNott||0]);});
+    const pagate=ttRaddoppiaMonte(voci.map(v=>v[1]));
+    let o=0,n=0;
+    voci.forEach((v,i)=>{if(v[0]==='goldenOrd')o+=pagate[i];else n+=pagate[i];});
+    tot.goldenOrd=o>0?o:null;
+    tot.goldenNott=n>0?n:null;
+  }
   return{days,tot,sestoIdx};
 }
 
@@ -13352,13 +13384,12 @@ function ttRenderAll(){
 function ttBadgesHtml(tab,days,tot){
   const mancDays=days.map((d,i)=>d.mancataPausa?TT_DAYS[i]:null).filter(Boolean);
   const mancBadge=mancDays.length>0?`<span onclick="ttShowMancata('${mancDays.join(',')}')" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--danger);border-radius:999px;padding:2px 9px;font-size:9px;cursor:pointer">⚠ Mancata pausa</span>`:'';
-  // Due stati: da decidere (apre il popup) oppure gia' raddoppiata, e in
-  // quel caso accanto compare il bottone per riportarla a valore normale.
-  const pill='display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10px;cursor:pointer';
-  const sestoBadge=!tot.golden6?'':(tab.sestoRaddoppio
-    ?`<span style="${pill};background:rgba(245,166,35,0.28);border:1px solid var(--orange);color:var(--orange);cursor:default">★ Golden 6°g. raddoppiata (${ttToHM(tot.golden6)})</span>`
-     +`<span onclick="ttSestoRipristina('${tab.id}')" title="Riporta la golden del 6° giorno al valore normale" style="${pill};background:none;border:1px solid var(--border-l);color:var(--muted)">↺ Normale</span>`
-    :`<span onclick="ttShowSestoPopup('${tab.id}')" style="${pill};background:rgba(245,166,35,0.15);border:1px solid rgba(245,166,35,0.4);color:var(--orange)">★ Golden 6°g. — raddoppiare?</span>`);
+  /* Un solo stato: il 6° giorno e' doppio e il badge lo dice. Non c'e'
+     piu' niente da decidere, quindi niente popup e niente bottone per
+     tornare al valore normale — il valore normale, sul 6° giorno, non
+     esiste. La cifra mostrata e' quella gia' raddoppiata. */
+  const pill='display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:10px';
+  const sestoBadge=!tot.golden6?'':`<span title="Oltre le 7h di lavoro del 6° giorno tutto è doppio: la cifra è già raddoppiata" style="${pill};background:rgba(245,166,35,0.28);border:1px solid var(--orange);color:var(--orange)">★ Golden 6°g. doppia (${ttToHM(tot.golden6)})</span>`;
   return mancBadge+sestoBadge;
 }
 
@@ -13377,7 +13408,7 @@ function ttBadgesHtml(tab,days,tot){
 function ttAggiornaCalc(tabId){
   const tab=ttTabelle.find(t=>t.id==tabId); if(!tab) return;
   const el=document.getElementById(`ttb-${tabId}`); if(!el) return;
-  const {days,tot,sestoIdx}=ttCalcTab(tab.orari,tab.sestoRaddoppio);
+  const {days,tot,sestoIdx}=ttCalcTab(tab.orari);
   const cRows=[{k:'oreViaggio',c:''},{k:'nottOrd',c:'nott2'},{k:'nottStr',c:'nott2'},
                {k:'goldenOrd',c:'gold2'},{k:'goldenNott',c:'gold2'},{k:'golden6',c:'gold2'}];
   for(const r of cRows){
@@ -13484,7 +13515,7 @@ function ttGiornoCalcHtml(d,tot){
 function ttAggiornaGiorno(tabId){
   const tab=ttTabelle.find(t=>t.id==tabId); if(!tab) return;
   const el=document.getElementById(`ttb-${tabId}`); if(!el) return;
-  const {days,tot,sestoIdx}=ttCalcTab(tab.orari,tab.sestoRaddoppio);
+  const {days,tot,sestoIdx}=ttCalcTab(tab.orari);
   const calc=el.querySelector('.ttg-calc');
   if(calc)calc.innerHTML=ttGiornoCalcHtml(days[ttGiornoSel],tot);
   el.querySelectorAll('.ttg-g').forEach(b=>{
@@ -13556,7 +13587,7 @@ function ttSetVista(v){
 }
 
 function ttRenderTab(tab){
-  const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
+  const{days,tot,sestoIdx}=ttCalcTab(tab.orari);
   const badges=ttBadgesHtml(tab,days,tot);
   const wLabel=tab.workers.length>0?tab.workers.join(', '):`<span style="color:var(--muted)">Nessun lavoratore</span>`;
   const chips=tab.workers.map((w,i)=>`<span class="tt-chip">${w}<button class="tt-chip-x" onclick="ttRemoveW('${tab.id}',${i})">×</button></span>`).join('');
@@ -13630,8 +13661,6 @@ async function ttClear(){
   const CAMPI=['partenza','inizio','pausa','stop','fine','rientro'];
   ttTabelle.forEach(t=>{
     CAMPI.forEach(f=>{t.orari[f]=Array(6).fill('');});
-    // Il raddoppio del 6° giorno si riferisce a orari che non ci sono piu'.
-    t.sestoRaddoppio=false;
   });
   ttRenderAll();
   showToast('Orari svuotati.');
@@ -13786,41 +13815,10 @@ function ttShowMancata(daysStr){
   document.getElementById('tt-mancataOv').style.display='flex';
 }
 
-// Riporta la golden del 6° giorno al valore non raddoppiato.
-function ttSestoRipristina(tabId){
-  const tab=ttTabelle.find(t=>t.id==tabId);if(!tab)return;
-  tab.sestoRaddoppio=false;
-  ttRenderAll();
-  showToast('Golden 6°g. riportata a valore normale.');
-}
+/* Il popup "raddoppiare la golden del 6° giorno?" non c'e' piu': la
+   risposta era sempre si', ed era il contratto a darla. Il raddoppio
+   adesso lo fa ttCalcTab senza chiedere. */
 
-function ttShowSestoPopup(tabId){
-  const tab=ttTabelle.find(t=>t.id==tabId);if(!tab)return;
-  const{tot,sestoIdx}=ttCalcTab(tab.orari, false);
-  if(!tot.golden6)return;
-  const dayName=sestoIdx>=0?TT_DAYS[sestoIdx]:'SAB';
-  document.getElementById('tt-sestoInfo').innerHTML=
-    `<div style="font-size:12px;color:var(--white-dim);margin-bottom:4px">Giorno: <strong style="color:var(--orange)">${dayName}</strong></div>
-     <div style="font-size:12px;color:var(--white-dim)">Golden 6°g. rilevata: <strong style="color:var(--orange)">${ttToHM(tot.golden6)}</strong></div>
-     <div style="font-size:10px;color:var(--muted);margin-top:6px">Lo straordinario sul 6° giorno è doppio per contratto CCNL. Raddoppiare il valore?</div>`;
-  ttSestoPopupCb=function(raddoppia){
-    if(raddoppia){
-      tab.sestoRaddoppio=true;
-      ttRenderAll();
-      showToast('Golden 6°g. raddoppiata — puoi annullare dal bottone "Normale".');
-    }
-    document.getElementById('tt-sestoOv').style.display='none';
-    ttSestoPopupCb=null;
-  };
-  // L'overlay viene agganciato al body prima di mostrarlo. Stava annidato
-  // dentro il modale di export, che ha display:none, quindi non compariva
-  // mai; e comunque, sepolto fra i contenitori della pagina, basta che uno
-  // qualsiasi di essi sia nascosto per farlo sparire. Attaccato al body non
-  // dipende piu' da nessuno. L'operazione e' ripetibile senza effetti.
-  const ov=document.getElementById('tt-sestoOv');
-  if(ov.parentElement!==document.body)document.body.appendChild(ov);
-  ov.style.display='flex';
-}
 
 /*
  * Le regole di calcolo valgono per tutta la settimana, non da qui in poi:
@@ -14160,7 +14158,7 @@ function ttLoadScript(src){
 }
 
 function ttBuildPdfPage(doc, tab, produzione, film, reparto, settimana, dal, al, note){
-  const{days,tot,sestoIdx}=ttCalcTab(tab.orari, tab.sestoRaddoppio);
+  const{days,tot,sestoIdx}=ttCalcTab(tab.orari);
   const W=297, mg=12;
   let y=mg;
 

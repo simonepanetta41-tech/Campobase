@@ -51,7 +51,7 @@ await p.evaluate(()=>{
   ttSetO(ttTabelle[0].id,'inizio',0,'07.30'); ttSetO(ttTabelle[0].id,'fine',0,'19.30');
   ttSetO(ttTabelle[0].id,'inizio',1,'08.00'); ttSetO(ttTabelle[0].id,'fine',1,'18.00');
 });
-const golden8 = await p.evaluate(()=>ttCalcTab(ttTabelle[0].orari,false).days[0].goldenOrd);
+const golden8 = await p.evaluate(()=>ttCalcTab(ttTabelle[0].orari).days[0].goldenOrd);
 p.evaluate(()=>ttSetGiornata(10));
 await p.waitForTimeout(250);
 ok('popup comparso',      await cePopup(), true);
@@ -64,7 +64,7 @@ await p.waitForTimeout(200);
 ok('regola invariata',    await p.evaluate(()=>ttMeta.tipoGiornata), 8);
 ok('bottone 8h riacceso', await p.evaluate(()=>document.getElementById('tt-tg8').classList.contains('active')), true);
 ok('bottone 10h spento',  await p.evaluate(()=>document.getElementById('tt-tg10').classList.contains('active')), false);
-ok('calcolo invariato',   await p.evaluate(()=>ttCalcTab(ttTabelle[0].orari,false).days[0].goldenOrd), golden8);
+ok('calcolo invariato',   await p.evaluate(()=>ttCalcTab(ttTabelle[0].orari).days[0].goldenOrd), golden8);
 
 console.log('\n── confermo: ricalcola ──');
 p.evaluate(()=>ttSetGiornata(10));
@@ -73,7 +73,7 @@ await conferma('si');
 await p.waitForTimeout(250);
 ok('regola applicata',    await p.evaluate(()=>ttMeta.tipoGiornata), 10);
 ok('bottone 10h acceso',  await p.evaluate(()=>document.getElementById('tt-tg10').classList.contains('active')), true);
-ok('golden diminuita',    await p.evaluate(x=>ttCalcTab(ttTabelle[0].orari,false).days[0].goldenOrd<x, golden8), true);
+ok('golden diminuita',    await p.evaluate(x=>ttCalcTab(ttTabelle[0].orari).days[0].goldenOrd<x, golden8), true);
 
 console.log('\n── la soglia del raddoppio: le prime restano normali ──');
 /* "Dopo 2h" vuol dire che le prime due ore di golden si contano una
@@ -88,23 +88,96 @@ ok('con la soglia a 1h',               await p.evaluate(()=>{
 ok('e senza raddoppio resta tutto',    await p.evaluate(()=>{
   ttMeta.raddoppio = 0; return ttApplyRd(240);}), 240);
 
-console.log('\n── giornaliero e settimanale danno numeri diversi ──');
-/* Due giornate con un'ora e mezza di golden ciascuna, soglia a 2h.
-   Giornaliero: nessuna delle due supera la soglia, niente raddoppio.
-   Settimanale: tre ore in tutto, la terza si conta doppia. */
-ok('due volte 90 minuti', await p.evaluate(()=>{
-  ttMeta.raddoppio = 2;
-  const prova = (quando) => { ttMeta.applicazione = quando;
-    const g = [{goldenOrd:90},{goldenOrd:90}];
-    return quando === 'giornaliero'
-      ? g.map(d=>ttApplyRd(d.goldenOrd)).reduce((a,b)=>a+b,0)
-      : ttApplyRd(g.reduce((a,b)=>a+b.goldenOrd,0)); };
-  return {giornaliero: prova('giornaliero'), settimanale: prova('settimanale')};
-/* Giornaliero: 90 + 90, nessuna delle due giornate supera le 2h, si
-   pagano 3 ore. Settimanale: 3 ore in tutto, le prime due normali e la
-   terza doppia, si pagano 4 ore. La stessa settimana vale un'ora in piu'
-   o in meno a seconda di come si legge il contratto. */
-}), {giornaliero:180, settimanale:240});
+console.log('\n── la soglia vale sul monte golden, non per categoria ──');
+/*
+ * Una settimana con 3h di golden ordinaria il lunedi' e 3h di golden
+ * notturna il martedi', soglia a 2h.
+ *
+ * Per categoria si pagavano 2+1x2 ordinarie e 2+1x2 notturne: otto ore,
+ * cioe' la soglia concessa due volte, una per riga della tabella. Sul
+ * monte complessivo le prime due ore della settimana restano semplici e
+ * tutte le altre quattro sono doppie: dieci ore.
+ *
+ * Le due ore sotto soglia si consumano in ordine di calendario, che e'
+ * l'ordine in cui si lavorano: cadono quindi sull'ordinaria del lunedi'.
+ */
+const settimanaMista = () => p.evaluate(()=>{
+  // Due giornate da 13h con giornata contrattuale di 10h: 3h di golden
+  // ciascuna. La seconda chiude alle 03:00, quindi la sua golden e' tutta
+  // in fascia notturna; la prima chiude alle 20:00 e non ne tocca niente.
+  document.getElementById('tt-dal').value = '2026-11-09';
+  ttMeta.tipoGiornata = 10; ttMeta.maggiorazioniNott = true;
+  const vuoti = () => Array(6).fill('');
+  const orari = {partenza:vuoti(), inizio:vuoti(), pausa:vuoti(),
+                 stop:vuoti(), fine:vuoti(), rientro:vuoti()};
+  orari.inizio[0]='07.00'; orari.fine[0]='20.00';
+  orari.inizio[1]='14.00'; orari.fine[1]='03.00';
+  return orari;
+});
+const orariMisti = await settimanaMista();
+ok('3h ordinarie + 3h notturne', await p.evaluate(o=>{
+  ttMeta.raddoppio = 0;
+  const t = ttCalcTab(o).tot;
+  return [t.goldenOrd, t.goldenNott];
+}, orariMisti), [180, 180]);
+ok('settimanale: 2h semplici e 4h doppie', await p.evaluate(o=>{
+  ttMeta.raddoppio = 2; ttMeta.applicazione = 'settimanale';
+  const t = ttCalcTab(o).tot;
+  return [t.goldenOrd, t.goldenNott, t.goldenOrd + t.goldenNott];
+}, orariMisti), [240, 360, 600]);
+ok('giornaliero: la soglia vale dentro il giorno', await p.evaluate(o=>{
+  ttMeta.raddoppio = 2; ttMeta.applicazione = 'giornaliero';
+  const t = ttCalcTab(o).tot;
+  return [t.goldenOrd, t.goldenNott, t.goldenOrd + t.goldenNott];
+}, orariMisti), [240, 240, 480]);
+ok('senza raddoppio le golden restano quelle', await p.evaluate(o=>{
+  ttMeta.raddoppio = 0;
+  const t = ttCalcTab(o).tot;
+  return t.goldenOrd + t.goldenNott;
+}, orariMisti), 360);
+
+console.log('\n── il 6° giorno è sempre doppio oltre le 7h ──');
+/*
+ * Prima lo si chiedeva con un popup, e la risposta "No" produceva un
+ * conto che nessuno avrebbe firmato: sul 6° giorno il contratto raddoppia
+ * tutto quello che supera le 7h, non e' una scelta.
+ *
+ * Quella golden sta anche fuori dal monte: e' doppia per intero, quindi
+ * non ha una soglia da consumare e non ne consuma per le altre voci.
+ */
+const seiGiorni = await p.evaluate(()=>{
+  document.getElementById('tt-dal').value = '2026-11-09';
+  ttMeta.tipoGiornata = 10;
+  const vuoti = () => Array(6).fill('');
+  const orari = {partenza:vuoti(), inizio:vuoti(), pausa:vuoti(),
+                 stop:vuoti(), fine:vuoti(), rientro:vuoti()};
+  // Lunedi' 13h: 3h di golden ordinaria. Gli altri cinque giorni esatti
+  // sulle 10h, tranne il sabato che e' il 6° e ha la soglia a 7h.
+  orari.inizio[0]='07.00'; orari.fine[0]='20.00';
+  for(let i=1;i<6;i++){ orari.inizio[i]='08.00'; orari.fine[i]='18.00'; }
+  return orari;
+});
+ok('oltre le 7h del 6° giorno, raddoppiate', await p.evaluate(o=>{
+  ttMeta.raddoppio = 0;
+  const {days, tot, sestoIdx} = ttCalcTab(o);
+  // 10h di lavoro meno la soglia di 7h sono 3h, pagate 6.
+  return [sestoIdx, days[5].golden6, tot.golden6];
+}, seiGiorni), [5, 360, 360]);
+ok('la soglia del raddoppio non la tocca', await p.evaluate(o=>{
+  ttMeta.raddoppio = 2; ttMeta.applicazione = 'settimanale';
+  return ttCalcTab(o).tot.golden6;
+}, seiGiorni), 360);
+ok('e non consuma la soglia delle altre', await p.evaluate(o=>{
+  ttMeta.raddoppio = 2; ttMeta.applicazione = 'settimanale';
+  // 3h di golden ordinaria il lunedi': 2h semplici e 1h doppia.
+  return ttCalcTab(o).tot.goldenOrd;
+}, seiGiorni), 240);
+ok('il badge lo dice, senza chiedere niente', await p.evaluate(o=>{
+  ttMeta.raddoppio = 0;
+  const {days, tot} = ttCalcTab(o);
+  const h = ttBadgesHtml(ttTabelle[0], days, tot);
+  return [/Golden 6°g\. doppia \(6h\)/.test(h), /raddoppiare/i.test(h), /onclick/.test(h)];
+}, seiGiorni), [true, false, false]);
 
 console.log('\n── riaprendo, i bottoni dicono le regole vere ──');
 /* Nell'HTML i bottoni partono con "10h" e "Off" accesi, scritti a mano:
