@@ -92,6 +92,86 @@ async function autorizzazione(endpoint, env) {
   return `vapid t=${testa}.${corpo}.${b64u(firma)}, k=${pubblica}`;
 }
 
+// ── Il contenuto cifrato ────────────────────────────────────────────────────
+
+/*
+ * Il testo dentro la notifica, cifrato come vuole la specifica (RFC 8291).
+ *
+ * All'inizio la notifica partiva vuota, e il telefono tornava a chiedere
+ * cosa dire: meno codice e niente cifratura da sbagliare. Ma Safari una
+ * notifica senza contenuto non la consegna in modo affidabile, e una
+ * notifica che non arriva e' peggio di un po' di codice in piu'. Quindi si
+ * cifra.
+ *
+ * Come funziona: il telefono, quando si iscrive, consegna due cose — la
+ * sua chiave pubblica (p256dh) e un segreto condiviso (auth). Si fabbrica
+ * una coppia di chiavi usa-e-getta, si fa un accordo di Diffie-Hellman con
+ * la sua pubblica, e dal risultato si ricavano la chiave di cifratura e il
+ * numero da usare una volta sola. La pubblica usa-e-getta viaggia in
+ * chiaro dentro il pacchetto: senza quella il telefono non puo' rifare il
+ * conto, e con quella sola non ci puo' fare nessun altro.
+ *
+ * Le due derivazioni sono HKDF, e Web Crypto le fa tutte e due: la prima
+ * usa auth come sale, la seconda un sale casuale che viaggia anch'esso nel
+ * pacchetto.
+ */
+
+const RECORD = 4096;
+
+function unisci(...pezzi) {
+  const n = pezzi.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(n);
+  let i = 0;
+  for (const p of pezzi) { out.set(p, i); i += p.length; }
+  return out;
+}
+
+const parola = s => new TextEncoder().encode(s);
+
+async function hkdf(ikm, sale, info, byte) {
+  const k = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: sale, info }, k, byte * 8));
+}
+
+export async function cifra(testo, p256dh, auth) {
+  const ua = daB64u(p256dh);          // la pubblica del telefono, 65 byte
+  const segreto = daB64u(auth);       // il segreto condiviso, 16 byte
+  if (ua.length !== 65 || ua[0] !== 4) throw new Error('p256dh malformata');
+  if (segreto.length !== 16) throw new Error('auth malformato');
+
+  // La coppia usa-e-getta, una per notifica.
+  const mia = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const miaPub = new Uint8Array(await crypto.subtle.exportKey('raw', mia.publicKey));
+
+  const suaChiave = await crypto.subtle.importKey('raw', ua,
+    { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const condiviso = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: suaChiave }, mia.privateKey, 256));
+
+  /* Il materiale di partenza. L'ordine delle due chiavi qui dentro non e'
+     arbitrario: prima quella del telefono, poi la nostra. Invertirle da' una
+     chiave diversa, il telefono non riesce a decifrare e la notifica
+     scompare senza un errore da nessuna parte. */
+  const info = unisci(parola('WebPush: info'), new Uint8Array([0]), ua, miaPub);
+  const ikm = await hkdf(condiviso, segreto, info, 32);
+
+  const sale = crypto.getRandomValues(new Uint8Array(16));
+  const chiave = await hkdf(ikm, sale, unisci(parola('Content-Encoding: aes128gcm'), new Uint8Array([0])), 16);
+  const numero = await hkdf(ikm, sale, unisci(parola('Content-Encoding: nonce'), new Uint8Array([0])), 12);
+
+  const aes = await crypto.subtle.importKey('raw', chiave, 'AES-GCM', false, ['encrypt']);
+  // Il 2 in coda dice "questo e' l'ultimo pezzo": con un pezzo solo e' sempre.
+  const dentro = unisci(parola(testo), new Uint8Array([2]));
+  const cifrato = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: numero, tagLength: 128 }, aes, dentro));
+
+  const misura = new Uint8Array(4);
+  new DataView(misura.buffer).setUint32(0, RECORD);
+  return unisci(sale, misura, new Uint8Array([miaPub.length]), miaPub, cifrato);
+}
+
 // ── Il database ─────────────────────────────────────────────────────────────
 
 function capi(env) {
@@ -112,17 +192,26 @@ async function db(env, percorso, opzioni = {}) {
 
 // ── Mandare ─────────────────────────────────────────────────────────────────
 
-/* Manda la notifica vuota a un dispositivo.
+/* Manda la notifica a un dispositivo.
  * Torna true se e' partita, false se quell'iscrizione non esiste piu'. */
-async function bussa(endpoint, env) {
-  const r = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: await autorizzazione(endpoint, env),
-      TTL: String(SCADENZA * 60),
-      Urgency: 'high'
-    }
-  });
+async function bussa(isc, testo, env) {
+  const capo = {
+    Authorization: await autorizzazione(isc.endpoint, env),
+    TTL: String(SCADENZA * 60),
+    Urgency: 'high'
+  };
+  let corpo;
+  if (isc.p256dh && isc.auth) {
+    corpo = await cifra(JSON.stringify({ testo }), isc.p256dh, isc.auth);
+    capo['Content-Encoding'] = 'aes128gcm';
+    capo['Content-Type'] = 'application/octet-stream';
+  }
+  /* Senza le chiavi del telefono si manda vuota e il service worker va a
+     chiedere il testo. E' la strada di riserva per le iscrizioni fatte
+     prima che ci fosse la cifratura: su Safari non e' affidabile, quindi
+     non e' la strada principale di nessuno. */
+
+  const r = await fetch(isc.endpoint, { method: 'POST', headers: capo, body: corpo });
   /* 404 e 410 vogliono dire che quel telefono non c'e' piu': app
      disinstallata, notifiche revocate, iscrizione scaduta. Insistere non
      serve, e tenersela vuol dire riprovare per sempre. */
@@ -131,13 +220,13 @@ async function bussa(endpoint, env) {
   return true;
 }
 
-async function mandaAUtente(userId, env) {
+async function mandaAUtente(userId, testo, env) {
   const isc = await db(env,
-    `push_iscrizioni?select=id,endpoint&user_id=eq.${userId}`);
+    `push_iscrizioni?select=id,endpoint,p256dh,auth&user_id=eq.${userId}`);
   let partite = 0;
   for (const i of isc || []) {
     let viva;
-    try { viva = await bussa(i.endpoint, env); }
+    try { viva = await bussa(i, testo, env); }
     catch (e) { console.error('push', i.id, e.message); continue; }
     if (viva) partite++;
     else await db(env, `push_iscrizioni?id=eq.${i.id}`, { method: 'DELETE' });
@@ -159,7 +248,7 @@ export async function mandaScadute(env) {
     `&quando=lte.${adesso}&quando=gte.${limite}&order=quando.asc&limit=100`);
 
   for (const a of dovute || []) {
-    const n = await mandaAUtente(a.user_id, env);
+    const n = await mandaAUtente(a.user_id, a.testo, env);
     await db(env, `push_appuntamenti?id=eq.${a.id}`, {
       method: 'PATCH', body: JSON.stringify({ mandato: adesso })
     });
@@ -181,7 +270,8 @@ export async function mandaScadute(env) {
 export async function handleIscrivi(request, env) {
   const { user, error } = await requireUser(request, env);
   if (error) return error;
-  const b = await readJson(request);
+  const { body: b, error: malformato } = await readJson(request);
+  if (malformato) return malformato;
   if (!b?.endpoint) return json({ error: 'manca endpoint' }, 400);
 
   await db(env, 'push_iscrizioni?on_conflict=endpoint', {
@@ -203,7 +293,8 @@ export async function handleIscrivi(request, env) {
 export async function handleAppuntamenti(request, env) {
   const { user, error } = await requireUser(request, env);
   if (error) return error;
-  const b = await readJson(request);
+  const { body: b, error: malformato } = await readJson(request);
+  if (malformato) return malformato;
   const lista = Array.isArray(b?.lista) ? b.lista : [];
   if (!lista.length) return json({ ok: true, scritti: 0 });
 
@@ -242,7 +333,8 @@ export async function handleAppuntamenti(request, env) {
  * ce l'ha poteva comunque mandare notifiche a quel telefono.
  */
 export async function handleMessaggio(request, env) {
-  const b = await readJson(request);
+  const { body: b, error: malformato } = await readJson(request);
+  if (malformato) return malformato;
   if (!b?.endpoint) return json({ error: 'manca endpoint' }, 400);
 
   const isc = await db(env,

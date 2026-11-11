@@ -10093,6 +10093,21 @@ async function pushAttiva(){
   }
 }
 
+/* Rimanda al server l'iscrizione che il telefono ha gia'. Senza rumore:
+   se non c'e' rete non e' un errore da mostrare, si riprova la prossima
+   volta che si apre la pagina. */
+async function pushRimanda(){
+  try {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (!sub) return;
+    const k = sub.toJSON().keys || {};
+    await fetch('/api/push/iscrivi', {
+      method: 'POST', headers: await pushCapi(),
+      body: JSON.stringify({ endpoint: sub.endpoint, p256dh: k.p256dh, auth: k.auth })
+    });
+  } catch (e) { console.log('[push] iscrizione non rimandata:', e.message); }
+}
+
 async function pushRender(){
   const t = document.getElementById('pushTasto');
   const d = document.getElementById('pushDesc');
@@ -10112,7 +10127,17 @@ async function pushRender(){
     iscritto = Notification.permission === 'granted' && !!(await reg.pushManager.getSubscription());
   } catch (_) {}
   t.textContent = iscritto ? 'Attive' : Notification.permission === 'denied' ? 'Bloccate' : 'Attiva';
-  t.disabled = iscritto || Notification.permission === 'denied';
+  /* Il tasto resta premibile anche quando dice "Attive".
+     "Attive" lo dice guardando il telefono: permesso dato, iscrizione
+     presente. Ma il server potrebbe non saperne niente — e la prima volta
+     e' andata proprio cosi': l'iscrizione non era stata registrata, il
+     tasto diceva "Attive", era disabilitato, e non c'era modo di
+     riprovare. Ora si puo' ripremere, e intanto l'iscrizione si rimanda da
+     sola ogni volta che si apre questa pagina: il server la riscrive al
+     posto di quella che ha, quindi rimandarla non costa niente e rimette a
+     posto un telefono che si era perso. */
+  t.disabled = Notification.permission === 'denied';
+  if (iscritto) pushRimanda();
   if (prova) prova.style.display = iscritto ? '' : 'none';
   if (d && Notification.permission === 'denied')
     d.textContent = 'Il telefono le ha bloccate per Campobase: si riaccendono dalle impostazioni del telefono, non da qui.';
@@ -10952,49 +10977,6 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
-/* Il comune, da un indirizzo scritto per certo: un CAP di cinque cifre e
- * subito dopo il nome. "Via del Faro, 58, 74122 Taranto TA" -> Taranto.
- *
- * Si usa SOLO sui giri auto, e la ragione va detta perche' e' il punto di
- * tutta questa funzione. In un ordine del giorno i CAP ci sono quasi
- * sempre, ma sono quelli della carta intestata: l'ufficio di produzione.
- * Su dieci ordini del giorno veri, nove danno Roma — e nove volte su
- * dieci non si gira a Roma. Il meteo di Roma mentre si gira in Puglia e'
- * esattamente il genere di risposta sbagliata-ma-convinta che fa piu'
- * danno di una risposta mancante.
- * I giri auto invece elencano alberghi e indirizzi di presa: sono vicini
- * al set per come sono fatti. Qualche chilometro di scarto non cambia se
- * piove.
- *
- * E non c'e' nessun ripiego. odgComune, quando gli si da' un indirizzo,
- * in ultima istanza prende l'ultima parola: va bene per un campo che
- * contiene un indirizzo e basta, ma cercando in un documento intero
- * pescherebbe qualunque cosa — ed e' cosi' che una volta il meteo era
- * quello di Paese, in provincia di Treviso, perche' nella sceneggiatura
- * c'era scritto "CASA PAESE".
- *
- * Gli spazi sono singoli di proposito: nel testo per righe due spazi
- * vogliono dire un'altra colonna, e "00135 Roma   Produttore delegato:"
- * diventava un comune chiamato "Roma Produttore". La sigla della
- * provincia resta fuori, e il nome deve avere almeno tre lettere, se no
- * "00193 RM" passava per un paese.
- */
-const CAP_COMUNE = /\b\d{5} ?-? ?([A-ZÀ-Ù](?:[a-zà-ÿ']{2,20}|[A-ZÀ-Ù']{2,20})(?: [A-ZÀ-Ù](?:[a-zà-ÿ']{1,20}|[A-ZÀ-Ù']{2,20})){0,2})/g;
-
-function odgComuneDaTesto(...testi){
-  const conto = new Map();
-  for (const t of testi) {
-    for (const m of String(t || '').matchAll(CAP_COMUNE)) {
-      const n = m[1].replace(/\s+/g, ' ').trim();
-      conto.set(n, (conto.get(n) || 0) + 1);
-    }
-  }
-  if (!conto.size) return null;
-  /* Quello che ricorre di piu'. In un foglio di giri auto gli alberghi
-     sono sparsi, ma il posto in cui si gira torna a ogni riga. */
-  return [...conto].sort((a, b) => b[1] - a[1])[0][0];
-}
-
 async function odgCoordinate(comune){
   const u = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&format=json&country=IT&name='
           + encodeURIComponent(comune);
@@ -11073,10 +11055,16 @@ async function odgPosto(d){
       return d.posto;
     } catch (e) { motivi.push(l.nome + ': ' + e.message); }
   }
-  /* Gli ordini del giorno all'antica scrivono l'indirizzo per esteso. E
-     quando non c'e' nemmeno quello, restano i giri auto: alberghi e
-     indirizzi di presa, che stanno vicino al set. */
-  const comune = odgComune(d.location) || odgComuneDaTesto(d.giriTesto);
+  /* Gli ordini del giorno all'antica scrivono l'indirizzo per esteso, nel
+     campo location: e quello e' l'indirizzo del campo base.
+     E qui si ferma. I giri auto NON si usano, anche se un indirizzo con il
+     CAP ce l'hanno sempre: elencano gli alberghi degli attori, e gli
+     attori dormono dove conviene alla produzione, non dove si gira. Se la
+     troupe dorme a Roma e si gira a Viterbo, il CAP dei giri auto dice
+     Roma — e il meteo di Roma mentre a Viterbo piove e' peggio di nessun
+     meteo. La posizione viene dal link di Google o dall'indirizzo del
+     campo base, e da nient'altro. */
+  const comune = odgComune(d.location);
   if (!comune) {
     motivi.push('nei documenti non c\'è un indirizzo con il CAP');
   } else {

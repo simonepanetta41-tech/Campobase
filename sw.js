@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v76';
+const CACHE = 'campobase-v77';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -99,24 +99,34 @@ self.addEventListener('fetch', e => {
 
 // ── NOTIFICHE ────────────────────────────────────────────────────────────────
 /*
- * La notifica che arriva e' vuota: nessun testo dentro.
+ * Il testo arriva dentro la notifica, cifrato dal Worker.
  *
- * Il testo in una notifica va cifrato per ogni destinatario — scambio di
- * chiavi, derivazione, AES — e sbagliare un passaggio vuol dire notifiche
- * che non arrivano senza che nessuno sappia perche'. Qui la notifica serve
- * solo a svegliare questo service worker, che poi chiede al Worker cosa
- * deve dire. Il testo si cambia senza toccare il telefono.
+ * All'inizio la notifica partiva vuota e questo service worker tornava a
+ * chiedere cosa dire: nessuna cifratura da sbagliare. Ma Safari una
+ * notifica senza contenuto non la consegna in modo affidabile — ed e'
+ * esattamente cosi' che la prima prova su iPhone non e' mai arrivata.
+ * Quella strada resta come riserva, per un'iscrizione fatta prima che ci
+ * fosse la cifratura.
  *
  * Mostrare qualcosa e' obbligatorio: un push ricevuto e non mostrato, su
- * iOS, dopo poche volte fa togliere il permesso. Quindi se la richiesta
- * non va — rete assente, Worker giu' — si mostra comunque una riga
- * generica, e meglio una riga vaga che perdere le notifiche.
+ * iOS, dopo poche volte fa togliere il permesso. Quindi se anche la
+ * riserva non va — rete assente, Worker giu' — si mostra comunque una
+ * riga generica: meglio una riga vaga che perdere le notifiche.
  */
 const GENERICA = 'Campobase: c\'è un aggiornamento';
 
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
     let testo = null;
+    // Di solito il testo e' dentro la notifica, cifrato: si legge e basta.
+    try { testo = (e.data && e.data.json() || {}).testo || null; } catch (_) {}
+    if (testo) {
+      await self.registration.showNotification('Campobase', {
+        body: testo, icon: '/icon-192.png', badge: '/icon-192.png',
+        tag: 'campobase-' + Date.now(), data: { apri: '/' }
+      });
+      return;
+    }
     try {
       const sub = await self.registration.pushManager.getSubscription();
       if (sub) {
