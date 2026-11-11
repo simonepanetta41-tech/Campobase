@@ -56,40 +56,53 @@ const dopo = await p.evaluate((d)=>{
 ok('tenuta',     dopo.tenuta, true);
 ok('ed è giusta', dopo.titolo, 'Missione San Gennaro');
 
-console.log('\n── spuntare una categoria ridisegna lo spoglio ──');
-/* L'effetto che si vede e' l'ordine dei reparti: quello che contiene una
-   categoria spuntata sale in cima. Si spunta "mezzi di scena", che sta in
-   Regia e non e' il primo — spuntarne una del reparto gia' primo non
-   avrebbe spostato niente, e il controllo sarebbe passato anche rotto. */
-const spunta = await p.evaluate(()=>{
+console.log('\n── si vede solo quello che è spuntato ──');
+const una = await p.evaluate(()=>{
   localStorage.removeItem('cb_rep_spoglio');
-  localStorage.setItem('cb_cat_attive', JSON.stringify([]));
-  spoglioRender(analysisData);
-  const reparti = () => [...document.querySelectorAll('#catsGrid .sp-rep-h span:first-child')].map(x=>x.textContent);
-  const prima = reparti();
-  analisiSpunta('mezzi_scena');     // come toccare l'interruttore
-  return {prima, dopo: reparti(), attive: [...catAttive()],
-          vuoto: /Nessuna criticità/.test(document.getElementById('spoglioSection').textContent)};
-});
-ok('la spunta si salva',       spunta.attive, ['mezzi_scena']);
-ok('prima Regia stava sotto',  spunta.prima, ['Stunt & SFX','Regia']);
-ok('e dopo è salita in cima',  spunta.dopo,  ['Regia','Stunt & SFX']);
-ok('e lo spoglio non si svuota', spunta.vuoto, false);
-
-console.log('\n── e le categorie non spuntate restano visibili ──');
-/* La spunta non e' un filtro: mette avanti e accende. Le altre restano,
-   in fondo e spente — una criticità non sparisce perche' non e' del tuo
-   reparto. */
-const viste = await p.evaluate(()=>{
   localStorage.setItem('cb_cat_attive', JSON.stringify(['animali']));
   spoglioRender(analysisData);
   const t = document.getElementById('spoglioSection').textContent;
-  return {stunt: /Stunt/i.test(t), animali: /Animali/i.test(t),
+  return {animali: /Animali/i.test(t), stunt: /Stunt(?!\s*&)/i.test(t),
+          mezzi: /Mezzi/i.test(t),
+          categorie: [...document.querySelectorAll('#catsGrid .sp-cat')].length,
           conta: (t.match(/(\d+)\s+segnalazion/)||[])[1]};
 });
-ok('c\'è quella spuntata',      viste.animali, true);
-ok('e anche quella non spuntata', viste.stunt, true);
-ok('contate tutte e tre',       viste.conta, '3');
+ok('c\'è quella spuntata',        una.animali, true);
+ok('le altre no',                [una.stunt, una.mezzi], [false, false]);
+ok('una categoria sola a schermo', una.categorie, 1);
+// Il conto dice quello che si vede: dicesse tre, sembrerebbe roba persa.
+ok('e il conto è di quella',     una.conta, '1');
+
+console.log('\n── il proprio reparto apre la pagina ──');
+const mio = await p.evaluate(()=>{
+  localStorage.setItem('cb_cat_attive', JSON.stringify(['animali','mezzi_scena']));
+  const reparti = () => [...document.querySelectorAll('#catsGrid .sp-rep-h span:first-child')].map(x=>x.textContent);
+  localStorage.removeItem('cb_rep_spoglio');
+  spoglioRender(analysisData);
+  const senza = reparti();
+  localStorage.setItem('cb_rep_spoglio', 'regia');
+  spoglioRender(analysisData);
+  return {senza, con: reparti(),
+          evidenziato: document.querySelector('#catsGrid .sp-rep').classList.contains('mio')};
+});
+ok('senza reparto, ordine della tabella', mio.senza, ['Stunt & SFX','Regia']);
+ok('col reparto, il proprio per primo',   mio.con,   ['Regia','Stunt & SFX']);
+ok('ed è marcato come proprio',           mio.evidenziato, true);
+
+console.log('\n── togliendo tutto si dice perché, non "nessuna criticità" ──');
+/* Una sceneggiatura senza criticita' e' una notizia; nessuna categoria
+   spuntata e' un'impostazione da cambiare. Confonderle manda a cercare un
+   guasto dove non c'e'. */
+const zero = await p.evaluate(()=>{
+  localStorage.setItem('cb_cat_attive', JSON.stringify([]));
+  spoglioRender(analysisData);
+  const t = document.getElementById('catsGrid').textContent;
+  return {impostazioni: /Impostazioni/.test(t), criticita: /Nessuna criticità/.test(t),
+          quante: /3/.test(t)};
+});
+ok('manda alle impostazioni', zero.impostazioni, true);
+ok('e non dice che non c\'è niente', zero.criticita, false);
+ok('anzi dice quante ce ne sono', zero.quante, true);
 
 console.log('\n── senza analisi non si ridisegna, ma non si rompe ──');
 const niente = await p.evaluate(()=>{

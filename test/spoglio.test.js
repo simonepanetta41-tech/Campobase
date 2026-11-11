@@ -67,8 +67,29 @@ await p.evaluate(x=>{
 await p.waitForTimeout(250);
 const reps = await p.evaluate(()=>[...document.querySelectorAll('.sp-rep-h span:first-child')].map(e=>e.textContent));
 ok('il mio reparto per primo', reps[0], 'Suono');
-ok('solo i reparti con qualcosa', reps.length, 5);
-ok('le categorie ci sono', await p.evaluate(()=>document.querySelectorAll('.sp-cat').length), 8);
+/* Si vede solo quello che e' scelto, e senza una scelta esplicita vale il
+   reparto: un fonico apre lo spoglio e trova il suono. Le altre non
+   spariscono in silenzio — in fondo c'e' scritto quante sono. */
+ok('solo il mio reparto', reps, ['Suono']);
+ok('le sue categorie', await p.evaluate(()=>document.querySelectorAll('.sp-cat').length), 2);
+/* Il numero non si scrive a mano: si controlla che i conti tornino —
+   quelle a schermo piu' quelle lasciate fuori fanno tutte quelle trovate.
+   Un numero copiato a mano regge finche' non si tocca la batteria di
+   prova, e poi va aggiornato senza che nessuno sappia piu' perche'. */
+ok('e in fondo cosa resta fuori', await p.evaluate(()=>{
+  const n = document.getElementById('spFuori');
+  const viste = +(document.getElementById('spConta').textContent.match(/(\d+)\s+segnalazion/)||[])[1];
+  const fuori = +(n.textContent.match(/Altre\s+(\d+)/)||[])[1];
+  const tutte = Object.values(spoglioDati(window.analysisData))
+    .reduce((s,v)=>s+(v.scene?.length||0),0);
+  return {visibile: n.style.display !== 'none', somma: viste + fuori === tutte, fuori: fuori > 0};
+}), {visibile:true, somma:true, fuori:true});
+ok('con tutte spuntate si vede tutto', await p.evaluate(()=>{
+  localStorage.setItem('cb_cat_attive', JSON.stringify(SPOGLIO.map(c=>c.key)));
+  spoglioRender(window.analysisData);
+  return [document.querySelectorAll('.sp-rep').length,
+          document.querySelectorAll('.sp-cat').length,
+          document.getElementById('spFuori').style.display];}), [5, 8, 'none']);
 ok('ognuna con le sue scene', await p.evaluate(()=>
   [...document.querySelectorAll('.sp-cat')].every(c=>c.querySelectorAll('.sp-sc').length>0)), true);
 ok('il numero di scena, non la riga intera', await p.evaluate(()=>

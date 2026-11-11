@@ -57,19 +57,38 @@ ok('i numeri',  await p.evaluate(()=>[...document.querySelectorAll('#statsRow .n
    ['184','96','88','7']);
 ok('giorno e notte sotto interno', await p.evaluate(()=>document.querySelectorAll('#statsRow .u')[0].textContent), '60 g · 36 n');
 ok('la scena con più attori', await p.evaluate(()=>[...document.querySelectorAll('#statsRow .u')].pop().textContent), 'sc. 12');
-ok('il conteggio in testa', await p.evaluate(()=>document.getElementById('spConta').textContent), '184 scene · 7 segnalazioni');
+/* Il conto dice quello che si vede, non quello che c'e': lo spoglio
+   mostra solo le categorie scelte, e un conto piu' alto di quello a
+   schermo sembrerebbe roba persa. Quante ne restano fuori sta scritto in
+   fondo, e i due numeri insieme fanno il totale. */
+ok('il conteggio in testa', await p.evaluate(()=>{
+  const viste = +(document.getElementById('spConta').textContent.match(/(\d+)\s+segnalazion/)||[])[1];
+  const fuori = +((document.getElementById('spFuori').textContent.match(/Altre\s+(\d+)/)||[])[1] || 0);
+  const tutte = Object.values(spoglioDati(window.analysisData)).reduce((s,v)=>s+(v.scene?.length||0),0);
+  return {testa: document.getElementById('spConta').textContent.startsWith('184 scene · '),
+          somma: viste + fuori, tutte};
+}), {testa:true, somma:7, tutte:7});
 
 console.log('\n── i reparti ──');
-ok('il mio per primo', await p.evaluate(()=>document.querySelector('.sp-rep-h span').textContent), 'Suono');
-ok('solo i reparti con qualcosa', await p.evaluate(()=>document.querySelectorAll('.sp-rep').length), 4);
-ok('il mio è acceso', await p.evaluate(()=>document.querySelector('.sp-rep').classList.contains('mio')), true);
-ok('gli altri sono spenti', await p.evaluate(()=>
-  [...document.querySelectorAll('.sp-rep')].slice(1).every(e=>!e.classList.contains('mio'))), true);
-ok('le categorie altrui in grigio', await p.evaluate(()=>
-  [...document.querySelectorAll('.sp-rep')].slice(1).every(e=>
-    [...e.querySelectorAll('.sp-cat')].every(c=>c.classList.contains('spenta')))), true);
-ok('le mie no', await p.evaluate(()=>
-  [...document.querySelectorAll('.sp-rep')[0].querySelectorAll('.sp-cat')].every(c=>!c.classList.contains('spenta'))), true);
+/* Si vede solo quello che e' scelto; senza una scelta esplicita vale il
+   reparto del profilo. Prima si vedeva tutto, con il proprio reparto in
+   cima e gli altri in grigio: e' cambiato perche' chi apre lo spoglio in
+   preparazione cerca il proprio lavoro, non un elenco da scorrere. */
+ok('solo il mio reparto', await p.evaluate(()=>
+  [...document.querySelectorAll('.sp-rep-h span:first-child')].map(e=>e.textContent)), ['Suono']);
+ok('ed è marcato come mio', await p.evaluate(()=>document.querySelector('.sp-rep').classList.contains('mio')), true);
+ok('niente categorie in grigio', await p.evaluate(()=>
+  [...document.querySelectorAll('.sp-cat')].every(c=>!c.classList.contains('spenta'))), true);
+ok('quello che resta fuori è scritto', await p.evaluate(()=>{
+  const n = document.getElementById('spFuori');
+  return n.style.display !== 'none' && /Altre \d+ segnalazioni in categorie non scelte/.test(n.textContent);}), true);
+ok('spuntando tutto tornano tutti', await p.evaluate(()=>{
+  localStorage.setItem('cb_cat_attive', JSON.stringify(SPOGLIO.map(c=>c.key)));
+  spoglioRender(window.analysisData);
+  const r = [...document.querySelectorAll('.sp-rep-h span:first-child')].map(e=>e.textContent);
+  const out = {quanti: r.length, primo: r[0], fuori: document.getElementById('spFuori').style.display};
+  localStorage.removeItem('cb_cat_attive'); spoglioRender(window.analysisData);
+  return out;}), {quanti:4, primo:'Suono', fuori:'none'});
 
 console.log('\n── le scene sono pulsanti, in ordine ──');
 ok('scene di ambienti rumorosi', await p.evaluate(()=>
@@ -99,14 +118,19 @@ await p.click('#spScena .sc-x'); await p.waitForTimeout(150);
 ok('si chiude',     await p.evaluate(()=>getComputedStyle(document.getElementById('spScena')).display), 'none');
 
 console.log('\n── le note per categoria ──');
-ok('chiusa all\'inizio', await p.evaluate(()=>document.getElementById('sp-nota-armi').classList.contains('on')), false);
-await p.evaluate(()=>toggleCatNote('armi'));
-ok('si apre', await p.evaluate(()=>document.getElementById('sp-nota-armi').classList.contains('on')), true);
-await p.fill('#sp-nota-ta-armi','Chiedere la scenica al pompiere');
+/* Su una categoria che si vede davvero: lo spoglio mostra solo quelle
+   scelte, e "armi" non e' del reparto suono — cercarne la nota dava un
+   elemento che non esiste. La nota non c'entra col reparto, quindi ne
+   vale una qualunque fra quelle a schermo. */
+const K = 'ambienti_rumorosi';
+ok('chiusa all\'inizio', await p.evaluate(k=>document.getElementById('sp-nota-'+k).classList.contains('on'), K), false);
+await p.evaluate(k=>toggleCatNote(k), K);
+ok('si apre', await p.evaluate(k=>document.getElementById('sp-nota-'+k).classList.contains('on'), K), true);
+await p.fill('#sp-nota-ta-'+K,'Chiedere la scenica al pompiere');
 await p.waitForTimeout(100);
-ok('il tasto si accende', await p.evaluate(()=>document.getElementById('sp-nota-b-armi').classList.contains('pieno')), true);
-ok('e resta dopo un ridisegno', await p.evaluate(()=>{spoglioRender(window.analysisData);
-  return document.getElementById('sp-nota-ta-armi').value}), 'Chiedere la scenica al pompiere');
+ok('il tasto si accende', await p.evaluate(k=>document.getElementById('sp-nota-b-'+k).classList.contains('pieno'), K), true);
+ok('e resta dopo un ridisegno', await p.evaluate(k=>{spoglioRender(window.analysisData);
+  return document.getElementById('sp-nota-ta-'+k).value}, K), 'Chiedere la scenica al pompiere');
 
 console.log('\n── Altro: Script e Analisi sono due voci ──');
 await p.evaluate(()=>switchResultTab('altro'));
@@ -131,12 +155,16 @@ await p.waitForTimeout(200);
 ok('ora è accesa',   await p.evaluate(()=>document.querySelectorAll('.an-sp.on').length), 5);
 await p.evaluate(()=>switchResultTab('spoglio'));
 await p.waitForTimeout(200);
-ok('il mio reparto resta in testa', await p.evaluate(()=>
-  [...document.querySelectorAll('.sp-rep-h span:first-child')].map(e=>e.textContent)), ['Suono','Stunt & SFX','Regia','Location']);
-ok('e non è più in grigio', await p.evaluate(()=>
-  !document.getElementById('sp-cat-armi').classList.contains('spenta')), true);
-ok('il suo reparto è in evidenza', await p.evaluate(()=>
-  document.getElementById('sp-cat-armi').closest('.sp-rep').classList.contains('mio')), true);
+/* Spuntando "armi" compare il suo reparto, e nient'altro: la spunta
+   aggiunge quello che si vede, non riporta tutto. Il proprio reparto
+   resta comunque il primo. */
+ok('compare il reparto di armi', await p.evaluate(()=>
+  [...document.querySelectorAll('.sp-rep-h span:first-child')].map(e=>e.textContent)), ['Suono','Stunt & SFX']);
+ok('la categoria c\'è davvero', await p.evaluate(()=>!!document.getElementById('sp-cat-armi')), true);
+// "mio" marca il proprio reparto, non quello che si e' appena spuntato.
+ok('in evidenza resta il mio', await p.evaluate(()=>
+  document.querySelector('.sp-rep').classList.contains('mio') &&
+  !document.getElementById('sp-cat-armi').closest('.sp-rep').classList.contains('mio')), true);
 
 console.log('\n── cambiare reparto riparte dal suo preset ──');
 await p.evaluate(()=>{switchResultTab('analisi');analisiReparto('costumi')});
@@ -148,8 +176,17 @@ await p.evaluate(()=>switchResultTab('spoglio'));
 await p.waitForTimeout(200);
 ok('costumi non ha scene, quindi non compare', await p.evaluate(()=>
   [...document.querySelectorAll('.sp-rep-h span')].map(e=>e.textContent).includes('Costumi')), false);
-ok('e suono torna spento', await p.evaluate(()=>
-  document.getElementById('sp-cat-ambienti_rumorosi').classList.contains('spenta')), true);
+/* E il suono sparisce del tutto, non si scolorisce: scelti i costumi, si
+   vedono i costumi. Qui pero' lo spoglio resta vuoto — questa
+   sceneggiatura di costumi non segnala niente — e allora deve dire
+   perche': "nessuna criticita'" manderebbe a cercare un guasto che non
+   c'e'. */
+ok('e il suono sparisce', await p.evaluate(()=>!document.getElementById('sp-cat-ambienti_rumorosi')), true);
+ok('lo spoglio spiega il vuoto', await p.evaluate(()=>{
+  const t = document.getElementById('catsGrid').textContent;
+  return {scelte: /categorie scelte/.test(t), altre: /in altre categorie/.test(t),
+          criticita: /Nessuna criticità/.test(t)};
+}), {scelte:true, altre:true, criticita:false});
 
 console.log('\n── la scelta sopravvive alla chiusura ──');
 await p.reload({waitUntil:'domcontentloaded'}); await p.waitForTimeout(700);

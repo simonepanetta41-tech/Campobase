@@ -472,6 +472,9 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:1px solid var(--border-l);color:var(--white);
   font-family:'Space Grotesk',sans-serif;font-size:14px}
 .sp-azioni button.active{border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,.1)}
+.sp-fuori{margin-top:10px;font-size:12px;color:var(--muted);text-align:center}
+.sp-fuori button{background:none;border:none;padding:0;color:var(--yellow);
+  font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer}
 .sp-vuoto{padding:30px 16px;text-align:center;font-size:13.5px;color:var(--muted);line-height:1.6}
 /* La scheda di una scena: tutto quello che lo spoglio sa di quella scena,
    il proprio reparto per primo e gli altri ripiegati. */
@@ -1518,6 +1521,8 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
       <div class="odg-sez" style="margin-top:24px">Reparti</div>
       <div id="catsGrid" style="margin-top:9px"></div>
+      <!-- Quello che il filtro tiene fuori: si dice, non si nasconde. -->
+      <div id="spFuori" class="sp-fuori" style="display:none"></div>
 
       <!-- NOTE MANUALI -->
       <div id="notesSection" style="margin-top:22px">
@@ -4252,34 +4257,69 @@ function spoglioRender(d){
      sceneggiatura cercando cose diverse, e scorrere sei reparti altrui
      prima del proprio e' il modo piu' rapido per smettere di aprire la
      pagina. Le altre categorie restano, in fondo e spente. */
+  /* Si vedono solo le categorie scelte, e il proprio reparto per primo.
+   *
+   * Prima le spunte mettevano avanti e accendevano senza togliere niente,
+   * per non far sparire una criticita' dagli occhi di chi la deve vedere.
+   * Ma chi apre lo spoglio in preparazione cerca il proprio lavoro, e
+   * ventuno categorie sparse su sette reparti sono un elenco da scorrere,
+   * non da leggere. Chi le vuole tutte le spunta tutte: e' una riga sola
+   * nelle impostazioni, e la scelta resta di chi guarda.
+   */
   const gruppi = REPARTI.map(([rk, rnome]) => {
-    const voci = SPOGLIO.filter(c => c.rep === rk && dati[c.key]?.scene?.length)
+    const voci = SPOGLIO.filter(c => c.rep === rk && att.has(c.key) && dati[c.key]?.scene?.length)
       .map(c => ({ c, scene: spoglioOrdina(dati[c.key].scene) }));
     return voci.length ? { rk, rnome, voci } : null;
   }).filter(Boolean);
 
-  /* Il proprio reparto apre sempre la pagina, poi i reparti che
-     contengono una categoria spuntata, poi il resto. A parità di peso
-     resta l'ordine della tabella. */
-  const tutte = SPOGLIO.every(c => att.has(c.key));
-  const scelto = g => g.rk === mio || (!tutte && g.voci.some(v => att.has(v.c.key)));
-  const peso = g => g.rk === mio ? 0 : scelto(g) ? 1 : 2;
-  const ordinati = gruppi.slice().sort((a,b) => peso(a) - peso(b));
+  // Il proprio reparto apre la pagina; gli altri restano nell'ordine
+  // della tabella, che e' quello in cui si lavora.
+  const ordinati = gruppi.slice()
+    .sort((a,b) => (a.rk === mio ? 0 : 1) - (b.rk === mio ? 0 : 1));
 
   const html = ordinati.map(g => `
-    <div class="sp-rep${scelto(g) ? ' mio' : ''}">
+    <div class="sp-rep${g.rk === mio ? ' mio' : ''}">
       <div class="sp-rep-h"><span>${esc(g.rnome)}</span><span class="q">${g.voci.length}</span></div>
-      ${g.voci.map(v => spoglioRigaCat(v.c, v.scene, att.has(v.c.key))).join('')}
+      ${g.voci.map(v => spoglioRigaCat(v.c, v.scene, true)).join('')}
     </div>`).join('');
 
-  document.getElementById('catsGrid').innerHTML = html ||
-    '<div class="sp-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>';
+  /* Due vuoti diversi, e non vanno confusi: una sceneggiatura senza
+     criticita' e' una notizia, nessuna categoria spuntata e' una
+     impostazione da cambiare. */
+  const trovate = Object.values(dati).reduce((s,v) => s + (v.scene?.length||0), 0);
+  document.getElementById('catsGrid').innerHTML = html || (
+    trovate
+      ? `<div class="sp-vuoto">Nessuna delle categorie scelte è segnalata qui.<br>
+           Ce ne ${trovate === 1 ? 'è 1 segnalata' : 'sono ' + trovate + ' segnalate'} in altre categorie:
+           si aggiungono da Impostazioni → Categorie di analisi.</div>`
+      : '<div class="sp-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>');
 
   const conta = document.getElementById('spConta');
+  let viste = 0;
   if (conta) {
-    const n = Object.values(dati).reduce((s,v) => s + (v.scene?.length||0), 0);
+    // Quello che si vede, non quello che c'e': se il conto dicesse di piu'
+    // di quello a schermo, sembrerebbe roba persa.
+    viste = ordinati.reduce((s,g) => s + g.voci.reduce((t,v) => t + v.scene.length, 0), 0);
     conta.textContent = (d.totale_scene ? d.totale_scene + ' scene · ' : '') +
-      n + ' segnalazion' + (n === 1 ? 'e' : 'i');
+      viste + ' segnalazion' + (viste === 1 ? 'e' : 'i');
+  }
+
+  /* Quello che resta fuori si dice sempre, anche quando a schermo c'e'
+   * qualcosa.
+   *
+   * Il reparto non lo sceglie sempre una persona: lo riempie anche il
+   * "sei tu?" quando si riconosce il proprio nome sull'ordine del giorno.
+   * Chi non ha mai aperto le impostazioni si ritroverebbe uno spoglio
+   * piu' corto senza sapere di averlo chiesto — e un filtro che non si sa
+   * di avere e' come un pezzo di analisi mancante. Una riga in fondo
+   * basta: dice quante sono e dove si accendono. */
+  const fuori = trovate - viste;
+  const nota = document.getElementById('spFuori');
+  if (nota) {
+    nota.style.display = fuori > 0 && html ? '' : 'none';
+    if (fuori > 0 && html) nota.innerHTML =
+      `Altre ${fuori} segnalazion${fuori === 1 ? 'e' : 'i'} in categorie non scelte · ` +
+      `<button onclick="showPage('settings')">Impostazioni</button>`;
   }
 }
 
