@@ -616,7 +616,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   font-weight:600;letter-spacing:-.01em;color:var(--white);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cb-nome em{font-style:normal;color:var(--yellow)}
-.cb-giu{color:var(--muted);font-size:11px;flex:0 0 auto}
+.cb-back{color:var(--muted);font-size:26px;line-height:1;flex:0 0 auto;
+  margin:-4px 0 0 -2px;font-family:'Space Grotesk',sans-serif}
 .cb-ing{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;background:none;
   border:none;border-radius:9px;color:var(--muted);cursor:pointer}
 .cb-ing:active{background:var(--surface2)}
@@ -1250,9 +1251,12 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
          alle impostazioni. -->
     <header class="cb-testa">
       <button class="cb-ident" onclick="showPage('home')" title="Cambia progetto">
+        <!-- La freccetta verso il basso diceva "qui si apre qualcosa", e
+             qui invece si torna indietro. Il segno di indietro sta dove lo
+             cerca la mano, tutto a sinistra, prima del nome del film. -->
+        <span class="cb-back">‹</span>
         <span class="cb-mark"><svg viewBox="0 0 100 100" width="26" height="26"><rect width="100" height="100" rx="22" fill="#0A0B0D"/><rect x="13" y="56" width="74" height="14" rx="3" fill="#F5C542"/><path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#0A0B0D"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#0A0B0D"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#0A0B0D"/><g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#F5C542"/><path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#0A0B0D"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#0A0B0D"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#0A0B0D"/></g></svg></span>
         <span class="cb-nome" id="cbNome">Campo<em>base</em></span>
-        <span class="cb-giu">▾</span>
       </button>
       <button class="cb-ing" onclick="showPage('settings')" title="Impostazioni">
         <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l6.5 3.75v7.5L10 17 3.5 13.25V5.75L10 2z"/><circle cx="10" cy="9.5" r="2.5"/></svg>
@@ -2710,9 +2714,49 @@ function cbTestata() {
     if (!nome && odgCorrente) nome = 'Ordine del giorno';
   }
   el.innerHTML = nome ? esc(nome) : 'Campo<em>base</em>';
-  const g = el.parentElement?.querySelector('.cb-giu');
-  if (g) g.style.visibility = nome ? 'visible' : 'hidden';
+  // Il segno di indietro solo quando c'e' un progetto aperto: sulla
+  // schermata di scelta non c'e' nessun posto dove tornare.
+  const g = el.parentElement?.querySelector('.cb-back');
+  if (g) g.style.display = nome ? '' : 'none';
 }
+
+/*
+ * Scorrere verso destra per tornare alla scelta del progetto.
+ *
+ * Solo su ordine del giorno, spoglio e piano. Nella sezione Ore la
+ * tabella della settimana scorre gia' in orizzontale, e un gesto che
+ * vuol dire "indietro" su una pagina dove si scorre per arrivare al
+ * sabato diventa un modo per uscirne per sbaglio.
+ *
+ * Vale la stessa cura dentro le tre schermate: se il dito parte da
+ * qualcosa che scorre per conto suo, il gesto non si prende. E se sopra
+ * c'e' aperta una scena o un PDF, quello e' un fratello di odgSection e
+ * non un figlio, quindi il contains lo esclude da solo.
+ */
+const CB_INDIETRO = ['odgSection', 'spoglioSection', 'pdlSection'];
+let cbTx = 0, cbTy = 0, cbSegue = false;
+
+document.addEventListener('touchstart', e => {
+  cbSegue = false;
+  if (e.touches.length !== 1) return;
+  const sez = CB_INDIETRO.map(id => document.getElementById(id))
+                         .find(el => el && el.offsetParent !== null);
+  if (!sez || !sez.contains(e.target)) return;
+  for (let n = e.target; n && n !== sez; n = n.parentElement)
+    if (n.scrollWidth > n.clientWidth + 4) return;
+  cbTx = e.touches[0].clientX; cbTy = e.touches[0].clientY; cbSegue = true;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+  if (!cbSegue) return;
+  cbSegue = false;
+  const t = e.changedTouches && e.changedTouches[0];
+  if (!t) return;
+  const dx = t.clientX - cbTx, dy = t.clientY - cbTy;
+  // Abbondante e chiaramente orizzontale: uno scorrimento in verticale
+  // che sbanda non deve far cambiare schermata.
+  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) showPage('home');
+}, { passive: true });
 
 /*
  * Chi sei: si chiede una volta, appena entrato, e mai piu'.

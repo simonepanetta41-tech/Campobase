@@ -44,13 +44,13 @@ console.log('\n── dice su cosa stai lavorando ──');
 await p.evaluate(()=>{document.getElementById('homePage').style.display='block';
   document.getElementById('resultsPage').style.display='none';cbTestata()});
 ok('in home: Campobase',    await p.evaluate(()=>document.getElementById('cbNome').textContent.trim()), 'Campobase');
-ok('freccia nascosta',      await p.evaluate(()=>document.querySelector('.cb-giu').style.visibility), 'hidden');
+ok('indietro nascosto',     await p.evaluate(()=>document.querySelector('.cb-back').style.display), 'none');
 
 await p.evaluate(()=>{document.getElementById('homePage').style.display='none';
   document.getElementById('resultsPage').style.display='block';
   document.getElementById('tt-film').value='Missione San Gennaro';cbTestata()});
 ok('nel progetto: il film', await p.evaluate(()=>document.getElementById('cbNome').textContent.trim()), 'Missione San Gennaro');
-ok('freccia visibile',      await p.evaluate(()=>document.querySelector('.cb-giu').style.visibility), 'visible');
+ok('indietro visibile',     await p.evaluate(()=>document.querySelector('.cb-back').style.display), '');
 
 console.log('\n── i tasti funzionano ──');
 await p.click('.cb-ing');
