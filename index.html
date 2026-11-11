@@ -415,6 +415,60 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   white-space:pre-wrap;word-break:break-word}
 .sc-id{margin:0 0 14px;padding:8px 12px;border-radius:9px;background:var(--surface);
   font-family:'DM Mono',monospace;font-size:11.5px;color:var(--white-dim)}
+/* ── FABBISOGNI ─────────────────────────────────────────────────────────── */
+/* La riga si accende solo quando c'e' qualcosa del tuo reparto: e' tutto
+   il valore della funzione, quindi deve vedersi da lontano senza gridare. */
+.fab-riga.acceso{background:rgba(245,197,66,.07)}
+.fab-riga.acceso .t{color:var(--yellow)}
+.fab-bollo{flex:0 0 auto;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 8px;border-radius:999px;background:rgba(245,197,66,.16);
+  color:var(--yellow);border:1px solid rgba(245,197,66,.4);white-space:nowrap;
+  max-width:112px;overflow:hidden;text-overflow:ellipsis}
+#odgFab{position:fixed;inset:0;z-index:310;background:var(--bg);display:none;
+  flex-direction:column;overflow:hidden;
+  padding:0 0 calc(env(safe-area-inset-bottom) + 30px)}
+#odgFab.on{display:flex}
+.fab-corpo{flex:1;overflow-y:auto;padding:16px 16px 40px}
+.fab-rep{margin-bottom:20px}
+.fab-rep-t{font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);margin:0 2px 8px;display:flex;align-items:center;gap:8px;
+  flex-wrap:wrap}
+.fab-rep.mio .fab-rep-t{color:var(--yellow)}
+.fab-rep-t em{font-style:normal;font-size:9px;letter-spacing:.08em;
+  padding:2px 7px;border-radius:999px;background:rgba(245,197,66,.16);color:var(--yellow)}
+.fab-rep.mio .card{border-color:rgba(245,197,66,.45)}
+.fab-g{margin:26px 2px 12px;font-size:10px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);padding-top:18px;
+  border-top:1px solid var(--border)}
+.fab-v{display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.fab-v:last-child{border-bottom:none}
+.fab-sc{flex:0 0 auto;font-family:'DM Mono',monospace;font-size:11px;
+  color:var(--yellow);background:rgba(245,197,66,.12);border-radius:6px;
+  padding:3px 7px;height:fit-content;white-space:nowrap}
+.fab-t{flex:1;min-width:0;font-size:13.5px;line-height:1.5;color:var(--white-dim)}
+/* Il richiamo alla prima apertura. Questo si tocca, a differenza
+   dell'avviso della posta: mostra la voce per intero, e se e' una riga
+   sola l'hai gia' letta e hai finito. */
+#fabPop{position:fixed;inset:0;z-index:9997;display:none;align-items:center;
+  justify-content:center;padding:28px;background:rgba(0,0,0,.55)}
+#fabPop.on{display:flex}
+.fabpop-c{background:var(--surface);border:1px solid var(--yellow);border-radius:18px;
+  padding:24px 22px 18px;max-width:320px;width:100%;text-align:center;
+  box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.fabpop-c .tt{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  line-height:1.3;color:var(--yellow)}
+.fabpop-c .vv{margin-top:14px;padding:11px 12px;border-radius:10px;
+  background:var(--surface2);font-size:13px;line-height:1.45;color:var(--white);
+  text-align:left}
+.fabpop-c .vv + .vv{margin-top:8px}
+.fabpop-c .vv b{display:block;color:var(--yellow);font-family:'DM Mono',monospace;
+  font-size:11px;font-weight:400;margin-bottom:3px}
+.fabpop-b{display:flex;gap:9px;margin-top:16px}
+.fabpop-b button{flex:1;padding:11px;border-radius:10px;font-size:13px;cursor:pointer;
+  font-family:inherit;font-weight:600}
+.fabpop-b .no{background:none;border:1px solid var(--border-l);color:var(--muted)}
+.fabpop-b .si{background:var(--yellow);border:none;color:#111}
+
 /* I reparti nello spoglio */
 .rep{margin-bottom:22px}
 .rep-t{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
@@ -2003,6 +2057,8 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <!-- ORDINE DEL GIORNO -->
       <div id="odgSection"><div id="odgCorpo"></div></div>
       <div id="odgScena" style="display:none"></div>
+      <div id="odgFab"></div>
+      <div id="fabPop"></div>
 
       <!-- ANALISI — il reparto e le categorie che si vogliono vedere.
            Stava insieme allo Script sotto una voce sola, e per cambiare
@@ -4873,7 +4929,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.102';
+const CB_VERSIONE = '1.103';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8888,6 +8944,145 @@ const REPARTI_CREW = ['Suono','Regia','Fotografia','Elettricisti','Macchinisti',
   'Scenografia','Costumi','Trucco','Parrucco','Produzione','Location','Montaggio',
   'SFX','VFX','Stunt','Autisti','Casting','Altro'];
 
+/* ── FABBISOGNI ──────────────────────────────────────────────────────────────
+ *
+ * Cosa serve oggi sul set, reparto per reparto: l'asino con la sella, i
+ * materassini dello stunt, il playback del suono. Ogni produzione scrive
+ * quella griglia a modo suo e il modello la riporta com'e' scritta, senza
+ * incasellarla nei nostri reparti.
+ */
+
+/* Quello che torna dal modello, ripulito. Una voce senza testo non e' una
+   voce, e un reparto senza voci e' una casella vuota del foglio: tenerli
+   vorrebbe dire contare caselle invece che cose da portare. */
+function fabPulisci(x) {
+  if (!Array.isArray(x)) return [];
+  return x.map(f => ({
+    reparto: String(f?.reparto || '').trim(),
+    voci: (Array.isArray(f?.voci) ? f.voci : [])
+      .map(v => ({ scene: String(v?.scene || '').trim(), cosa: String(v?.cosa || '').trim() }))
+      .filter(v => v.cosa)
+  })).filter(f => f.reparto && f.voci.length);
+}
+
+/* Il reparto del foglio e' il mio?
+ *
+ * Da questa risposta dipende se la riga si accende, e la riga che si
+ * accende e' tutto il valore della funzione: se una volta ti manda a
+ * cercare le lacrime di un attore perche' stavano scritte accanto a
+ * "Suono", la volta dopo quella spia non la guardi piu'. Quindi si
+ * riconosce solo quello che si riconosce davvero — i nomi che quel
+ * reparto usa per se' — e nel dubbio si resta spenti.
+ *
+ * Una casella come "Costumi / Trucco" vale per tutti e due, perche' il
+ * foglio li ha messi insieme apposta.
+ */
+const FAB_NOMI = {
+  'Suono':        ['suono', 'audio', 'fonico', 'microfon', 'playback'],
+  'Regia':        ['regia'],
+  'Fotografia':   ['fotografia', 'camera', 'macchina da presa', 'mdp', 'dop'],
+  'Elettricisti': ['elettric', 'luci'],
+  'Macchinisti':  ['macchinist', 'grip'],
+  'Scenografia':  ['scenografia', 'props', 'arredamento', 'arredo', 'attrezzeria', 'attrezz'],
+  'Costumi':      ['costum', 'sartoria'],
+  'Trucco':       ['trucco', 'make up', 'makeup'],
+  'Parrucco':     ['parrucc', 'capelli', 'hair'],
+  'Produzione':   ['produzione'],
+  'Location':     ['location'],
+  'Montaggio':    ['montaggio'],
+  'SFX':          ['sfx', 'effetti speciali', 'special effect'],
+  'VFX':          ['vfx', 'effetti visivi'],
+  'Stunt':        ['stunt'],
+  'Autisti':      ['autist', 'veicoli', 'trasport', 'mezzi di scena'],
+  'Casting':      ['casting', 'figurazion']
+};
+
+function fabMio(reparto, mioReparto) {
+  const mio = String(mioReparto || '').trim();
+  if (!mio) return false;
+  const chiavi = FAB_NOMI[mio];
+  if (!chiavi) return false;
+  const r = senzaAccenti(String(reparto || '')).toLowerCase();
+  if (!r) return false;
+  return chiavi.some(k => r.includes(k));
+}
+
+/* Le voci del mio reparto, in tutta la griglia. */
+function fabMie(fabbisogni, mioReparto) {
+  return (fabbisogni || []).filter(f => fabMio(f.reparto, mioReparto));
+}
+
+/* Il mio reparto per primo, il resto nell'ordine del foglio. */
+function fabOrdina(fabbisogni, mioReparto) {
+  const mie = [], altre = [];
+  (fabbisogni || []).forEach(f => (fabMio(f.reparto, mioReparto) ? mie : altre).push(f));
+  return mie.concat(altre);
+}
+
+/* La finestra: il mio reparto in cima col bordo giallo, gli altri sotto
+   nell'ordine del foglio. Le scene stanno in un riquadro a sinistra
+   perche' scorrendo si cerca il numero di scena, non si legge tutto. */
+function fabCard(f, mio) {
+  const suo = fabMio(f.reparto, mio);
+  return `<div class="fab-rep${suo ? ' mio' : ''}">
+    <div class="fab-rep-t">${esc(f.reparto)}${suo ? '<em>il tuo reparto</em>' : ''}</div>
+    <div class="card">${f.voci.map(v => `<div class="fab-v">
+      ${v.scene ? `<span class="fab-sc">SC. ${esc(v.scene)}</span>` : ''}
+      <span class="fab-t">${esc(v.cosa)}</span></div>`).join('')}</div></div>`;
+}
+
+function fabApri() {
+  const d = odgCorrente;
+  if (!d || !(d.fabbisogni || []).length) return;
+  const mio = profilo().reparto;
+  const dom = (d.domani && (d.domani.fabbisogni || []).length) ? d.domani : null;
+  const el = document.getElementById('odgFab');
+  el.innerHTML = `
+    <div class="sc-top">
+      <button class="sc-x" onclick="fabChiudi()">‹</button>
+      <span class="sc-n">Fabbisogni</span>
+      <span class="sc-h">${esc(odgDataEstesa(d.data) || '')}</span>
+    </div>
+    <div class="fab-corpo">
+      ${fabOrdina(d.fabbisogni, mio).map(f => fabCard(f, mio)).join('')}
+      ${dom ? `<div class="fab-g">Domani${dom.etichetta ? ' · ' + esc(dom.etichetta) : ''}</div>
+        ${fabOrdina(dom.fabbisogni, mio).map(f => fabCard(f, mio)).join('')}` : ''}
+    </div>`;
+  el.classList.add('on');
+}
+
+function fabChiudi() { document.getElementById('odgFab')?.classList.remove('on'); }
+
+/* Il richiamo, una volta per ordine del giorno.
+ *
+ * La data fa da segno: un OdG nuovo lo merita, lo stesso riaperto dieci
+ * volte no. Si mostra solo se c'e' davvero qualcosa del tuo reparto —
+ * se non c'e' niente, non c'e' niente da dire. */
+const FAB_VISTO = 'cb_fab_visto';
+
+function fabRichiamo() {
+  const d = odgCorrente;
+  if (!d) return;
+  const mie = fabMie(d.fabbisogni, profilo().reparto);
+  if (!mie.length) return;
+  const segno = String(d.data || d.id || '');
+  try { if (localStorage.getItem(FAB_VISTO) === segno) return; } catch (_) {}
+  try { localStorage.setItem(FAB_VISTO, segno); } catch (_) {}
+
+  const voci = mie.flatMap(f => f.voci).slice(0, 3);
+  const el = document.getElementById('fabPop');
+  el.innerHTML = `<div class="fabpop-c">
+    <div class="tt">C’è un fabbisogno per il tuo reparto</div>
+    ${voci.map(v => `<div class="vv">${v.scene ? `<b>SC. ${esc(v.scene)}</b>` : ''}${esc(v.cosa)}</div>`).join('')}
+    <div class="fabpop-b">
+      <button class="no" onclick="fabPopChiudi()">Ho capito</button>
+      <button class="si" onclick="fabPopChiudi();fabApri()">Vedi tutti</button>
+    </div></div>`;
+  el.classList.add('on');
+}
+
+function fabPopChiudi() { document.getElementById('fabPop')?.classList.remove('on'); }
+
 function profilo() {
   try { return JSON.parse(localStorage.getItem(CB_PROFILO) || 'null') || {}; }
   catch (_) { return {}; }
@@ -9030,7 +9225,8 @@ Il testo viene da un PDF e ha spazi sparsi dentro parole e numeri: "0 8.30" e' 0
 
 Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
 {"scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}],
- "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}]},
+ "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}],"fabbisogni":[{"reparto":"","voci":[{"scene":"","cosa":""}]}]},
+ "fabbisogni":[{"reparto":"","voci":[{"scene":"","cosa":""}]}],
  "cast":[{"id":"","ruolo":"","interprete":"","scene":"","pickup":"","set":""}],
  "troupe":[{"reparto":"","ruolo":"","nome":"","partenza":"","set":""}],
  "contatti":[{"nome":"","ruolo":"","tel":""}]}
@@ -9038,7 +9234,9 @@ Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
 scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola.
 pag: SOLO l'ultima colonna, PAG: "1/8", "3 3/8", "2". DAY e PAG sono due colonne diverse e vicine: DAY e' il numero della giornata di lavorazione ed e' lo stesso per tutte le scene del giorno, PAG sono gli ottavi di pagina di quella scena. Non attaccarle: una riga "ID 1, 19 | DAY 4 | PAG 1/8" ha pag "1/8", non "4 1/8". Se la somma dei pag delle scene non somiglia al "Tot. pag." in fondo alla tabella, hai preso dentro la colonna DAY.
 Fra una scena e l'altra la tabella puo' avere una riga senza numero, con una scritta sola in maiuscolo (TRASFERIMENTO, DRONE UNIT, SECOND UNIT, PRANZO, SPOSTAMENTO): e' uno stacco nella giornata, non una scena. Rendila come {"n":"","nota":"TRASFERIMENTO"} al posto suo nell'elenco, senza attaccarla alla scena prima o dopo.
-domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null.
+domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null. Se sotto quella tabella c'e' una sua griglia di fabbisogni, va in domani.fabbisogni con le stesse regole di sotto.
+fabbisogni: cosa serve quel giorno, reparto per reparto. Ogni produzione la scrive a modo suo: una griglia di caselle senza titolo, oppure sotto "FABBISOGNI", "NOTE PER I REPARTI", "ARREDAMENTO/FABBISOGNO SCENA", "NOTE". Le intestazioni sono i nomi dei reparti come li scrive quel foglio — "Scenografia / Props", "Veicoli", "Stunt", "Animali", "Costumi / Trucco", "SFX", "VFX", "Suono", "Mezzi di Scena", "Attr. speciali" — e non vanno tradotte ne' raggruppate: riportale alla lettera. Sotto ogni intestazione le voci sono righe tipo "SC. 21: Accampamento Volpe, lanterne" oppure "Sc. 25, 25A, 27: Auto carabinieri": scene e' la parte prima dei due punti, senza "SC."; cosa e' quella dopo, senza il punto e virgola finale.
+ATTENZIONE, e vale piu' di ogni altra regola: questa griglia e' fatta di colonne affiancate, e nel testo che ricevi le intestazioni e i contenuti arrivano mescolati. Metti una voce sotto un reparto SOLO se sei sicuro che sia sua; se una voce potrebbe appartenere a due intestazioni vicine, lasciala fuori. L'app accende un avviso quando trova qualcosa del reparto di chi legge: una voce messa sotto il reparto sbagliato gli fa portare sul set la roba di un altro, ed e' molto peggio di una voce che manca. Se la griglia non si capisce, fabbisogni vale [].
 cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP. set: l'ultima colonna, SET.
 troupe: tutte le persone sotto "CONVOCAZIONE TROUPE". La tabella ha tre gruppi di colonne affiancati e le righe arrivano intrecciate: ricostruisci ogni persona con il reparto della sua intestazione (REGIA, FOTOGRAFIA, COSTUMI, ELETTRICISTI, MACCHINISTI, SCENOGRAFIA, SUONO, LOCATION, TRUCCO, AUTISTI, MONTAGGIO, VFX, SFX, AGGIUNTI, PRODUZIONE...). partenza e set sono le due colonne di orario; "O.C.", "Vedi GA" e "--" riportali come stanno.
 contatti: solo le persone con un numero di telefono, in testa al documento. tel: sole cifre.
@@ -9065,12 +9263,14 @@ async function odgEstrai(doc, onPasso) {
     const j = grezzo.slice(grezzo.indexOf('{'), grezzo.lastIndexOf('}') + 1);
     const p = JSON.parse(j);
     tab = {
-      scene:     Array.isArray(p.scene) ? p.scene : [],
-      domani:    p.domani && Array.isArray(p.domani.scene) ? p.domani : null,
-      cast:      Array.isArray(p.cast) ? p.cast : [],
-      troupe:    Array.isArray(p.troupe) ? p.troupe : [],
-      contatti:  Array.isArray(p.contatti) ? p.contatti : []
+      scene:      Array.isArray(p.scene) ? p.scene : [],
+      domani:     p.domani && Array.isArray(p.domani.scene) ? p.domani : null,
+      fabbisogni: fabPulisci(p.fabbisogni),
+      cast:       Array.isArray(p.cast) ? p.cast : [],
+      troupe:     Array.isArray(p.troupe) ? p.troupe : [],
+      contatti:   Array.isArray(p.contatti) ? p.contatti : []
     };
+    if (tab.domani) tab.domani.fabbisogni = fabPulisci(tab.domani.fabbisogni);
   } catch (e) {
     // L'intestazione resta valida anche se le tabelle non si leggono: meglio
     // un OdG con gli orari e senza le scene che nessun OdG.
@@ -11885,6 +12085,8 @@ function odgRender() {
   if (!odgCorrente) { c.innerHTML = odgVuotoHtml(); return; }
   c.innerHTML = odgPienoHtml(odgCorrente);
   if (navigator.onLine) setTimeout(odgCaricaMeteo, 60);
+  // Una volta sola per ordine del giorno, e solo se c'e' del tuo.
+  try { fabRichiamo(); } catch (_) {}
 }
 
 function odgCaricamentoHtml() {
@@ -12031,6 +12233,18 @@ function odgPienoHtml(d) {
       <span class="go">Cerca ›</span></a>`}</div>` : ''}
 
 
+
+  ${(d.fabbisogni || []).length ? (() => {
+    const mie  = fabMie(d.fabbisogni, profilo().reparto);
+    const voci = d.fabbisogni.reduce((n, f) => n + f.voci.length, 0);
+    return `<div class="odg-sez">FABBISOGNI DEL GIORNO</div>
+    <div class="card">
+      <a class="odg-att cerca fab-riga${mie.length ? ' acceso' : ''}" onclick="fabApri()">
+        <span class="c"><span class="t">${d.fabbisogni.length} ${d.fabbisogni.length === 1 ? 'reparto' : 'reparti'} · ${voci} ${voci === 1 ? 'voce' : 'voci'}</span>
+        <span class="s">${mie.length ? 'C’è qualcosa per il tuo reparto' : 'Niente per il tuo reparto'}</span></span>
+        ${mie.length ? `<span class="fab-bollo">${esc(mie[0].reparto)}</span>` : ''}
+        <span class="chev">›</span></a>
+    </div>`; })() : ''}
 
   ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
   <div class="card"><ul class="odg-scene">${d.scene.map(s => odgStacco(s)
