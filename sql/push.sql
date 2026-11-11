@@ -63,11 +63,32 @@ create table if not exists public.push_appuntamenti (
   -- nello stesso minuto si leggerebbero entrambe come l'ultima.
   mandato    timestamptz,
   mostrato   timestamptz,
+
+  /* A quanti telefoni e' arrivata, e quanti indirizzi erano morti.
+   *
+   * "mandato" dice soltanto che il cron ci ha provato: lo scrive anche
+   * quando non c'era nessun telefono a cui mandarla. Il primo giorno vero
+   * di notifiche sul set e' bastato a mostrare il buco — a un collega non
+   * era arrivata, e non c'era modo di sapere se non fosse iscritto, se
+   * Apple avesse rifiutato il suo indirizzo o se l'avesse scartata senza
+   * leggerla.
+   *
+   * dispositivi = 0 e scartati = 0  -> nessun telefono iscritto
+   * dispositivi = 0 e scartati > 0  -> il telefono c'era e non c'e' piu'
+   *                                    (app disinstallata o permesso tolto)
+   * dispositivi > 0                 -> partita; se non l'ha vista, l'ha
+   *                                    vista il telefono e non lui
+   */
+  dispositivi integer,
+  scartati    integer,
+
   creato     timestamptz not null default now()
 );
 
 -- Per chi avesse gia' lanciato una versione precedente di questo file.
-alter table public.push_appuntamenti add column if not exists mostrato timestamptz;
+alter table public.push_appuntamenti add column if not exists mostrato    timestamptz;
+alter table public.push_appuntamenti add column if not exists dispositivi integer;
+alter table public.push_appuntamenti add column if not exists scartati    integer;
 
 -- Quello che il cron cerca ogni minuto: gli appuntamenti scaduti e non
 -- ancora mandati.

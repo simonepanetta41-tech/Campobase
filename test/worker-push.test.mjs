@@ -181,6 +181,41 @@ tavoli.push_appuntamenti.push({ id: 'a1', user_id: 'u1', quando: fra(-1), genere
 await push.mandaScadute(ENV);
 ok('provati tutti e due', bussate.length, 2);
 ok('resta solo il vivo', tavoli.push_iscrizioni.map(i => i.endpoint), ['https://web.push.apple.com/vivo']);
+ok('uno consegnato e uno scartato',
+  [tavoli.push_appuntamenti[0].dispositivi, tavoli.push_appuntamenti[0].scartati], [1, 1]);
+
+console.log('\n── resta scritto a quanti telefoni è arrivata ──');
+/*
+ * "mandato" dice soltanto che il cron ci ha provato, e lo scrive anche
+ * quando non c'era nessuno a cui mandarla. Il primo giorno di notifiche
+ * sul set a un collega non e' arrivata, e non c'era modo di sapere se il
+ * suo telefono non fosse iscritto, se Apple avesse rifiutato l'indirizzo
+ * o se l'avesse scartata senza leggerla: tre cause, tre rimedi diversi,
+ * nessuna traccia per distinguerle.
+ */
+azzera();
+iscrivi('u1', 'https://web.push.apple.com/t1');
+tavoli.push_appuntamenti.push({ id: 'a1', user_id: 'u1', quando: fra(-1), genere: 'pickup', testo: 'x', mandato: null });
+await push.mandaScadute(ENV);
+ok('consegnata a un telefono',
+  [tavoli.push_appuntamenti[0].dispositivi, tavoli.push_appuntamenti[0].scartati], [1, 0]);
+
+console.log('\n── e si distingue "nessuno iscritto" da "mai provata" ──');
+/* Zero vuol dire che si e' provato e non c'era nessun telefono: quello
+   e' un collega da far riattivare. Il vuoto vuol dire che non si e'
+   nemmeno provato, ed e' tutta un'altra cosa. */
+azzera();
+tavoli.push_appuntamenti.push({ id: 'a1', user_id: 'u1', quando: fra(-1), genere: 'catering', testo: 'x', mandato: null });
+await push.mandaScadute(ENV);
+ok('nessun telefono iscritto',
+  [tavoli.push_appuntamenti[0].dispositivi, tavoli.push_appuntamenti[0].scartati], [0, 0]);
+
+azzera();
+iscrivi('u1', 'https://web.push.apple.com/t1');
+// Scaduta da quattro ore: archiviata senza mandarla.
+tavoli.push_appuntamenti.push({ id: 'a1', user_id: 'u1', quando: fra(-240), genere: 'pickup', testo: 'x', mandato: null });
+await push.mandaScadute(ENV);
+ok('archiviata senza provarci', tavoli.push_appuntamenti[0].dispositivi, undefined);
 
 console.log('\n── le notifiche di un altro non arrivano a me ──');
 azzera();

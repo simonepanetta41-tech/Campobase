@@ -220,18 +220,36 @@ async function bussa(isc, testo, env) {
   return true;
 }
 
+/*
+ * Restituisce com'e' andata, telefono per telefono.
+ *
+ * Prima tornava solo il numero di notifiche partite, e quel numero finiva
+ * in un log del Worker che dopo qualche ora non c'e' piu'. Il primo giorno
+ * vero di notifiche sul set e' bastato a mostrare il problema: a un collega
+ * non era arrivata, e non c'era modo di sapere se il telefono non fosse
+ * iscritto, se Apple avesse rifiutato l'indirizzo o se lui l'avesse
+ * semplicemente scartata senza leggerla. Tre cause diverse, tre rimedi
+ * diversi, e nessuna traccia per distinguerle.
+ *
+ * Gli errori veri — Apple che risponde 500, o troppe richieste — restano
+ * solo nel log: non dicono niente sull'iscrizione, e domani lo stesso
+ * telefono funziona.
+ */
 async function mandaAUtente(userId, testo, env) {
   const isc = await db(env,
     `push_iscrizioni?select=id,endpoint,p256dh,auth&user_id=eq.${userId}`);
-  let partite = 0;
+  let partite = 0, scartati = 0;
   for (const i of isc || []) {
     let viva;
     try { viva = await bussa(i, testo, env); }
     catch (e) { console.error('push', i.id, e.message); continue; }
     if (viva) partite++;
-    else await db(env, `push_iscrizioni?id=eq.${i.id}`, { method: 'DELETE' });
+    else {
+      scartati++;
+      await db(env, `push_iscrizioni?id=eq.${i.id}`, { method: 'DELETE' });
+    }
   }
-  return partite;
+  return { partite, scartati };
 }
 
 // ── Il cron ─────────────────────────────────────────────────────────────────
@@ -248,11 +266,12 @@ export async function mandaScadute(env) {
     `&quando=lte.${adesso}&quando=gte.${limite}&order=quando.asc&limit=100`);
 
   for (const a of dovute || []) {
-    const n = await mandaAUtente(a.user_id, a.testo, env);
+    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env);
     await db(env, `push_appuntamenti?id=eq.${a.id}`, {
-      method: 'PATCH', body: JSON.stringify({ mandato: adesso })
+      method: 'PATCH',
+      body: JSON.stringify({ mandato: adesso, dispositivi: partite, scartati })
     });
-    console.log('[push]', a.testo, '->', n, 'dispositivi');
+    console.log('[push]', a.testo, '->', partite, 'dispositivi,', scartati, 'scartati');
   }
 
   /* Le scadute davvero: si archiviano senza mandarle, se no il cron le
