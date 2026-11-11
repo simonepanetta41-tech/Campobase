@@ -3465,12 +3465,11 @@ async function loadFromHistory(id) {
   switchResultTab('odg');
   loadNotes(data.notes);
 
-  // Try to load PDL from Supabase in background
-  loadPdlFromSupabase(id).then(loaded => {
-    if (loaded) {
-      showToast('PDL caricato correttamente', 'default', 3000);
-    }
-  });
+  /* Il piano di lavorazione si carica da solo, in sottofondo. Prima lo
+     annunciava un toast a ogni apertura di progetto: una riga che dice
+     che ha funzionato una cosa che l'utente non aveva chiesto. Se non si
+     carica si vede, perche' la schermata del piano resta vuota. */
+  loadPdlFromSupabase(id);
 
   // Try to load PDF from Storage in background
   try {
@@ -3483,8 +3482,10 @@ async function loadFromHistory(id) {
       const chunk = 8192;
       for (let i = 0; i < bytes.byteLength; i += chunk) bin += String.fromCharCode(...bytes.subarray(i, i+chunk));
       pdfB64Array = [btoa(bin)];
-      // Show toast confirmation
-      showToast('📄 PDF caricato — scene cliccabili disponibili', 'yellow', 3000);
+      /* Anche la sceneggiatura si carica da sola: annunciarlo a ogni
+         apertura era la seconda riga di seguito a dire che era andato
+         bene qualcosa che nessuno aveva chiesto. Che le scene si possano
+         toccare lo si scopre toccandole. */
     }
   } catch(e) { console.log('PDF load from storage:', e.message); }
 
@@ -4854,6 +4855,42 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
     document.addEventListener('keydown', onKey);
     document.body.appendChild(ov);
   });
+}
+
+/*
+ * Un avviso che si legge davvero.
+ *
+ * I toast sono una riga da undici pixel in cima allo schermo: vanno bene
+ * per confermare un tocco appena dato, quando l'occhio e' gia' li'. Non
+ * vanno bene per dire una cosa che arriva da sola — la posta della
+ * produzione arriva quando capita, e il telefono magari e' sul tavolo:
+ * quella riga non la legge nessuno.
+ *
+ * Questo sta in mezzo allo schermo ed e' grande. Non prende i tocchi, in
+ * modo che quello che c'e' sotto continui a funzionare mentre si legge, e
+ * se ne va da solo.
+ */
+function avvisoGrande(titolo, sotto, durata = 5000) {
+  const vecchio = document.getElementById('avvisoGrande');
+  if (vecchio) vecchio.remove();
+  const el = document.createElement('div');
+  el.id = 'avvisoGrande';
+  el.style.cssText = 'position:fixed;inset:0;z-index:9998;display:flex;align-items:center;'
+    + 'justify-content:center;padding:28px;pointer-events:none;opacity:0;transition:opacity .25s';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--yellow);
+      border-radius:18px;padding:26px 24px;max-width:320px;text-align:center;
+      box-shadow:0 18px 50px rgba(0,0,0,.6)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+        line-height:1.25;color:var(--yellow)">${esc(titolo)}</div>
+      ${sotto ? `<div style="margin-top:10px;font-size:13px;line-height:1.5;
+        color:var(--white-dim)">${esc(sotto)}</div>` : ''}
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, durata);
 }
 
 function showToast(msg, type = 'default', duration = 3000) {
@@ -10310,9 +10347,11 @@ async function postaApri(p){
   } catch (e) { console.log('[posta] gettone:', e.message); }
   if (!preso) return;
 
-  // Si dice anche di restare: l'analisi dura, e un'app mandata in secondo
-  // piano a meta' lavoro viene congelata dal telefono.
-  showToast('Pacchetto dalla produzione. Non chiudere l\'app.', 'default', 6000);
+  /* Grande e in mezzo allo schermo: questa arriva da sola, quando capita,
+     e una riga piccola in cima non la leggeva nessuno. Sotto resta la
+     cosa da fare — l'analisi dura, e un'app mandata in secondo piano a
+     meta' lavoro viene congelata dal telefono. */
+  avvisoGrande('Nuova mail dalla produzione', 'Non chiudere l\'app: la sto leggendo.', 6000);
   // Si va dove si vede lavorare. Una barra che avanza in una pagina che
   // nessuno sta guardando non serve a tenere l'app aperta.
   try { if (typeof switchResultTab === 'function') switchResultTab('odg'); } catch (_) {}
