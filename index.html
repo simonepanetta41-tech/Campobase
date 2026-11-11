@@ -415,6 +415,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   white-space:pre-wrap;word-break:break-word}
 .sc-id{margin:0 0 14px;padding:8px 12px;border-radius:9px;background:var(--surface);
   font-family:'DM Mono',monospace;font-size:11.5px;color:var(--white-dim)}
+/* Le categorie dello spoglio sotto una scena del giorno. Il proprio
+   reparto in giallo, il resto grigio: si legge di sfuggita scorrendo. */
+.odg-scene .cc-riga{display:block;margin-top:5px;font-size:11px;
+  color:var(--muted);line-height:1.4}
+.odg-scene .cc-riga b{font-weight:400;color:var(--yellow)}
+
 /* ── FABBISOGNI ─────────────────────────────────────────────────────────── */
 /* La riga si accende solo quando c'e' qualcosa del tuo reparto: e' tutto
    il valore della funzione, quindi deve vedersi da lontano senza gridare. */
@@ -4929,7 +4935,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.103';
+const CB_VERSIONE = '1.104';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9019,6 +9025,56 @@ function fabOrdina(fabbisogni, mioReparto) {
   return mie.concat(altre);
 }
 
+/* ── LE CATEGORIE DELLO SPOGLIO SULLE SCENE DEL GIORNO ───────────────────────
+ *
+ * Lo spoglio sa gia' che la 25 e' uno stunt e un camera car, e che alla 21
+ * c'e' un animale. Quella roba, la mattina, serve esattamente dove si
+ * guarda: nella lista delle scene di oggi, non in una schermata a parte.
+ *
+ * Non c'e' niente da estrarre: e' lo stesso dato dello spoglio, incrociato
+ * per numero di scena.
+ */
+
+/* Il numero nudo di una scena, per confrontarlo.
+ * Lo spoglio le scrive "SC.21 - EST. ACCAMPAMENTO - GIORNO (p.14)",
+ * l'ordine del giorno le chiama "21", "32END", "65C". Si confronta solo
+ * il numero, e per intero: senza l'ancora di fine, la scena 2 si
+ * prenderebbe addosso tutto quello che riguarda la 21 e la 25. */
+function catNumero(s) {
+  const m = /^\s*(?:SC\s*\.?\s*)?([0-9]+[A-Za-z]*)/i.exec(String(s || '').trim());
+  return m ? m[1].toUpperCase() : '';
+}
+
+/* Le categorie che toccano una scena, il mio reparto per primo. */
+function catDiScena(n, dati, mioRep) {
+  const num = catNumero(n);
+  if (!num || !dati) return [];
+  const out = [];
+  for (const [k, v] of Object.entries(dati)) {
+    if (!v || !Array.isArray(v.scene) || !v.scene.length) continue;
+    const c = spoglioCat(k);
+    if (!c) continue;
+    const tocca = v.scene.some(s => catNumero(s && (s.scena || s.scene || s)) === num);
+    if (tocca) out.push({ key: k, nome: c.nome, mia: !!mioRep && c.rep === mioRep });
+  }
+  return out.sort((a, b) => (b.mia ? 1 : 0) - (a.mia ? 1 : 0));
+}
+
+/* La riga sotto gli ID. Testo e basta: quelle righe si scorrono cercando
+   la propria scena, e una riga si legge di sfuggita mentre una fila di
+   pastiglie chiede di fermarsi. */
+function catRigaHtml(n) {
+  let dati = null;
+  try { dati = spoglioDati(window.analysisData); } catch (_) { return ''; }
+  if (!dati) return '';
+  let mio = null;
+  try { mio = spoglioMioReparto(); } catch (_) {}
+  const c = catDiScena(n, dati, mio);
+  if (!c.length) return '';
+  return `<span class="cc-riga">${c.map(x =>
+    x.mia ? `<b>${esc(x.nome)}</b>` : esc(x.nome)).join(' · ')}</span>`;
+}
+
 /* La finestra: il mio reparto in cima col bordo giallo, gli altri sotto
    nell'ordine del foglio. Le scene stanno in un riquadro a sinistra
    perche' scorrendo si cerca il numero di scena, non si legge tutto. */
@@ -12253,7 +12309,8 @@ function odgPienoHtml(d) {
     <span class="n num">${esc(s.n || '')}</span>
     <span class="c"><span class="t">${esc(s.sinossi || '')}</span>
     <span class="s">${[s.ie, s.m, odgCap(s.ambiente || ''), s.pag ? s.pag + ' pag' : ''].filter(Boolean).map(esc).join(' · ')}</span>
-    ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}</span>
+    ${s.ids ? `<span class="ids">ID ${esc(s.ids)}</span>` : ''}
+    ${catRigaHtml(s.n)}</span>
     ${odgHaStralcio(d, s.n) ? '<span class="chev">›</span>' : ''}</li>`).join('')}</ul></div>` : ''}
 
   ${(d.cast || []).length ? `<div class="odg-sez">CAST</div>
