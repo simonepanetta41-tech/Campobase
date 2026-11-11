@@ -4189,6 +4189,19 @@ function hideHomeShowResults() {
 
 // ══ RENDER RESULTS ══
 function renderResults(d) {
+  /* L'analisi che si sta guardando si tiene da parte, qui, che e' il
+   * passaggio obbligato di tutti.
+   *
+   * Prima la riempiva soltanto il percorso dell'analisi appena fatta.
+   * Aprendo un progetto salvato — cioe' quasi sempre — restava vuota, e
+   * chi spuntava una categoria nelle impostazioni chiamava spoglioRender
+   * con niente in mano: la prima riga di quella funzione e' "se non c'e'
+   * niente, torna indietro". Lo spoglio restava quello di prima e la
+   * spunta sembrava non fare nulla.
+   */
+  analysisData = d;
+  window.analysisData = d;
+
   // Il titolo del film sta nell'intestazione, non piu' in cima alla pagina.
   try { if (d.titolo) { const f=document.getElementById('tt-film');
         if (f && !f.dataset.manuallyEdited) f.value = d.titolo; } cbTestata(); } catch(_) {}
