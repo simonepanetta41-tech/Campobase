@@ -314,7 +314,15 @@ export default {
    */
   async scheduled(event, env, ctx) {
     try { await mandaScadute(env); }
-    catch (e) { console.error('cron', e); }
+    catch (e) {
+      /* Finche' sql/push.sql non e' stato lanciato le tabelle non ci sono,
+         e il cron passa ogni minuto: un errore al minuto riempirebbe i log
+         di Cloudflare e coprirebbe quelli veri. Quel caso si riconosce e si
+         dice una volta, piano. */
+      const m = String(e && e.message || e);
+      if (/does not exist|42P01|PGRST205|\b404\b/.test(m)) console.log('cron: tabelle delle notifiche non ancora create');
+      else console.error('cron', e);
+    }
   },
 
   async email(message, env, ctx) {
