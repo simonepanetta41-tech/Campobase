@@ -10152,7 +10152,7 @@ async function pushProva(){
       body: JSON.stringify({ lista: [{
         quando: new Date(Date.now() + 65000).toISOString(),
         genere: 'prova',
-        testo: 'Funziona! Le notifiche di Campobase arrivano.'
+        testo: 'Funziona!\nLe notifiche di Campobase arrivano su questo telefono.'
       }] })
     });
     if (!r.ok) throw new Error('prova ' + r.status);
@@ -10184,21 +10184,28 @@ async function pushAppuntamenti(d){
   catch (_) { return; }
   if (!sub) return;
 
+  /* Prima riga: la cosa da sapere, che e' quella che si legge a schermo
+     bloccato senza sbloccare niente. Seconda riga: il dettaglio che serve
+     se si apre — l'ora esatta e il posto. iOS mette il nome dell'app
+     sopra da solo, quindi la prima riga non lo ripete. */
   const lista = [];
   const pick = d.pickup && d.pickup.ora;
   if (pick) {
     const q = pushIstante(d.data, pick, PUSH_PRIMA.pickup);
-    /* Il nome dell'autista se c'e': "Stefano e' li' fra 10 minuti" dice
-       anche chi cercare fra i furgoni al campo base. */
+    /* Il nome dell'autista se c'e': al campo base i furgoni sono cinque, e
+       "Stefano" dice anche chi cercare. */
     const chi = d.pickup.autista ? d.pickup.autista.split(/\s+/)[0] : null;
+    const dove = d.pickup.luogo || d.pickup.indirizzo || '';
     if (q) lista.push({ quando: q.toISOString(), genere: 'pickup',
-      testo: chi ? `${chi} è lì fra 10 minuti per il pick up!`
-                 : 'Il tuo driver è lì fra 10 minuti per il pick up!' });
+      testo: (chi ? `${chi} è lì fra 10 minuti per il pick up!`
+                  : 'Il tuo driver è lì fra 10 minuti per il pick up!')
+             + '\n' + ['Pick up alle ' + pick, odgCap(dove)].filter(Boolean).join(' · ') });
   }
   if (d.catering) {
     const q = pushIstante(d.data, d.catering, PUSH_PRIMA.catering);
     if (q) lista.push({ quando: q.toISOString(), genere: 'catering',
-      testo: 'Catering pronto fra 15 minuti!' });
+      testo: 'Catering pronto fra 15 minuti!\nPronto alle ' + d.catering
+             + (d.cestini ? ` · ${d.cestini} cestini` : '') });
   }
   if (!lista.length) return;
 

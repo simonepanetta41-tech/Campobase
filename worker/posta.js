@@ -215,7 +215,7 @@ export async function riceviPosta(message, env, ctx) {
       const fatti = [];
       if (/\bodg\b|ordine[ _-]?del[ _-]?giorno|call[ _-]?sheet/.test(nomi)) fatti.push('odg');
       if (/\bpdl\b|piano[ _-]?di[ _-]?lavoraz/.test(nomi)) fatti.push('pdl');
-      const quanti = await avvisaPosta(env, film.id, fatti);
+      const quanti = await avvisaPosta(env, film.id, fatti, riga.oggetto);
       console.log('posta: avvisati', quanti, 'membri', fatti.length ? '(' + fatti.join('+') + ')' : '(generico)');
     } catch (e) {
       // Una notifica mancata non deve far rimbalzare una mail arrivata.

@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v77';
+const CACHE = 'campobase-v78';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -113,20 +113,34 @@ self.addEventListener('fetch', e => {
  * riserva non va — rete assente, Worker giu' — si mostra comunque una
  * riga generica: meglio una riga vaga che perdere le notifiche.
  */
-const GENERICA = 'Campobase: c\'è un aggiornamento';
+const GENERICA = 'C\'è un aggiornamento';
+
+/* Il titolo e' la prima riga, il resto va sotto.
+ *
+ * iOS stampa da solo il nome dell'app sopra la notifica. Mettere
+ * "Campobase" anche come titolo voleva dire leggere "Campobase from
+ * Campobase" e perdere una riga su due di quelle che si vedono a schermo
+ * bloccato. Il titolo e' quindi la cosa da sapere — "Stefano e' li' fra 10
+ * minuti per il pick up!" — e la seconda riga il dettaglio. */
+async function mostra(testo) {
+  const righe = String(testo).split('\n');
+  await self.registration.showNotification(righe[0], {
+    body: righe.slice(1).join('\n'),
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    // Niente raggruppamento: due notifiche nello stesso minuto — la posta
+    // e il catering — sono due cose diverse e si devono leggere entrambe.
+    tag: 'campobase-' + Date.now(),
+    data: { apri: '/' }
+  });
+}
 
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
     let testo = null;
     // Di solito il testo e' dentro la notifica, cifrato: si legge e basta.
     try { testo = (e.data && e.data.json() || {}).testo || null; } catch (_) {}
-    if (testo) {
-      await self.registration.showNotification('Campobase', {
-        body: testo, icon: '/icon-192.png', badge: '/icon-192.png',
-        tag: 'campobase-' + Date.now(), data: { apri: '/' }
-      });
-      return;
-    }
+    if (testo) { await mostra(testo); return; }
     try {
       const sub = await self.registration.pushManager.getSubscription();
       if (sub) {
@@ -140,15 +154,7 @@ self.addEventListener('push', e => {
     } catch (err) {
       console.warn('[SW] testo della notifica non recuperato:', err);
     }
-    await self.registration.showNotification('Campobase', {
-      body: testo || GENERICA,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      // Niente raggruppamento: due notifiche nello stesso minuto — la posta
-      // e il catering — sono due cose diverse e si devono leggere entrambe.
-      tag: 'campobase-' + Date.now(),
-      data: { apri: '/' }
-    });
+    await mostra(testo || GENERICA);
   })());
 });
 

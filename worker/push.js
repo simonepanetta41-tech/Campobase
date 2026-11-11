@@ -364,12 +364,21 @@ export async function handleMessaggio(request, env) {
 /* Chiamata da posta.js quando un pacchetto e' stato messo da parte.
  * L'appuntamento e' per adesso, cosi' il cron lo manda al primo passaggio:
  * un meccanismo solo per tutte e tre le notifiche. */
-export async function avvisaPosta(env, projectId, fatti) {
-  const testo = fatti.includes('pdl')
+export async function avvisaPosta(env, projectId, fatti, oggetto) {
+  const titolo = fatti.includes('pdl')
     ? 'Nuovo piano di lavorazione!'
     : fatti.includes('odg')
       ? 'Nuovo ordine del giorno!'
       : 'Nuova posta dalla produzione';
+
+  /* Sotto il titolo, l'oggetto della mail: e' la produzione a scriverlo, e
+     dice di che giorno si tratta meglio di qualunque frase nostra —
+     "MSG - ODG 22 del 11.11.2026". I prefissi di inoltro no: tre "Fwd:" in
+     fila mangiano la riga e non dicono niente. */
+  const sotto = String(oggetto || '')
+    .replace(/^(\s*(?:fwd?|re|i|inoltro)\s*:\s*)+/i, '')
+    .replace(/\s+/g, ' ').trim().slice(0, 80);
+  const testo = sotto ? titolo + '\n' + sotto : titolo;
 
   const membri = await db(env,
     `film_membri?select=user_id&project_id=eq.${projectId}`);
