@@ -660,6 +660,15 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-luce>div:last-child{border-right:none}
 .odg-luce .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .odg-luce .v{display:block;font-size:14px;color:var(--white-dim);margin-top:3px}
+.push-invito{padding:14px 16px}
+.push-invito .t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600}
+.push-invito .s{margin-top:4px;font-size:12.5px;color:var(--muted);line-height:1.5}
+.push-invito .sino{display:flex;gap:9px;margin-top:12px}
+.push-invito .sino button{flex:1;border:1px solid var(--border);border-radius:10px;padding:12px 10px;
+  min-height:46px;background:none;color:var(--white);font-family:inherit;font-size:14px;
+  font-weight:600;cursor:pointer}
+.push-invito .sino .si{flex:2;background:var(--yellow);border-color:var(--yellow);color:var(--bg)}
+.push-invito .sino .no{color:var(--white-dim)}
 .odg-meteo{padding:12px 16px;font-size:13.5px;color:var(--white-dim)}
 .odg-meteo .t{display:block}
 .odg-meteo .s{display:block;margin-top:3px;font-size:11.5px;opacity:.55}
@@ -10093,6 +10102,67 @@ async function pushAttiva(){
   }
 }
 
+/* ── Chiedere il permesso, una volta e nel momento giusto ──────────────────
+ *
+ * Accendere le notifiche da sole non si puo', e non e' una mancanza
+ * dell'app: Apple pretende che la richiesta parta da un tocco. Chiamare
+ * requestPermission senza un tocco su iOS non apre nessuna finestra, e il
+ * permesso resta negato.
+ *
+ * E la richiesta si fa una volta sola, perche' su iOS una volta e' davvero
+ * una volta: se uno dice no, il sistema non lo chiede piu' e l'unico modo
+ * di tornare indietro e' passare dalle impostazioni del telefono. Quindi
+ * non si chiede all'avvio, quando uno ha appena scaricato l'app e non sa
+ * cosa sia — si chiede sopra il primo ordine del giorno, quando sullo
+ * schermo c'e' la sua convocazione e il suo pick-up e la domanda si
+ * risponde da se'.
+ *
+ * E non si chiede affatto fuori dalla schermata home: in Safari le
+ * notifiche non arrivano comunque, e bruciare l'unica occasione per una
+ * finestra che non puo' funzionare sarebbe il modo peggiore di usarla. */
+const PUSH_CHIESTO = 'cb_push_chiesto';
+
+function pushInstallata(){
+  return window.navigator.standalone === true ||
+         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+
+function pushDaChiedere(d){
+  if (!d || !pushPossibile() || !pushInstallata()) return false;
+  if (Notification.permission !== 'default') return false;
+  try { return !localStorage.getItem(PUSH_CHIESTO); } catch (_) { return false; }
+}
+
+function pushInvitoHtml(d){
+  if (!pushDaChiedere(d)) return '';
+  return `<div class="card push-invito" id="pushInvito">
+    <div class="t">Ti avviso io?</div>
+    <div class="s">Quando arriva un ordine del giorno nuovo, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering. Niente altro.</div>
+    <div class="sino">
+      <button class="si" onclick="pushInvitoSi()">Sì, avvisami</button>
+      <button class="no" onclick="pushInvitoNo()">No grazie</button>
+    </div>
+  </div>`;
+}
+
+async function pushInvitoSi(){
+  try { localStorage.setItem(PUSH_CHIESTO, 'si'); } catch (_) {}
+  const el = document.getElementById('pushInvito');
+  if (el) el.remove();
+  // Il tocco e' questo: la richiesta parte da qui e la finestra si apre.
+  await pushAttiva();
+}
+
+function pushInvitoNo(){
+  try { localStorage.setItem(PUSH_CHIESTO, 'no'); } catch (_) {}
+  const el = document.getElementById('pushInvito');
+  if (el) el.remove();
+  /* Il permesso non lo si chiede nemmeno: resta "default", cosi' se un
+     giorno cambia idea le pua' accendere da Impostazioni senza dover
+     passare dalle impostazioni di iOS. Dire no qui non e' dire no a iOS. */
+  showToast('Va bene. Se cambi idea: Impostazioni → Notifiche.', 'default', 4000);
+}
+
 /* Rimanda al server l'iscrizione che il telefono ha gia'. Senza rumore:
    se non c'e' rete non e' un errore da mostrare, si riprova la prossima
    volta che si apre la pagina. */
@@ -11280,6 +11350,8 @@ function odgPienoHtml(d) {
   </div>
 
   ${odgBadgeHtml(d, io)}
+
+  ${pushInvitoHtml(d)}
 
   ${righe.length ? `<div class="card odg-orari">${righe.map(([k, v]) =>
       `<div><span class="k">${esc(k)}</span><span class="v num">${esc(v)}</span></div>`).join('')}</div>` : ''}
