@@ -3298,6 +3298,68 @@ async function apriFilm(id) {
   switchResultTab('odg');
   await odgRipristina();
   postaControlla();
+  // Lo spoglio e il piano arrivano dopo: l'ordine del giorno e' quello
+  // che si guarda la mattina, e non deve aspettare altre due domande.
+  filmAnalisi(id);
+}
+
+/* Lo spoglio, il piano e il cast di un film di cui si e' solo membri.
+ *
+ * Chi entra col codice vedeva l'ordine del giorno e la troupe, e le altre
+ * due schede vuote. Non era la schermata: lo spoglio sta in analyses e il
+ * piano in pdl_versions, tabelle legate a chi le ha create — il capo
+ * reparto che ha caricato la sceneggiatura. Un membro non le poteva
+ * leggere, e nemmeno sapere che c'erano.
+ *
+ * Eppure e' il motivo per cui l'app esiste: uno spoglio unico che vale
+ * per tutti i reparti. Visto solo da chi l'ha caricato non serve a
+ * niente. Si passa da tre funzioni che restituiscono quel film e basta, e
+ * solo a chi di quel film fa parte (sql/troupe-analisi.sql).
+ *
+ * Chi l'analisi ce l'ha gia' sua non passa di qui: l'ha caricata lui e la
+ * legge direttamente.
+ */
+async function filmAnalisi(filmId){
+  if (!filmId || currentAnalysisId) return;
+  try {
+    const { data, error } = await sb.rpc('analisi_del_film', { p_film: filmId });
+    if (error) throw error;
+    const a = (data || [])[0];
+    if (!a || !a.data) return;
+    currentAnalysisId = a.id;
+    renderResults(a.data);
+    // renderResults porta allo spoglio: chi apre un film vuole l'ordine
+    // del giorno, che e' dove stava un attimo fa.
+    switchResultTab('odg');
+    if (a.notes) loadNotes(a.notes);
+
+    const { data: pdl } = await sb.rpc('pdl_del_film', { p_film: filmId });
+    const p = (pdl || [])[0];
+    if (p && p.data) {
+      pdlData = p.data;
+      window.pdlData = pdlData;
+      pdlShootingData = p.shooting_data || {};
+      if (pdlData.data_inizio) {
+        const d = new Date(pdlData.data_inizio);
+        pdlCurrentMonth = d.getMonth();
+        pdlCurrentYear = d.getFullYear();
+      }
+      document.getElementById('pdlUploadArea').style.display = 'none';
+      document.getElementById('pdlDashboard').style.display = 'block';
+      renderPdlDashboard();
+    }
+
+    const { data: cast } = await sb.rpc('cast_del_film', { p_film: filmId });
+    if (cast && cast.length) {
+      castData = cast;
+      window.castData = castData;
+      renderCastTab(castData, castData[0] && castData[0].fonte === 'provvisoria');
+    }
+  } catch (e) {
+    /* Zitti, ma non invisibili: se le funzioni non ci sono ancora sul
+       database la scheda resta vuota come prima, e il motivo sta qui. */
+    console.log('[film] spoglio e piano non caricati:', e.message);
+  }
 }
 
 function renderHistoryGrid(items, film) {
