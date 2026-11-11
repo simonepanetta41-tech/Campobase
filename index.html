@@ -1279,6 +1279,9 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
     <div id="benvenuto" style="display:none;padding:20px 16px"></div>
 
       <div id="homePage">
+      <!-- L'invito alle notifiche, subito dopo il primo accesso. Si riempie
+           da pushInvitoMostra() e sparisce per sempre appena si risponde. -->
+      <div id="pushInvitoHome"></div>
       <h2 class="prog-tit">I tuoi progetti</h2>
       <div id="historyGrid">
         <div class="prog-vuoto">Caricamento…</div>
@@ -2623,6 +2626,12 @@ async function showApp() {
   }, { onConflict: 'id' });
   if (!profiloBenvenuto()) loadHistory();
   else loadHistory();
+  /* Le notifiche si chiedono qui, appena fatto l'accesso.
+     Non e' una scelta di stile: chi installa l'app alle dieci del mattino
+     deve avere la notifica del catering di mezzogiorno, e per quella serve
+     il permesso adesso, non stasera quando arriva l'ordine del giorno
+     nuovo. */
+  pushInvitoMostra();
   // L'ordine del giorno di ieri sera deve esserci stamattina: la bozza
   // sta sul telefono, il cloud la conferma. Prima questa non la chiamava
   // nessuno e a ogni chiusura dell'app l'OdG spariva.
@@ -10110,12 +10119,17 @@ async function pushAttiva(){
  * permesso resta negato.
  *
  * E la richiesta si fa una volta sola, perche' su iOS una volta e' davvero
- * una volta: se uno dice no, il sistema non lo chiede piu' e l'unico modo
- * di tornare indietro e' passare dalle impostazioni del telefono. Quindi
- * non si chiede all'avvio, quando uno ha appena scaricato l'app e non sa
- * cosa sia — si chiede sopra il primo ordine del giorno, quando sullo
- * schermo c'e' la sua convocazione e il suo pick-up e la domanda si
- * risponde da se'.
+ * una volta: se uno dice no al sistema, il sistema non lo chiede piu' e
+ * l'unico modo di tornare indietro e' passare dalle impostazioni del
+ * telefono.
+ *
+ * Si chiede al primo accesso. L'idea di chiederlo sopra il primo ordine
+ * del giorno — quando sullo schermo c'e' la convocazione e la domanda si
+ * risponde da se' — era piu' elegante e sbagliata: una troupe installa
+ * l'app la mattina, e chi la installa alle dieci deve avere la notifica
+ * del catering di mezzogiorno. Aspettare l'ordine del giorno nuovo vuol
+ * dire aspettare la sera, e la prima giornata e' persa. Il riquadro resta
+ * anche sopra l'ordine del giorno, per chi era entrato prima che ci fosse.
  *
  * E non si chiede affatto fuori dalla schermata home: in Safari le
  * notifiche non arrivano comunque, e bruciare l'unica occasione per una
@@ -10127,15 +10141,15 @@ function pushInstallata(){
          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
 }
 
-function pushDaChiedere(d){
-  if (!d || !pushPossibile() || !pushInstallata()) return false;
+function pushDaChiedere(){
+  if (!pushPossibile() || !pushInstallata()) return false;
   if (Notification.permission !== 'default') return false;
   try { return !localStorage.getItem(PUSH_CHIESTO); } catch (_) { return false; }
 }
 
-function pushInvitoHtml(d){
-  if (!pushDaChiedere(d)) return '';
-  return `<div class="card push-invito" id="pushInvito">
+function pushInvitoHtml(){
+  if (!pushDaChiedere()) return '';
+  return `<div class="card push-invito">
     <div class="t">Ti avviso io?</div>
     <div class="s">Quando arriva un ordine del giorno nuovo, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering. Niente altro.</div>
     <div class="sino">
@@ -10145,18 +10159,33 @@ function pushInvitoHtml(d){
   </div>`;
 }
 
+/* Si mostra sulla pagina iniziale, che e' dove si arriva appena fatto
+   l'accesso. Prima stava solo sopra l'ordine del giorno, e il conto non
+   tornava: chi installa l'app alle dieci del mattino e non apre quella
+   scheda perde la notifica del catering di mezzogiorno. Il momento giusto
+   e' il primo accesso, quando uno ha appena digitato la password e sta
+   guardando lo schermo. */
+function pushInvitoMostra(){
+  const el = document.getElementById('pushInvitoHome');
+  if (el) el.innerHTML = pushInvitoHtml();
+}
+
+function pushInvitoVia(){
+  // Tutti: ce n'e' uno sulla pagina iniziale e uno sopra l'ordine del
+  // giorno, e si risponde una volta per entrambi.
+  document.querySelectorAll('.push-invito').forEach(x => x.remove());
+}
+
 async function pushInvitoSi(){
   try { localStorage.setItem(PUSH_CHIESTO, 'si'); } catch (_) {}
-  const el = document.getElementById('pushInvito');
-  if (el) el.remove();
+  pushInvitoVia();
   // Il tocco e' questo: la richiesta parte da qui e la finestra si apre.
   await pushAttiva();
 }
 
 function pushInvitoNo(){
   try { localStorage.setItem(PUSH_CHIESTO, 'no'); } catch (_) {}
-  const el = document.getElementById('pushInvito');
-  if (el) el.remove();
+  pushInvitoVia();
   /* Il permesso non lo si chiede nemmeno: resta "default", cosi' se un
      giorno cambia idea le pua' accendere da Impostazioni senza dover
      passare dalle impostazioni di iOS. Dire no qui non e' dire no a iOS. */
@@ -11351,7 +11380,7 @@ function odgPienoHtml(d) {
 
   ${odgBadgeHtml(d, io)}
 
-  ${pushInvitoHtml(d)}
+  ${pushInvitoHtml()}
 
   ${righe.length ? `<div class="card odg-orari">${righe.map(([k, v]) =>
       `<div><span class="k">${esc(k)}</span><span class="v num">${esc(v)}</span></div>`).join('')}</div>` : ''}
