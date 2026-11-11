@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v75';
+const CACHE = 'campobase-v76';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -95,4 +95,58 @@ self.addEventListener('fetch', e => {
       });
     })
   );
+});
+
+// ── NOTIFICHE ────────────────────────────────────────────────────────────────
+/*
+ * La notifica che arriva e' vuota: nessun testo dentro.
+ *
+ * Il testo in una notifica va cifrato per ogni destinatario — scambio di
+ * chiavi, derivazione, AES — e sbagliare un passaggio vuol dire notifiche
+ * che non arrivano senza che nessuno sappia perche'. Qui la notifica serve
+ * solo a svegliare questo service worker, che poi chiede al Worker cosa
+ * deve dire. Il testo si cambia senza toccare il telefono.
+ *
+ * Mostrare qualcosa e' obbligatorio: un push ricevuto e non mostrato, su
+ * iOS, dopo poche volte fa togliere il permesso. Quindi se la richiesta
+ * non va — rete assente, Worker giu' — si mostra comunque una riga
+ * generica, e meglio una riga vaga che perdere le notifiche.
+ */
+const GENERICA = 'Campobase: c\'è un aggiornamento';
+
+self.addEventListener('push', e => {
+  e.waitUntil((async () => {
+    let testo = null;
+    try {
+      const sub = await self.registration.pushManager.getSubscription();
+      if (sub) {
+        const r = await fetch('/api/push/messaggio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint: sub.endpoint })
+        });
+        if (r.ok) testo = (await r.json()).testo || null;
+      }
+    } catch (err) {
+      console.warn('[SW] testo della notifica non recuperato:', err);
+    }
+    await self.registration.showNotification('Campobase', {
+      body: testo || GENERICA,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      // Niente raggruppamento: due notifiche nello stesso minuto — la posta
+      // e il catering — sono due cose diverse e si devono leggere entrambe.
+      tag: 'campobase-' + Date.now(),
+      data: { apri: '/' }
+    });
+  })());
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const aperte = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of aperte) if ('focus' in c) return c.focus();
+    return self.clients.openWindow('/');
+  })());
 });

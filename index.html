@@ -1361,6 +1361,23 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
       </div>
       <div class="settings-section">
+        <div class="settings-title">Notifiche</div>
+        <div class="settings-row">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Avvisi sul telefono</div>
+            <div class="settings-row-desc" id="pushDesc">Quando la produzione manda un ordine del giorno o un piano, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering.</div>
+          </div>
+          <button id="pushTasto" onclick="pushAttiva()" style="flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--white);padding:9px 14px;border-radius:9px;font-family:'DM Mono',monospace;font-size:11.5px;cursor:pointer">Attiva</button>
+        </div>
+        <div class="settings-row" id="pushProvaRiga" style="display:none">
+          <div class="settings-row-info">
+            <div class="settings-row-label">Prova</div>
+            <div class="settings-row-desc">Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.</div>
+          </div>
+          <button onclick="pushProva()" style="flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--white);padding:9px 14px;border-radius:9px;font-family:'DM Mono',monospace;font-size:11.5px;cursor:pointer">Provala</button>
+        </div>
+      </div>
+      <div class="settings-section">
         <div class="settings-title">PDF</div>
         <div class="settings-row">
           <div class="settings-row-info">
@@ -2677,7 +2694,10 @@ function profiloChiudiBenvenuto(){
 
 function showPage(page) {
   setTimeout(cbTestata, 0);
-  if (page === 'settings') try { profiloRenderImpostazioni(); } catch(_) {}
+  if (page === 'settings') {
+    try { profiloRenderImpostazioni(); } catch(_) {}
+    try { pushRender(); } catch(_) {}
+  }
   // I risultati sono una pagina come le altre: restando accesi comparivano
   // sotto le impostazioni, con l'ordine del giorno che continuava in fondo.
   const rp = document.getElementById('resultsPage');
@@ -10004,6 +10024,167 @@ async function postaSegna(id, stato, nota){
  * riportava a galla l'orario che il lettore sbagliava il giorno in cui
  * era stato caricato. Il testo dei giri auto invece e' salvato: rileggerlo
  * costa niente e vale anche per chi scrive il proprio nome dopo. */
+/* ── Le notifiche ──────────────────────────────────────────────────────────
+ *
+ * Tre avvisi: la posta appena arriva, il pick-up dieci minuti prima, il
+ * catering un quarto d'ora prima.
+ *
+ * Quello della posta lo scrive il Worker, che la riceve. I due a orario li
+ * scrive questa app, e la ragione e' che il pick-up lo sa solo lei: l'ora
+ * del furgone sta nei giri auto, e chi legge i giri auto e' il telefono di
+ * chi li ha in mano. Il server non sa a che ora passano a prendere Simone,
+ * e non ha motivo di saperlo.
+ *
+ * Non sono sveglie. Se alle sette e venti il telefono e' spento o senza
+ * campo la notifica non arriva, e dopo venti minuti il Worker la butta
+ * invece di consegnarla in ritardo: "fra 10 minuti il tuo driver" letto a
+ * mezzogiorno e' una bugia. La sveglia resta quella del telefono.
+ */
+const PUSH_PUBBLICA = 'BJD6Xo8PM0CECDMO509OCdtC8kdCFjNtO16gfVknSY0akgJjIM_oB5_UboWvJ91cPYaTV9-8pQpIwIPmYjfEed8';
+
+function pushPossibile(){
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+// La chiave pubblica va consegnata al telefono come byte, non come testo.
+function pushChiave(b64){
+  const t = b64.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(t + '='.repeat((4 - t.length % 4) % 4));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function pushCapi(){
+  const s = (await sb.auth.getSession()).data.session;
+  return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (s && s.access_token) };
+}
+
+async function pushAttiva(){
+  if (!pushPossibile()) {
+    showToast('Questo telefono non le sa fare. Su iPhone l\'app deve stare sulla schermata home.', 'red', 6000);
+    return;
+  }
+  const t = document.getElementById('pushTasto');
+  if (t) { t.disabled = true; t.textContent = '…'; }
+  try {
+    if ((await Notification.requestPermission()) !== 'granted') {
+      showToast('Permesso negato. Si riattiva dalle impostazioni del telefono.', 'red', 6000);
+      return;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({
+      // Obbligatorio: promette che ogni notifica ricevuta viene mostrata.
+      userVisibleOnly: true,
+      applicationServerKey: pushChiave(PUSH_PUBBLICA)
+    });
+    const k = sub.toJSON().keys || {};
+    const r = await fetch('/api/push/iscrivi', {
+      method: 'POST', headers: await pushCapi(),
+      body: JSON.stringify({ endpoint: sub.endpoint, p256dh: k.p256dh, auth: k.auth })
+    });
+    if (!r.ok) throw new Error(((await r.json().catch(() => null)) || {}).error || ('iscrizione ' + r.status));
+    showToast('Notifiche attive su questo telefono.', 'yellow', 3000);
+    if (odgCorrente) pushAppuntamenti(odgCorrente);
+  } catch (e) {
+    showToast('Non ci sono riuscito: ' + e.message, 'red', 6000);
+  } finally {
+    await pushRender();
+  }
+}
+
+async function pushRender(){
+  const t = document.getElementById('pushTasto');
+  const d = document.getElementById('pushDesc');
+  const prova = document.getElementById('pushProvaRiga');
+  if (!t) return;
+  t.disabled = false;
+  if (!pushPossibile()) {
+    t.textContent = 'Non disponibile';
+    t.disabled = true;
+    if (d) d.textContent = 'Su iPhone le notifiche arrivano solo se l\'app sta sulla schermata home: aprila dal segnalibro, non da Safari.';
+    if (prova) prova.style.display = 'none';
+    return;
+  }
+  let iscritto = false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    iscritto = Notification.permission === 'granted' && !!(await reg.pushManager.getSubscription());
+  } catch (_) {}
+  t.textContent = iscritto ? 'Attive' : Notification.permission === 'denied' ? 'Bloccate' : 'Attiva';
+  t.disabled = iscritto || Notification.permission === 'denied';
+  if (prova) prova.style.display = iscritto ? '' : 'none';
+  if (d && Notification.permission === 'denied')
+    d.textContent = 'Il telefono le ha bloccate per Campobase: si riaccendono dalle impostazioni del telefono, non da qui.';
+}
+
+/* Una notifica finta fra un minuto, per sapere se arrivano davvero senza
+   dover aspettare il catering. */
+async function pushProva(){
+  try {
+    const r = await fetch('/api/push/appuntamenti', {
+      method: 'POST', headers: await pushCapi(),
+      body: JSON.stringify({ lista: [{
+        quando: new Date(Date.now() + 65000).toISOString(),
+        genere: 'prova',
+        testo: 'Funziona! Le notifiche di Campobase arrivano.'
+      }] })
+    });
+    if (!r.ok) throw new Error('prova ' + r.status);
+    showToast('Fra un minuto dovrebbe arrivare.', 'yellow', 4000);
+  } catch (e) {
+    showToast('Non ci sono riuscito: ' + e.message, 'red', 5000);
+  }
+}
+
+// ── Gli appuntamenti di oggi ────────────────────────────────────────────────
+
+const PUSH_PRIMA = { pickup: 10, catering: 15 };
+
+/* Da un'ora scritta nell'ordine del giorno a un istante vero, nel giorno
+   dell'ordine del giorno e nel fuso di chi gira. */
+function pushIstante(data, ora, meno){
+  const m = /^(\d{1,2})[.:](\d{2})$/.exec(String(ora || ''));
+  if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(String(data || ''))) return null;
+  const [a, me, g] = data.split('-').map(Number);
+  const q = new Date(a, me - 1, g, +m[1], +m[2]);
+  q.setMinutes(q.getMinutes() - meno);
+  return isNaN(q) ? null : q;
+}
+
+async function pushAppuntamenti(d){
+  if (!d || !pushPossibile() || Notification.permission !== 'granted') return;
+  let sub;
+  try { sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription(); }
+  catch (_) { return; }
+  if (!sub) return;
+
+  const lista = [];
+  const pick = d.pickup && d.pickup.ora;
+  if (pick) {
+    const q = pushIstante(d.data, pick, PUSH_PRIMA.pickup);
+    /* Il nome dell'autista se c'e': "Stefano e' li' fra 10 minuti" dice
+       anche chi cercare fra i furgoni al campo base. */
+    const chi = d.pickup.autista ? d.pickup.autista.split(/\s+/)[0] : null;
+    if (q) lista.push({ quando: q.toISOString(), genere: 'pickup',
+      testo: chi ? `${chi} è lì fra 10 minuti per il pick up!`
+                 : 'Il tuo driver è lì fra 10 minuti per il pick up!' });
+  }
+  if (d.catering) {
+    const q = pushIstante(d.data, d.catering, PUSH_PRIMA.catering);
+    if (q) lista.push({ quando: q.toISOString(), genere: 'catering',
+      testo: 'Catering pronto fra 15 minuti!' });
+  }
+  if (!lista.length) return;
+
+  try {
+    await fetch('/api/push/appuntamenti', {
+      method: 'POST', headers: await pushCapi(),
+      body: JSON.stringify({ lista, project_id: (filmCorrente() || {}).id || null })
+    });
+  } catch (e) { console.log('[push] appuntamenti non registrati:', e.message); }
+}
+
 /* Quando cambia il modo di leggere il nome dei posti, questo numero sale
    e gli ordini del giorno gia' salvati si rileggono da soli. Senza, la
    correzione valeva solo sul prossimo OdG — e quello di domani sera uno
@@ -10028,6 +10209,12 @@ function odgRicalcola() {
     }
     d.luoghiV = ODG_LUOGHI_V;
   }
+  /* Gli appuntamenti si registrano in fondo, a pick-up ricalcolato: ogni
+     volta che l'ordine del giorno viene caricato o ripreso. Riscriverli non
+     li duplica — il server li tiene per persona, genere e giorno, e
+     riscrivere la stessa chiave aggiorna l'ora, che e' quello che serve
+     quando la produzione sposta il giro. */
+  pushAppuntamenti(d);
 }
 
 function odgRimuovi() {
@@ -10765,6 +10952,49 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
+/* Il comune, da un indirizzo scritto per certo: un CAP di cinque cifre e
+ * subito dopo il nome. "Via del Faro, 58, 74122 Taranto TA" -> Taranto.
+ *
+ * Si usa SOLO sui giri auto, e la ragione va detta perche' e' il punto di
+ * tutta questa funzione. In un ordine del giorno i CAP ci sono quasi
+ * sempre, ma sono quelli della carta intestata: l'ufficio di produzione.
+ * Su dieci ordini del giorno veri, nove danno Roma — e nove volte su
+ * dieci non si gira a Roma. Il meteo di Roma mentre si gira in Puglia e'
+ * esattamente il genere di risposta sbagliata-ma-convinta che fa piu'
+ * danno di una risposta mancante.
+ * I giri auto invece elencano alberghi e indirizzi di presa: sono vicini
+ * al set per come sono fatti. Qualche chilometro di scarto non cambia se
+ * piove.
+ *
+ * E non c'e' nessun ripiego. odgComune, quando gli si da' un indirizzo,
+ * in ultima istanza prende l'ultima parola: va bene per un campo che
+ * contiene un indirizzo e basta, ma cercando in un documento intero
+ * pescherebbe qualunque cosa — ed e' cosi' che una volta il meteo era
+ * quello di Paese, in provincia di Treviso, perche' nella sceneggiatura
+ * c'era scritto "CASA PAESE".
+ *
+ * Gli spazi sono singoli di proposito: nel testo per righe due spazi
+ * vogliono dire un'altra colonna, e "00135 Roma   Produttore delegato:"
+ * diventava un comune chiamato "Roma Produttore". La sigla della
+ * provincia resta fuori, e il nome deve avere almeno tre lettere, se no
+ * "00193 RM" passava per un paese.
+ */
+const CAP_COMUNE = /\b\d{5} ?-? ?([A-ZÀ-Ù](?:[a-zà-ÿ']{2,20}|[A-ZÀ-Ù']{2,20})(?: [A-ZÀ-Ù](?:[a-zà-ÿ']{1,20}|[A-ZÀ-Ù']{2,20})){0,2})/g;
+
+function odgComuneDaTesto(...testi){
+  const conto = new Map();
+  for (const t of testi) {
+    for (const m of String(t || '').matchAll(CAP_COMUNE)) {
+      const n = m[1].replace(/\s+/g, ' ').trim();
+      conto.set(n, (conto.get(n) || 0) + 1);
+    }
+  }
+  if (!conto.size) return null;
+  /* Quello che ricorre di piu'. In un foglio di giri auto gli alberghi
+     sono sparsi, ma il posto in cui si gira torna a ogni riga. */
+  return [...conto].sort((a, b) => b[1] - a[1])[0][0];
+}
+
 async function odgCoordinate(comune){
   const u = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&format=json&country=IT&name='
           + encodeURIComponent(comune);
@@ -10814,7 +11044,14 @@ async function odgCoordDaLink(url){
                Authorization: 'Bearer ' + (await sb.auth.getSession()).data.session?.access_token },
     body: JSON.stringify({ url })
   });
-  if (!r.ok) throw new Error('mappa ' + r.status);
+  /* Il Worker dice perche' non ce l'ha fatta — "coordinate non trovate su
+     consent.google.com" e' una frase da cui si capisce cosa sta
+     succedendo. Alzando solo "mappa 404" quella frase si buttava via, e
+     dal telefono restava un numero. */
+  if (!r.ok) {
+    const j = await r.json().catch(() => null);
+    throw new Error((j && j.error) || ('mappa ' + r.status));
+  }
   const j = await r.json();
   if (!j || typeof j.lat !== 'number') throw new Error(j && j.error || 'niente coordinate');
   return { lat: j.lat, lon: j.lon, nome: j.nome || null };
@@ -10836,10 +11073,12 @@ async function odgPosto(d){
       return d.posto;
     } catch (e) { motivi.push(l.nome + ': ' + e.message); }
   }
-  // Gli ordini del giorno all'antica scrivono l'indirizzo per esteso.
-  const comune = odgComune(d.location);
+  /* Gli ordini del giorno all'antica scrivono l'indirizzo per esteso. E
+     quando non c'e' nemmeno quello, restano i giri auto: alberghi e
+     indirizzi di presa, che stanno vicino al set. */
+  const comune = odgComune(d.location) || odgComuneDaTesto(d.giriTesto);
   if (!comune) {
-    if (!(d.luoghi || []).length) motivi.push('nell\'OdG non c\'è né un link né un indirizzo');
+    motivi.push('nei documenti non c\'è un indirizzo con il CAP');
   } else {
     try { d.posto = await odgCoordinate(comune); return d.posto; }
     catch (e) { motivi.push(comune + ': ' + e.message); }

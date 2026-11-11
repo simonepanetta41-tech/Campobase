@@ -198,5 +198,28 @@ export async function riceviPosta(message, env, ctx) {
   } catch (e) {
     console.error('posta: scrittura fallita', e.message);
     message.setReject('Salvataggio non riuscito, riprovare');
+    return;
+  }
+
+  /* Poi si avvisa la troupe.
+   *
+   * Cosa sia arrivato lo si indovina dal nome dei file. L'app lo sapra'
+   * con certezza, perche' e' lei che li legge, ma per allora la notifica
+   * e' gia' passata: qui serve adesso una parola giusta, non la verita'
+   * definitiva. Quando il nome non dice niente si resta sul generico
+   * invece di annunciare un ordine del giorno che non c'e'.
+   */
+  if (riga.stato !== 'errore' && (riga.allegati || []).some(v => v.tenuto)) {
+    try {
+      const nomi = riga.allegati.filter(v => v.tenuto).map(v => v.nome).join(' ').toLowerCase();
+      const fatti = [];
+      if (/\bodg\b|ordine[ _-]?del[ _-]?giorno|call[ _-]?sheet/.test(nomi)) fatti.push('odg');
+      if (/\bpdl\b|piano[ _-]?di[ _-]?lavoraz/.test(nomi)) fatti.push('pdl');
+      const quanti = await avvisaPosta(env, film.id, fatti);
+      console.log('posta: avvisati', quanti, 'membri', fatti.length ? '(' + fatti.join('+') + ')' : '(generico)');
+    } catch (e) {
+      // Una notifica mancata non deve far rimbalzare una mail arrivata.
+      console.error('posta: avviso non partito', e.message);
+    }
   }
 }

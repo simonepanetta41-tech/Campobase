@@ -12,6 +12,7 @@
 import { json, readJson, requireUser, consumeQuota, callAnthropic, CORS } from './shared.js';
 import { handleWrap } from './wrap.js';
 import { riceviPosta } from './posta.js';
+import { handleIscrivi, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
 
 const FREE_LIMIT = 3;
 
@@ -223,12 +224,16 @@ async function handleMappa(request, env) {
   const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15';
   let dove = u.toString(), c = null, nome = null, ultima = null;
   for (let i = 0; i < 6 && dove; i++) {
-    let r;
-    try { r = await fetch(dove, { redirect: 'manual', headers: { 'user-agent': UA } }); }
-    catch (e) { return json({ error: 'Google non risponde: ' + e.message }, 502); }
+    /* Si guarda l'indirizzo PRIMA di chiederlo. Al secondo giro "dove" e'
+       gia' l'indirizzo lungo di Google, con le coordinate dentro: andarle
+       a leggere dopo la richiesta voleva dire che, se quella richiesta
+       fallisce, si buttavano via coordinate che erano in mano. */
     c = c || coordinateDa(dove);
     nome = nome || nomeDa(dove);
     if (c) break;
+    let r;
+    try { r = await fetch(dove, { redirect: 'manual', headers: { 'user-agent': UA } }); }
+    catch (e) { return json({ error: 'Google non risponde: ' + e.message }, 502); }
     const prossima = r.headers.get('location');
     if (!prossima) { ultima = r; break; }
     try { dove = new URL(prossima, dove).toString(); } catch (_) { break; }
@@ -246,7 +251,11 @@ async function handleMappa(request, env) {
   if (!c) {
     let host = dove;
     try { host = new URL(dove).hostname; } catch (_) {}
-    return json({ error: 'coordinate non trovate su ' + host }, 404);
+    /* Il nome si restituisce anche senza coordinate: nel Dove serve
+       comunque, e sapere che Google il posto lo conosceva ma le coordinate
+       non le ha date e' un'informazione diversa da "non ho trovato
+       niente". */
+    return json({ error: 'coordinate non trovate su ' + host, nome: nome || null }, 404);
   }
 
   return json({ lat: c.lat, lon: c.lon, nome: nome || null });
@@ -257,7 +266,10 @@ const ROUTES = {
   '/api/chat':    handleChat,
   '/api/pdl':     handlePdl,
   '/api/wrap':    handleWrap,
-  '/api/mappa':   handleMappa
+  '/api/mappa':   handleMappa,
+  '/api/push/iscrivi':       handleIscrivi,
+  '/api/push/appuntamenti':  handleAppuntamenti,
+  '/api/push/messaggio':     handleMessaggio
 };
 
 export default {
@@ -292,6 +304,19 @@ export default {
    * Worker. Il catch-all serve perche' le regole per indirizzo sono al
    * massimo 200 per dominio, e un film per produzione le finirebbe.
    */
+  /*
+   * Il minuto. Guarda se c'e' qualche notifica da mandare.
+   *
+   * Ogni minuto e non ogni cinque perche' "fra 10 minuti" con cinque
+   * minuti di scarto diventa "fra 10 o fra 15", e per un pick-up alle
+   * sette e mezza la differenza si sente. Un passaggio a vuoto costa una
+   * lettura su un indice, quindi quasi niente.
+   */
+  async scheduled(event, env, ctx) {
+    try { await mandaScadute(env); }
+    catch (e) { console.error('cron', e); }
+  },
+
   async email(message, env, ctx) {
     try {
       await riceviPosta(message, env, ctx);

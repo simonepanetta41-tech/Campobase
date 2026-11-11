@@ -43,6 +43,21 @@
     "run_worker_first": ["/api/*"]
   },
 
+  // Ogni minuto, per le notifiche a orario. "Fra 10 minuti" con cinque
+  // minuti di scarto diventa "fra 10 o fra 15", e per un pick-up alle
+  // sette e mezza la differenza si sente.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  // Qui NON va dichiarato un blocco "vars". Le variabili scritte a mano
+  // nel pannello e non ripetute in questo file vengono rimosse al deploy,
+  // e fra quelle ci sono SUPABASE_URL e SUPABASE_SERVICE_KEY: un deploy
+  // avrebbe spento la posta. La chiave pubblica VAPID sta scritta nel
+  // codice, in worker/push.js, dove la vede anche l'app: e' pubblica per
+  // definizione, e tenerla in un posto solo evita che le due parti
+  // finiscano per usarne due diverse.
+
   "observability": {
     "enabled": true
   }
