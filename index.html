@@ -716,6 +716,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* La scheda dell'attore */
 .at-corpo{flex:1;min-height:0;overflow-y:auto;padding:14px 16px calc(env(safe-area-inset-bottom) + 30px)}
 .at-wiki{display:flex;gap:13px;margin-bottom:18px}
+.at-niente{margin:0 0 18px;font-size:12px;color:var(--muted)}
 .at-wiki img{width:86px;height:112px;flex:0 0 86px;object-fit:cover;border-radius:11px;
   background:var(--surface2)}
 .at-wiki .c{flex:1;min-width:0}
@@ -10934,7 +10935,19 @@ function apriScheda(a){
   if (!a.interprete) return;
   wikiAttore(a.interprete).then(w => {
     const box = document.getElementById('atWiki');
-    if (!box || !w) return;
+    if (!box) return;
+    if (!w) {
+      /* Si dice che si e' cercato e non c'era.
+       *
+       * Tanti attori di mestiere \u2014 caratteristi, gente di teatro \u2014 una
+       * pagina su Wikipedia non ce l'hanno, e non e' un guasto. Ma uno
+       * spazio vuoto non distingue "non c'e' niente da dire" da "qualcosa
+       * non ha funzionato", e chi guarda ci perde tempo a chiederselo. */
+      box.innerHTML = `<p class="at-niente">${navigator.onLine === false
+        ? 'Scheda non caricata: niente rete.'
+        : 'Nessuna scheda su Wikipedia per questo interprete.'}</p>`;
+      return;
+    }
     box.innerHTML = `<div class="at-wiki">
       ${w.foto ? `<img src="${esc(w.foto)}" alt="" loading="lazy">` : ''}
       <div class="c"><p>${esc(w.testo)}</p>

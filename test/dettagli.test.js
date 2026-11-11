@@ -143,6 +143,26 @@ ok('e il credito',        await p.evaluate(()=>document.querySelector('.at-wiki 
 ok('ricordato sul telefono', await p.evaluate(()=>{
   const m = JSON.parse(localStorage.getItem('cb_wiki'));
   return !!(m && m.v && m.voci && m.voci['Rocco Maffei']);}), true);
+
+console.log('\n── un attore senza pagina su Wikipedia ──');
+/* Tanti caratteristi e attori di teatro una pagina non ce l'hanno, e non
+   e' un guasto: ma uno spazio vuoto non distingue "non c'e' niente da
+   dire" da "qualcosa non ha funzionato". */
+ok('lo dice invece di tacere', await p.evaluate(async()=>{
+  localStorage.removeItem('cb_wiki');
+  const vero = window.fetch;
+  // Wikipedia risponde, ma con la pagina di un film: nessuna biografia.
+  window.fetch = async () => ({ok:true, json: async()=>({query:{pages:{'1':{index:1,
+    title:'È stata la mano di Dio',
+    extract:'È stata la mano di Dio è un film del 2021 di Paolo Sorrentino, interpretato da Filippo Scotti.'}}}})});
+  await odgApriAttore('1');
+  await new Promise(r=>setTimeout(r,400));
+  window.fetch = vero;
+  const b = document.getElementById('atWiki');
+  return {niente: !!b.querySelector('.at-niente'), riquadro: !!b.querySelector('.at-wiki'),
+          testo: (b.textContent||'').trim()};
+}), {niente:true, riquadro:false, testo:'Nessuna scheda su Wikipedia per questo interprete.'});
+
 await p.evaluate(()=>odgChiudiScena());
 
 console.log('\n── un omonimo che non è un attore non entra ──');
