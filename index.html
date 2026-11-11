@@ -3464,6 +3464,27 @@ let castData = []; // in-memory, synced with cast_list table
 async function saveCastToSupabase(analysisId, castArray) {
   if (!analysisId || !castArray?.length) return;
   try {
+    /* Il cast ufficiale non lo sostituisce quello provvisorio.
+     *
+     * Il provvisorio lo tira fuori il modello dalla sceneggiatura: i
+     * personaggi, non gli attori. L'ufficiale arriva dal piano di
+     * lavorazione e porta i nomi veri. Rianalizzando, il cast ufficiale
+     * veniva portato sulla versione nuova e poi cancellato due righe
+     * dopo, perche' l'analisi salva sempre il suo provvisorio: si
+     * tornava dai nomi degli attori a quelli dei personaggi senza che
+     * nessuno l'avesse chiesto.
+     *
+     * Al contrario si sovrascrive eccome: importare il cast dal piano
+     * sopra un provvisorio e' esattamente quello che si vuole. */
+    const nuova = castArray[0]?.fonte || 'provvisoria';
+    if (nuova === 'provvisoria') {
+      const { data: gia } = await sb.from('cast_list')
+        .select('fonte').eq('analysis_id', analysisId).limit(200);
+      if (gia?.some(r => r.fonte && r.fonte !== 'provvisoria')) {
+        console.log('[cast] c\'è già il cast ufficiale: il provvisorio non lo tocca');
+        return;
+      }
+    }
     // Delete existing rows for this analysis (re-import)
     await sb.from('cast_list').delete().eq('analysis_id', analysisId);
     const rows = castArray.map(c => ({

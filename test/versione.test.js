@@ -24,8 +24,10 @@ await p.addInitScript(()=>{
     analyses: [{id:'v1', project_id:'film1', created_at:'2026-10-01'}],
     pdl_versions: [{analysis_id:'v1', user_id:'u1',
       data:{titolo:'MSG', totale_giorni:37}, shooting_data:{'3':{status:'complete'}}}],
-    cast_list: [{id:'c1', created_at:'2026-10-01', analysis_id:'v1', character_id:1, nome:'CIRO'},
-                {id:'c2', created_at:'2026-10-01', analysis_id:'v1', character_id:2, nome:'ASSUNTA'}]
+    /* Il cast ufficiale: viene dal piano di lavorazione e porta i nomi
+       degli attori, non quelli dei personaggi. */
+    cast_list: [{id:'c1', created_at:'2026-10-01', analysis_id:'v1', character_id:1, nome:'CIRO', fonte:'ufficiale'},
+                {id:'c2', created_at:'2026-10-01', analysis_id:'v1', character_id:2, nome:'ASSUNTA', fonte:'ufficiale'}]
   };
   const tavola = (t) => {
     let righe = window.__db[t] || [];
@@ -48,7 +50,9 @@ await p.addInitScript(()=>{
                    i >= 0 ? window.__db[t][i] = n : window.__db[t].push(n);
                  }
                  return Promise.resolve({error:null}); },
-      update(){ return q; }
+      update(){ return q; },
+      delete(){ return {eq: async (c,v) => { window.__db[t] = window.__db[t].filter(r => r[c] !== v);
+                                             return {error:null}; }}; }
     };
     return q;
   };
@@ -98,6 +102,25 @@ ok('un piano solo per v2', await p.evaluate(async()=>{
   return window.__db.pdl_versions.filter(x=>x.analysis_id==='v2').length;}), 1);
 ok('e due attori, non quattro', await p.evaluate(()=>
   window.__db.cast_list.filter(c=>c.analysis_id==='v2').length), 2);
+
+console.log('\n── il cast ufficiale non lo sostituisce il provvisorio ──');
+/* Il provvisorio lo tira fuori il modello dalla sceneggiatura: i
+   personaggi, non gli attori. Rianalizzando, il cast ufficiale veniva
+   portato sulla versione nuova e cancellato due righe dopo. */
+ok('resta l\'ufficiale', await p.evaluate(async()=>{
+  await saveCastToSupabase('v2', [{character_id:1, nome:'UOMO AL BAR'},
+                                  {character_id:2, nome:'DONNA'}]);
+  return window.__db.cast_list.filter(c=>c.analysis_id==='v2').map(c=>c.nome+'/'+c.fonte);
+}), ['CIRO/ufficiale','ASSUNTA/ufficiale']);
+
+console.log('\n── ma il piano sopra il provvisorio sì ──');
+// Importare il cast dal piano sopra un provvisorio e' quello che si vuole.
+ok('vince il piano', await p.evaluate(async()=>{
+  window.__db.cast_list = window.__db.cast_list.filter(c=>c.analysis_id!=='v2');
+  await saveCastToSupabase('v2', [{character_id:1, nome:'PERSONAGGIO'}]);
+  await saveCastToSupabase('v2', [{character_id:1, nome:'Attore Vero', fonte:'ufficiale'}]);
+  return window.__db.cast_list.filter(c=>c.analysis_id==='v2').map(c=>c.nome+'/'+c.fonte);
+}), ['Attore Vero/ufficiale']);
 
 console.log('\n── la prima analisi di un film non ha niente da portare ──');
 ok('nessun piano inventato', await p.evaluate(async()=>{
