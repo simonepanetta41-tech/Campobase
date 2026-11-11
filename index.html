@@ -712,7 +712,16 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 
 .odg-att{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)}
 .odg-att.cerca{text-decoration:none;color:inherit;min-height:54px;cursor:pointer}
+/* Il nome degli attori che si possono aprire e' giallo, come il titolo
+   della scheda che si apre toccandolo: il colore promette la stessa cosa
+   che poi mantiene. Prima erano bianchi come tutto il resto, il chevron
+   stava in fondo alla riga dopo l'orario, e nessuno capiva che quella
+   riga si toccasse. Giallo solo dove si apre davvero: le righe senza
+   interprete restano bianche, e la differenza si vede. */
+.odg-att.cerca .t{color:var(--yellow)}
 .odg-att .chev{flex:0 0 auto;color:var(--muted);font-size:16px;margin-left:2px}
+.odg-att.cerca .chev{color:var(--yellow);opacity:.75}
+.odg-att.cerca:active{background:var(--surface2)}
 /* La scheda dell'attore */
 .at-corpo{flex:1;min-height:0;overflow-y:auto;padding:14px 16px calc(env(safe-area-inset-bottom) + 30px)}
 .at-wiki{display:flex;gap:13px;margin-bottom:18px}

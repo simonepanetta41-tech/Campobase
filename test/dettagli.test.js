@@ -144,6 +144,21 @@ ok('ricordato sul telefono', await p.evaluate(()=>{
   const m = JSON.parse(localStorage.getItem('cb_wiki'));
   return !!(m && m.v && m.voci && m.voci['Rocco Maffei']);}), true);
 
+console.log('\n── si capisce che quel nome si tocca ──');
+/* Il chevron da solo non bastava: stava in fondo alla riga, dopo
+   l'orario, ed era grigio come il resto. Ora il nome e' giallo, come il
+   titolo della scheda che si apre toccandolo — il colore promette la
+   stessa cosa che mantiene — e solo dove si apre davvero. */
+ok('i nomi che si aprono sono gialli', await p.evaluate(()=>{
+  const giallo = getComputedStyle(document.documentElement).getPropertyValue('--yellow').trim();
+  const col = (e) => getComputedStyle(e.querySelector('.t')).color;
+  const a = document.querySelector('.odg-att.cerca');
+  const b = [...document.querySelectorAll('.odg-att')].find(x=>!x.classList.contains('cerca'));
+  const inRgb = (c) => { const d=document.createElement('div'); d.style.color=c;
+    document.body.appendChild(d); const v=getComputedStyle(d).color; d.remove(); return v; };
+  return {aperto: col(a) === inRgb(giallo), chiuso: b ? col(b) !== inRgb(giallo) : 'nessuna riga chiusa'};
+}), {aperto:true, chiuso:true});
+
 console.log('\n── la scheda da TMDB: prima i titoli ──');
 /* Davanti a un nome che non conosci la domanda e' "dove l'ho gia'
    vista", non "chi e'". E i titoli ci sono anche per gli attori di cui
