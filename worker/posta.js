@@ -18,6 +18,14 @@
  */
 
 import { leggiMessaggio } from './mime.js';
+/* Questo import mancava, e la chiamata in fondo al file sollevava un
+   ReferenceError che il try/catch di li' intorno si mangiava. La mail
+   arrivava, gli allegati si salvavano, la riga di posta diceva "nuova" —
+   e l'annuncio alla troupe non e' mai partito, nemmeno una volta. Il
+   catch e' giusto, una notifica mancata non deve far rimbalzare una mail
+   arrivata; ma messo attorno a un nome che non esiste rende invisibile un
+   errore di programmazione. */
+import { avvisaPosta } from './push.js';
 
 // Quello che vale la pena tenere. Le immagini no: nei pacchetti sono firme
 // e loghi della mail, non documenti.
