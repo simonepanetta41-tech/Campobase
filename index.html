@@ -822,6 +822,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .pdl-barra .r b{font-family:'DM Mono',monospace;font-weight:400;color:var(--white)}
 .pdl-barra .v{height:5px;border-radius:3px;background:var(--surface2);overflow:hidden}
 .pdl-barra .v>div{height:100%;border-radius:3px}
+.pdl-barra .d{font-size:11px;color:var(--muted);margin-top:1px}
 .pdl-leg{display:flex;flex-wrap:wrap;gap:13px;font-size:12px;color:var(--muted)}
 .pdl-leg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;
   vertical-align:-1px}
@@ -12001,20 +12002,41 @@ function renderPdlStats() {
   const allSc=getPdlAllGiorni().flatMap(g=>g.scene||[]);
   const girate=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='done').length,0);
   const standby=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='standby').length,0);
-  const completi=Object.values(pdlShootingData).filter(d=>d.status==='complete').length;
+  const segnate=Object.values(pdlShootingData).filter(d=>d.status==='complete').length;
   const tot=pdlTotali(pdlData);
+  /* Le giornate girate le dice l'ordine del giorno.
+   *
+   * Prima si contavano solo quelle marcate a mano, una per una, dalla
+   * finestra di una giornata del piano. Sul set nessuno lo fa, quindi la
+   * barra restava a zero a metà film.
+   *
+   * Il numero dell'ordine del giorno e' il contatore della produzione: se
+   * in mano c'e' il 23, le prime 22 sono fatte — quella di oggi e' in
+   * corso e non si conta. E' lo stesso principio di tutto il resto qui
+   * dentro: si crede a quello che il documento dichiara, non a quello che
+   * ricostruiamo noi.
+   *
+   * Le marcature a mano continuano a vincere quando dicono di piu': sono
+   * una cosa che ha detto chi c'era. */
+  const daOdg = (odgCorrente && odgCorrente.numero > 0 && odgCorrente.numero - 1) || 0;
+  const completi = Math.min(Math.max(segnate, daOdg), tot.giorni || Infinity);
   document.getElementById('pdlStatsRow').innerHTML=[
     [tot.giorni || '—','Giorni totali'],[completi,'Giornate girate'],
     [girate,'Scene girate'],[standby,'In stand-by']
   ].map(([n,k])=>`<div><span class="n num">${n}</span><span class="k">${k}</span></div>`).join('');
   const pct=allSc.length>0?Math.round(girate/allSc.length*100):0;
   const gPct=tot.giorni>0?Math.round(completi/tot.giorni*100):0;
-  const barra=(nome,fatto,tot,perc,colore)=>`<div class="pdl-barra">
+  const barra=(nome,fatto,tot,perc,colore,nota)=>`<div class="pdl-barra">
     <div class="r"><span>${nome}</span><b>${fatto}/${tot} · ${perc}%</b></div>
-    <div class="v"><div style="width:${perc}%;background:${colore}"></div></div></div>`;
+    <div class="v"><div style="width:${perc}%;background:${colore}"></div></div>
+    ${nota?`<div class="d">${nota}</div>`:''}</div>`;
+  /* Da dove viene il numero si dice, se non l'ha messo una persona: una
+     barra che si muove da sola senza spiegare perche' e' una barra di cui
+     non si fida nessuno. */
+  const nota = daOdg > segnate ? 'dall\'ordine del giorno ' + odgCorrente.numero : '';
   document.getElementById('pdlProgBars').innerHTML =
     barra('Scene', girate, allSc.length, pct, 'var(--green)') +
-    barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)');
+    barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)', nota);
 }
 
 function renderPdlStandby() {
