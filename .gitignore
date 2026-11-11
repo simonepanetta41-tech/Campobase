@@ -1,3 +1,6 @@
 node_modules/
 .wrangler/
 .dev.vars
+test/odg-corpus/
+test/dati/
+test/*.png
