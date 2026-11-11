@@ -720,7 +720,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .at-wiki img{width:86px;height:112px;flex:0 0 86px;object-fit:cover;border-radius:11px;
   background:var(--surface2)}
 .at-wiki .c{flex:1;min-width:0}
-.at-wiki p{margin:0;font-size:13px;line-height:1.55;color:var(--white-dim)}
+.at-wiki p{margin:0 0 8px;font-size:13px;line-height:1.55;color:var(--white-dim)}
+.at-wiki .nato{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:7px}
+.at-wiki .vista{font-size:11.5px;color:var(--muted);margin-bottom:3px}
+.at-wiki .tit{display:flex;flex-wrap:wrap;gap:6px;margin:5px 0 9px}
+.at-wiki .tit span{font-family:'DM Mono',monospace;font-size:11px;padding:5px 9px;
+  border-radius:8px;background:var(--surface2);color:var(--white-dim)}
 .at-wiki a{display:inline-block;margin-top:7px;font-size:11.5px;color:var(--muted);text-decoration:none}
 .at-ore{display:flex;gap:26px;margin-bottom:12px}
 .at-ore .k{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
@@ -10933,25 +10938,35 @@ function apriScheda(a){
     </div>`);
 
   if (!a.interprete) return;
-  wikiAttore(a.interprete).then(w => {
+  schedaAttore(a.interprete).then(w => {
     const box = document.getElementById('atWiki');
     if (!box) return;
     if (!w) {
-      /* Si dice che si e' cercato e non c'era.
+      /* Si dice che si e' cercato e non si e' trovato.
        *
-       * Tanti attori di mestiere \u2014 caratteristi, gente di teatro \u2014 una
-       * pagina su Wikipedia non ce l'hanno, e non e' un guasto. Ma uno
-       * spazio vuoto non distingue "non c'e' niente da dire" da "qualcosa
-       * non ha funzionato", e chi guarda ci perde tempo a chiederselo. */
+       * Uno spazio vuoto non distingue "non c'e' niente da dire" da
+       * "qualcosa non ha funzionato", e chi guarda ci perde tempo a
+       * chiederselo. */
       box.innerHTML = `<p class="at-niente">${navigator.onLine === false
         ? 'Scheda non caricata: niente rete.'
-        : 'Nessuna scheda su Wikipedia per questo interprete.'}</p>`;
+        : 'Nessuna scheda trovata per questo interprete.'}</p>`;
       return;
     }
+    /* La prima cosa e' "dove l'ho gia' vista", non "chi e'".
+     *
+     * Davanti a un nome che non conosci, sul set, la domanda e' quella. E
+     * i titoli ci sono anche per gli attori di cui nessuno ha scritto una
+     * biografia, che sono poi quelli che non riconosci. */
+    const titoli = (w.titoli || []).map(t => `<span>${esc(t)}</span>`).join('');
     box.innerHTML = `<div class="at-wiki">
       ${w.foto ? `<img src="${esc(w.foto)}" alt="" loading="lazy">` : ''}
-      <div class="c"><p>${esc(w.testo)}</p>
-      <a href="${esc(w.url)}" target="_blank" rel="noopener">Wikipedia \u2197</a></div></div>`;
+      <div class="c">
+        ${w.nascita ? `<div class="nato">${esc(w.nascita)}</div>` : ''}
+        ${w.testo ? `<p>${esc(w.testo)}</p>` : ''}
+        ${titoli ? `<div class="vista">L${'\u2019'}hai ${w.femmina ? 'vista' : 'visto'} in</div>
+                    <div class="tit">${titoli}</div>` : ''}
+        <a href="${esc(w.url)}" target="_blank" rel="noopener">${esc(w.fonte)} \u2197</a>
+      </div></div>`;
   });
 }
 
@@ -10968,7 +10983,7 @@ const WIKI_MEMO = 'cb_wiki';
    memoria sul telefono si butta. Senza, la descrizione sbagliata gia'
    salvata resterebbe li' per sempre: la correzione varrebbe solo per gli
    attori mai cercati prima. */
-const WIKI_V = 2;
+const WIKI_V = 3;   // 3: prima TMDB, poi Wikipedia
 
 function wikiNudo(s){
   return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -11004,7 +11019,18 @@ function wikiVaBene(p, nome){
   return parole.every(w => inizio.includes(w));
 }
 
-async function wikiAttore(nome){
+/* La scheda di un interprete: prima TMDB, poi Wikipedia.
+ *
+ * TMDB e' un database di cinema e ha dentro anche gli attori di cui
+ * nessuno ha scritto una voce enciclopedica — i caratteristi, la gente di
+ * teatro, gli attori di giornata, che sono poi esattamente quelli che su
+ * un ordine del giorno non riconosci. La biografia spesso non ce l'ha, ma
+ * ha i titoli, e "dove l'ho gia' vista" e' la domanda vera.
+ *
+ * Wikipedia resta dietro, per quando TMDB non trova nessuno: sui nomi
+ * noti scrive meglio, e due righe in italiano valgono piu' di una lista.
+ */
+async function schedaAttore(nome){
   const chiave = String(nome || '').trim();
   if (!chiave) return null;
   let memo = {};
@@ -11014,8 +11040,61 @@ async function wikiAttore(nome){
   } catch (_) {}
   if (Object.prototype.hasOwnProperty.call(memo, chiave)) return memo[chiave];
 
-  let trovato = null;
+  /* Due fonti, e ognuna puo' mancare per due ragioni diverse: non aver
+     trovato nessuno, o non aver risposto. Si tengono separate — se TMDB
+     non risponde si prova comunque Wikipedia, che e' il momento in cui la
+     riserva serve davvero. La prima versione di questo codice tornava
+     indietro al primo errore e la riserva non veniva mai usata. */
+  let trovato = null, rotte = 0;
+
   try {
+    const s = (await sb.auth.getSession()).data.session;
+    const r = await fetch('/api/attore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 Authorization: 'Bearer ' + (s && s.access_token) },
+      body: JSON.stringify({ nome: chiave })
+    });
+    if (!r.ok) throw new Error('attore ' + r.status);
+    const j = await r.json();
+    if (j && j.trovato) {
+      trovato = { nascita: j.nascita || null, testo: j.bio || null, titoli: j.titoli || [],
+                  foto: j.foto || null, url: j.url, fonte: 'TMDB', femmina: !!j.femmina };
+    }
+  } catch (e) {
+    rotte++;
+    console.log('[attore] TMDB non raggiunto:', e.message);
+  }
+
+  if (!trovato) {
+    try {
+      const w = await wikiAttore(chiave);
+      if (w) trovato = { nascita: null, testo: w.testo, titoli: [],
+                         foto: w.foto, url: w.url, fonte: 'Wikipedia', femmina: false };
+    } catch (e) {
+      rotte++;
+      console.log('[attore] Wikipedia non raggiunta:', e.message);
+    }
+  }
+
+  /* Se nessuna delle due ha risposto, non si ricorda di non aver trovato:
+     al prossimo tentativo, con la rete, si riprova. */
+  if (!trovato && rotte >= 2) return null;
+
+  memo[chiave] = trovato;
+  const ch = Object.keys(memo);
+  if (ch.length > 120) ch.slice(0, ch.length - 120).forEach(k => delete memo[k]);
+  try { localStorage.setItem(WIKI_MEMO, JSON.stringify({ v: WIKI_V, voci: memo })); } catch (_) {}
+  return trovato;
+}
+
+async function wikiAttore(nome){
+  // La memoria e il nome gia' puliti li ha schedaAttore, che e' l'unica
+  // che chiama questa.
+  const chiave = String(nome || '').trim();
+  if (!chiave) return null;
+  let trovato = null;
+  {
     /* Cinque risultati, non uno: il primo per Wikipedia e' il piu'
        pertinente alla ricerca, non il piu' giusto per noi — e la pagina
        di un film in cui la persona ha recitato batte spesso la sua. Si
@@ -11039,14 +11118,14 @@ async function wikiAttore(nome){
         url:   'https://it.wikipedia.org/wiki/' + encodeURIComponent(String(p.title).replace(/ /g, '_'))
       };
     }
-  } catch (_) {
-    return null;   // niente rete: non si ricorda di non aver trovato
   }
-  memo[chiave] = trovato;
-  // Non deve crescere all'infinito: una troupe per volta basta.
-  const ch = Object.keys(memo);
-  if (ch.length > 120) ch.slice(0, ch.length - 120).forEach(k => delete memo[k]);
-  try { localStorage.setItem(WIKI_MEMO, JSON.stringify({ v: WIKI_V, voci: memo })); } catch (_) {}
+  /* L'errore di rete non si zittisce qui, e non c'e' un try che lo
+     prenda: chi chiama deve poter distinguere "non c'e' nessuna pagina"
+     da "non ho potuto chiedere", e una funzione che risponde null a tutte
+     e due le rende uguali.
+     La memoria la tiene schedaAttore, che e' quella che sceglie fra le
+     due fonti: tenerla anche qui vorrebbe dire due voci per lo stesso
+     nome, con dentro cose diverse. */
   return trovato;
 }
 

@@ -144,24 +144,51 @@ ok('ricordato sul telefono', await p.evaluate(()=>{
   const m = JSON.parse(localStorage.getItem('cb_wiki'));
   return !!(m && m.v && m.voci && m.voci['Rocco Maffei']);}), true);
 
-console.log('\n── un attore senza pagina su Wikipedia ──');
+console.log('\n── la scheda da TMDB: prima i titoli ──');
+/* Davanti a un nome che non conosci la domanda e' "dove l'ho gia'
+   vista", non "chi e'". E i titoli ci sono anche per gli attori di cui
+   nessuno ha scritto una biografia — che sono quelli che non riconosci. */
+ok('titoli, nascita e fonte', await p.evaluate(async()=>{
+  localStorage.removeItem('cb_wiki');
+  const vero = window.fetch;
+  window.fetch = async (u) => u === '/api/attore'
+    ? {ok:true, json: async()=>({trovato:true, nome:'Carmen Pommella', femmina:true,
+        nascita:'Napoli · 14 gennaio 1972', foto:null, bio:null,
+        titoli:['Gomorra',"L'amica geniale"], url:'https://www.themoviedb.org/person/1'})}
+    : vero(u);
+  await odgApriAttore('1');
+  await new Promise(r=>setTimeout(r,400));
+  window.fetch = vero;
+  const b = document.getElementById('atWiki');
+  return {nato: (b.querySelector('.nato')||{}).textContent,
+          vista: (b.querySelector('.vista')||{}).textContent,
+          titoli: [...b.querySelectorAll('.tit span')].map(x=>x.textContent),
+          fonte: (b.querySelector('a')||{}).textContent.trim(),
+          biografia: !!b.querySelector('p')};
+}), {nato:'Napoli · 14 gennaio 1972', vista:'L\u2019hai vista in',
+     titoli:['Gomorra',"L'amica geniale"], fonte:'TMDB ↗', biografia:false});
+
+console.log('\n── un attore che non c\'è da nessuna parte ──');
 /* Tanti caratteristi e attori di teatro una pagina non ce l'hanno, e non
    e' un guasto: ma uno spazio vuoto non distingue "non c'e' niente da
    dire" da "qualcosa non ha funzionato". */
 ok('lo dice invece di tacere', await p.evaluate(async()=>{
   localStorage.removeItem('cb_wiki');
   const vero = window.fetch;
-  // Wikipedia risponde, ma con la pagina di un film: nessuna biografia.
-  window.fetch = async () => ({ok:true, json: async()=>({query:{pages:{'1':{index:1,
-    title:'È stata la mano di Dio',
-    extract:'È stata la mano di Dio è un film del 2021 di Paolo Sorrentino, interpretato da Filippo Scotti.'}}}})});
+  /* TMDB non lo trova, e Wikipedia risponde con la pagina di un film:
+     nessuna biografia da nessuna delle due. */
+  window.fetch = async (u) => u === '/api/attore'
+    ? {ok:true, json: async()=>({trovato:false})}
+    : ({ok:true, json: async()=>({query:{pages:{'1':{index:1,
+        title:'È stata la mano di Dio',
+        extract:'È stata la mano di Dio è un film del 2021 di Paolo Sorrentino, interpretato da Filippo Scotti.'}}}})});
   await odgApriAttore('1');
   await new Promise(r=>setTimeout(r,400));
   window.fetch = vero;
   const b = document.getElementById('atWiki');
   return {niente: !!b.querySelector('.at-niente'), riquadro: !!b.querySelector('.at-wiki'),
           testo: (b.textContent||'').trim()};
-}), {niente:true, riquadro:false, testo:'Nessuna scheda su Wikipedia per questo interprete.'});
+}), {niente:true, riquadro:false, testo:'Nessuna scheda trovata per questo interprete.'});
 
 await p.evaluate(()=>odgChiudiScena());
 

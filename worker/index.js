@@ -13,6 +13,7 @@ import { json, readJson, requireUser, consumeQuota, callAnthropic, CORS } from '
 import { handleWrap } from './wrap.js';
 import { riceviPosta } from './posta.js';
 import { handleIscrivi, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
+import { handleAttore } from './attore.js';
 
 const FREE_LIMIT = 3;
 
@@ -267,6 +268,7 @@ const ROUTES = {
   '/api/pdl':     handlePdl,
   '/api/wrap':    handleWrap,
   '/api/mappa':   handleMappa,
+  '/api/attore':  handleAttore,
   '/api/push/iscrivi':       handleIscrivi,
   '/api/push/appuntamenti':  handleAppuntamenti,
   '/api/push/messaggio':     handleMessaggio

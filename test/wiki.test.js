@@ -73,27 +73,34 @@ ok('vince la biografia, non il film', await p.evaluate(([f,l])=>{
 
 console.log('\n── la memoria vecchia si butta ──');
 /* La descrizione sbagliata era gia' salvata sul telefono: senza buttarla,
-   la correzione varrebbe solo per gli attori mai cercati prima. */
+   la correzione varrebbe solo per gli attori mai cercati prima.
+   La memoria la tiene schedaAttore, che e' quella che sceglie fra TMDB e
+   Wikipedia: wikiAttore da sola non sa nemmeno che esiste. */
 const memoria = await p.evaluate(async()=>{
   localStorage.setItem('cb_wiki', JSON.stringify({
     'Carmen Pommella': {testo:'È stata la mano di Dio è un film del 2021…', foto:null, url:'x'}}));
   let chiamate = 0;
   const vero = window.fetch;
   window.fetch = async () => { chiamate++; throw new Error('niente rete'); };
-  const r = await wikiAttore('Carmen Pommella');
+  const r = await schedaAttore('Carmen Pommella');
   window.fetch = vero;
-  return {risposta: r, chiamate};
+  const dopo = JSON.parse(localStorage.getItem('cb_wiki') || 'null');
+  return {risposta: r, chiamate, scrittaNuova: !!(dopo && dopo.v === 3)};
 });
 ok('non serve la vecchia',  memoria.risposta, null);
-ok('ed è andata a richiedere', memoria.chiamate, 1);
+// Due fonti, due tentativi: TMDB e poi Wikipedia.
+ok('ed è andata a richiedere', memoria.chiamate, 2);
+/* E non si ricorda il buco: se nessuna delle due ha risposto, al
+   prossimo tentativo con la rete si riprova. */
+ok('senza ricordarsi il buco', memoria.scrittaNuova, false);
 
 ok('ma la memoria nuova si usa', await p.evaluate(async()=>{
-  localStorage.setItem('cb_wiki', JSON.stringify({v:2, voci:{
-    'Carmen Pommella': {testo:'Carmen Pommella è un\'attrice italiana.', foto:null, url:'x'}}}));
+  localStorage.setItem('cb_wiki', JSON.stringify({v:3, voci:{
+    'Carmen Pommella': {testo:'Carmen Pommella è un\'attrice italiana.', titoli:[], fonte:'TMDB', url:'x'}}}));
   let chiamate = 0;
   const vero = window.fetch;
   window.fetch = async () => { chiamate++; throw new Error('niente rete'); };
-  const r = await wikiAttore('Carmen Pommella');
+  const r = await schedaAttore('Carmen Pommella');
   window.fetch = vero;
   return {testo: r && r.testo, chiamate};
 }), {testo:'Carmen Pommella è un\'attrice italiana.', chiamate:0});
