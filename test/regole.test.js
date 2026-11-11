@@ -75,7 +75,26 @@ ok('regola applicata',    await p.evaluate(()=>ttMeta.tipoGiornata), 10);
 ok('bottone 10h acceso',  await p.evaluate(()=>document.getElementById('tt-tg10').classList.contains('active')), true);
 ok('golden diminuita',    await p.evaluate(x=>ttCalcTab(ttTabelle[0].orari,false).days[0].goldenOrd<x, golden8), true);
 
+console.log('\n── riaprendo, i bottoni dicono le regole vere ──');
+/* Nell'HTML i bottoni partono con "10h" e "Off" accesi, scritti a mano:
+   sono lo stato di una tabella nuova. Aprendo una tabella salvata con
+   regole diverse, il riassunto diceva 8h e i bottoni mostravano 10h — e
+   toccare 8 non faceva niente, perche' per ttSetGiornata era gia' 8.
+   Il valore era giusto da sempre: era l'evidenziatura a non saperlo. */
+ok('le regole caricate si vedono', await p.evaluate(()=>{
+  ttMeta.tipoGiornata = 8; ttMeta.raddoppio = 2;
+  ttMeta.maggiorazioniNott = false; ttMeta.viaggioConcesso = 30;
+  // Come al caricamento di una tabella salvata.
+  ttRenderAll();
+  const on = id => document.getElementById(id).classList.contains('active');
+  return {otto: on('tt-tg8'), dieci: on('tt-tg10'), rd2: on('tt-rd2'), rd0: on('tt-rd0'),
+          nottOff: on('tt-nOff'), nottOn: on('tt-nOn'),
+          viaggio: [...document.querySelectorAll('.tt-vtog')]
+            .filter(x=>x.classList.contains('active')).map(x=>x.dataset.mins)};
+}), {otto:true, dieci:false, rd2:true, rd0:false, nottOff:true, nottOn:false, viaggio:['30']});
+
 console.log('\n── ritoccare la stessa regola non chiede nulla ──');
+await p.evaluate(()=>{ ttMeta.tipoGiornata = 10; ttRenderAll(); });
 await p.evaluate(()=>ttSetGiornata(10));
 await p.waitForTimeout(150);
 ok('nessun popup',        !(await cePopup()), true);
