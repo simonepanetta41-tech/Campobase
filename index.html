@@ -13320,6 +13320,20 @@ function ttCalcTab(orari,raddoppiaSesto){
 }
 
 function ttRenderAll(){
+  /* I bottoni delle regole si riallineano qui.
+   *
+   * Nell'HTML partono con "10h" e "Off" accesi, scritti a mano: sono lo
+   * stato di una tabella nuova. Ma aprendo una tabella salvata con le
+   * regole diverse — 8h continuate — il riassunto diceva 8h e i bottoni
+   * mostravano 10h acceso. E toccando 8 non succedeva niente, perche' la
+   * prima riga di ttSetGiornata vede che e' gia' 8 ed esce: il valore era
+   * giusto da sempre, era l'evidenziatura a non averlo mai saputo.
+   *
+   * Prima di ogni uscita anticipata: le regole valgono anche quando le
+   * tabelle sono zero, e messo piu' in basso il riallineo non avveniva —
+   * compreso quello che fa comparire la scelta fra giornaliero e
+   * settimanale. */
+  try{ ttSyncRegole(); }catch(_){}
   const c=document.getElementById('tt-tabelle');if(!c)return;
   const st=document.getElementById('tt-stato'); if(st)st.textContent=ttStatoTxt;
   if(ttTabelle.length===0){
@@ -13330,18 +13344,6 @@ function ttRenderAll(){
   // Unico aggancio del salvataggio: ogni funzione che cambia i dati passa
   // di qui, cosi' non ce n'e' una che possa dimenticarselo.
   if(!ttSoloVista)ttTocca();
-  /* I bottoni delle regole si riallineano qui.
-   *
-   * Nell'HTML partono con "10h" e "Off" accesi, scritti a mano: sono lo
-   * stato di una tabella nuova. Ma aprendo una tabella salvata con le
-   * regole diverse — 8h continuate — il riassunto diceva 8h e i bottoni
-   * mostravano 10h acceso. E toccando 8 non succedeva niente, perche' la
-   * prima riga di ttSetGiornata vede che e' gia' 8 ed esce: il valore era
-   * giusto da sempre, era l'evidenziatura a non averlo mai saputo.
-   *
-   * Qui perche' ttRenderAll e' il passaggio obbligato di tutto quello che
-   * tocca la tabella, compreso il caricamento. */
-  try{ ttSyncRegole(); }catch(_){}
   try{ ttSommari(); }catch(_){}
 }
 
