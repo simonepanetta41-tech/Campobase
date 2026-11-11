@@ -13803,11 +13803,28 @@ function ttDigita(el){
 function ttSetO(tabId,field,di,val){
   const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;
   val=ttNormalizzaOra(val);
-  // La casella non viene ridisegnata, quindi la forma corretta va
-  // riscritta a mano: chi ha battuto 830 deve vedere 08.30.
-  const el=ttVista==='giorno'
-    ? (ttGiornoSel===di?document.getElementById(`ttg-${tabId}-${field}`):null)
-    : document.querySelector(`#ttb-${tabId} input[data-f="${field}"][data-i="${di}"]`);
+  /* La casella non viene ridisegnata, quindi la forma corretta va
+   * riscritta a mano: chi ha battuto 830 deve vedere 08.30.
+   *
+   * Il riquadro della tabella si prende per id, non infilando l'id dentro
+   * un selettore CSS. L'id di una tabella nasce da Date.now()+Math.random(),
+   * quindi e' un numero con la virgola — 1794413039170.8691 — e dentro un
+   * selettore quel ".8691" il CSS lo legge come il nome di una classe. Il
+   * selettore risulta illegale, querySelector solleva un errore, e ttSetO
+   * si fermava li': una riga PRIMA di quella che salva l'orario.
+   *
+   * Sul telefono non si vedeva, perche' l'app si apre sulla vista a giorno
+   * e quel ramo usa getElementById, a cui la virgola non da' fastidio.
+   * Bastava passare a Settimana e quello che si scriveva spariva senza un
+   * avviso, con le celle calcolate ferme a "—". Su schermo largo, dove si
+   * apre direttamente la settimana, non si poteva scrivere niente. */
+  let el=null;
+  if(ttVista==='giorno'){
+    if(ttGiornoSel===di)el=document.getElementById(`ttg-${tabId}-${field}`);
+  }else{
+    const box=document.getElementById(`ttb-${tabId}`);
+    if(box)el=box.querySelector(`input[data-f="${field}"][data-i="${di}"]`);
+  }
   if(el&&el.value!==val)el.value=val;
   if(t.orari[field][di]===val)return;
   t.orari[field][di]=val;

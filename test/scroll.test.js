@@ -1,19 +1,33 @@
-/* ⚠ QUESTO CONTROLLO E' DA RIFARE, e non va preso per buono.
+/* ⚠ UN'ATTESA DI QUESTO CONTROLLO E' ANCORA ROSSA, e non e' spiegata.
  *
  * Nato per un guasto vero: sulla tabella delle ore, su un telefono, si
  * scorreva fino al sabato, si scriveva un orario, e lo scorrimento tornava
  * al lunedi' facendo perdere il segno.
  *
- * Nel frattempo la tabella e' cambiata — su schermo stretto l'app si apre
- * sulla vista a giorno, e la vista a settimana a 390 pixel non sborda piu'
- * — quindi due delle sue attese parlano di una schermata che non c'e' piu':
- * dice che il campo non resta attivo e che le ore non si aggiornano, ma
- * misura su una tabella che non ha nulla da scorrere (max 0).
+ * QUI SOPRA C'ERA SCRITTA UNA SPIEGAZIONE SBAGLIATA, e vale la pena
+ * lasciarne memoria. Diceva che la tabella era cambiata, che a 390 pixel
+ * la vista a settimana non sbordava piu' e che quindi le due attese rosse
+ * parlavano di una schermata inesistente. Misurato poi davvero: a 390
+ * pixel ci sono 352 pixel da scorrere, e il KO "le ore calcolate si
+ * aggiornano" era un guasto in piena regola — ttSetO infilava l'id della
+ * tabella, che e' un numero con la virgola, dentro un selettore CSS, e
+ * sollevava un errore prima di salvare l'orario. Quell'attesa adesso e'
+ * verde, e il guasto e' coperto da ore-scrittura.test.js.
  *
- * Va deciso se il guasto di allora e' ancora possibile. Se lo e', il
- * controllo si rifa' sulla schermata di oggi; se non lo e' piu', si butta.
- * Quello che non si deve fare e' aggiustare le attese finche' diventa
- * verde: diventerebbe un controllo che non controlla niente.
+ * Morale: un rosso che non si capisce non si archivia con un racconto.
+ * Questo controllo stava dicendo la verita' e gli e' stata scritta sopra
+ * una spiegazione che lo faceva sembrare obsoleto. E' una forma piu'
+ * educata di ritarare le attese finche' passano, e fa lo stesso danno.
+ *
+ * COSA RESTA: l'attesa "il campo resta attivo" e' ancora rossa e NON si
+ * sa perche'. Provato a parte, il comportamento dell'app e' giusto:
+ * scrivendo in una casella della vista a settimana e aspettando 600ms, il
+ * fuoco resta sulla casella. Quindi il sospetto e' che a perderlo sia
+ * questa sequenza di prova — lo scorrimento e le misure fra una scrittura
+ * e l'altra — e non l'app. Ma "il sospetto e'" non basta: va trovato il
+ * motivo e poi o si rifa' l'attesa su cio' che conta davvero (la tastiera
+ * che non si chiude su iOS), oppure si toglie. Quello che non si deve
+ * fare e' aggiustarla finche' diventa verde.
  */
 const RADICE = require('path').join(__dirname, '..');
 const {chromium}=require('playwright');
