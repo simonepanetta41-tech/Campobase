@@ -359,6 +359,11 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-pick .conme{padding:11px 16px;border-top:1px solid var(--border)}
 .odg-pick .conme .k{display:block;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .odg-pick .conme .v{display:block;font-size:13px;color:var(--white-dim);margin-top:3px;line-height:1.5}
+/* Quando il nome compare in piu' tratte si prende la piu' mattiniera e lo
+   si dice: scegliere in silenzio e' il modo in cui prima si finiva con
+   l'orario di un altro. */
+.odg-pick .pick-altre{padding:10px 16px 12px;border-top:1px solid var(--border);
+  font-size:11px;line-height:1.55;color:var(--orange)}
 .odg-osp{margin-top:9px}
 /* Il passaggio e la scena */
 .odg-pick .r{display:flex;align-items:center;justify-content:space-between;
@@ -9134,18 +9139,46 @@ function correggiLuogo(nome, tutti){
   return best;
 }
 
+/* L'ora in minuti, per mettere in fila le partenze. Senza orario va in
+   fondo: una tratta senza ora non e' quella da cui dipende la sveglia. */
+function odgMinuti(h){
+  const m = /^\s*(\d{1,2})\s*[.:]\s*(\d{2})/.exec(String(h || ''));
+  return m ? +m[1] * 60 + +m[2] : Infinity;
+}
+
+/*
+ * Il giro auto che e' il tuo.
+ *
+ * Cercava il solo cognome, in fondo al nome stampato, e prendeva la prima
+ * tratta che lo conteneva. Sui giri auto veri di un lunedi' qualsiasi
+ * quattro cognomi su cinquantadue comparivano in due tratte diverse, e in
+ * un caso erano due persone davvero diverse: stesso cognome, iniziali
+ * diverse, due alberghi diversi, trentacinque minuti di scarto. Chi dei
+ * due veniva scritto dopo nel PDF si ritrovava in mano l'orario e il posto
+ * dell'altro — e con le notifiche accese, la sveglia all'ora sbagliata.
+ *
+ * Il confronto giusto l'app ce l'aveva gia': nomeCorrisponde, quella della
+ * convocazione troupe, che guarda nome e cognome insieme e accetta
+ * l'iniziale puntata perche' le convocazioni abbreviano quasi sempre.
+ * "F.Lonardo" e "A.Lonardo" si distinguono da sole, senza chiedere niente
+ * a nessuno.
+ *
+ * Quando restano piu' tratte e' la stessa persona scritta due volte —
+ * l'andata e il rientro, o la tratta in due pezzi. Li' vale la piu'
+ * mattiniera: e' quella che non si puo' perdere.
+ */
 function odgPickUp(testo, prof){
   if (!testo || !prof || !prof.cognome) return null;
   const tratte = odgTratte(testo);
   if (!tratte.length) return null;
 
-  const cog = senzaAccenti(prof.cognome).trim().replace(/\s+/g,'\\s*');
-  const re = new RegExp('(^|[\\s.])' + cog + '$', 'i');
-  const mia = tratte.find(t => t.nomi.some(n => re.test(senzaAccenti(n))));
-  if (!mia) return null;
+  const mie = tratte.filter(t => t.nomi.some(n => nomeCorrisponde(n, prof)));
+  if (!mie.length) return null;
+  const mia = mie.length === 1 ? mie[0]
+    : [...mie].sort((a, b) => odgMinuti(a.partenza) - odgMinuti(b.partenza))[0];
 
   const tuttiLuoghi = tratte.map(t=>t.luogo).concat(tratte.map(t=>t.destinazione)).filter(Boolean);
-  const io = mia.nomi.find(n => re.test(senzaAccenti(n)));
+  const io = mia.nomi.find(n => nomeCorrisponde(n, prof));
   return {
     ora: mia.partenza,
     arrivo: mia.arrivo,
@@ -9154,7 +9187,10 @@ function odgPickUp(testo, prof){
     destinazione: correggiLuogo(mia.destinazione, tuttiLuoghi),
     autista: mia.autista,
     tel: mia.tel,
-    conMe: mia.nomi.filter(n => n !== io)
+    conMe: mia.nomi.filter(n => n !== io),
+    /* Quante altre tratte portavano il tuo nome. Serve alla schermata per
+       dirlo invece di far finta che ce ne fosse una sola. */
+    altre: mie.length - 1
   };
 }
 
@@ -11865,6 +11901,9 @@ function odgPienoHtml(d) {
       ${d.pickup.tel?`<span class="b">${ODG_SEGNI.tel}</span>`:''}</a>` : ''}
     ${(d.pickup.conMe||[]).length?`<div class="conme"><span class="k">Con te</span>
       <span class="v">${d.pickup.conMe.map(esc).join(' · ')}</span></div>`:''}
+    ${d.pickup.altre ? `<div class="pick-altre">Sui giri auto il tuo nome compare
+      ${d.pickup.altre === 1 ? 'anche in un\'altra tratta' : `in altre ${d.pickup.altre} tratte`}:
+      qui c'è la partenza più mattiniera. Controlla il foglio se aspettavi un altro orario.</div>` : ''}
   </div>` : ''}
 
   ${(d.location || (d.luoghi || []).length) ? `<div class="odg-sez">DOVE</div>
