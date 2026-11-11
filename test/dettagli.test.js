@@ -137,7 +137,12 @@ ok('due frasi, non tre',  await p.evaluate(()=>document.querySelector('.at-wiki 
    'Rocco Maffei è un attore, regista e cantautore italiano. Ha esordito nel 1988.');
 ok('con la faccia',       await p.evaluate(()=>document.querySelector('.at-wiki img').src), 'https://upload.wikimedia.org/x.jpg');
 ok('e il credito',        await p.evaluate(()=>document.querySelector('.at-wiki a').textContent.trim()), 'Wikipedia ↗');
-ok('ricordato sul telefono', await p.evaluate(()=>!!JSON.parse(localStorage.getItem('cb_wiki'))['Rocco Maffei']), true);
+/* La memoria porta un numero di versione: quando cambia il modo di
+   scegliere la pagina, quella vecchia si butta invece di restare li' con
+   dentro una descrizione sbagliata. */
+ok('ricordato sul telefono', await p.evaluate(()=>{
+  const m = JSON.parse(localStorage.getItem('cb_wiki'));
+  return !!(m && m.v && m.voci && m.voci['Rocco Maffei']);}), true);
 await p.evaluate(()=>odgChiudiScena());
 
 console.log('\n── un omonimo che non è un attore non entra ──');

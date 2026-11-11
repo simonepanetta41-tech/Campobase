@@ -10951,25 +10951,74 @@ function apriScheda(a){
  * faccia sbagliata, che e' peggio di nessuna faccia. Quello che si trova
  * resta sul telefono, cosi' la seconda volta c'e' anche senza campo. */
 const WIKI_MEMO = 'cb_wiki';
+/* Quando cambia il modo di scegliere la pagina, questo numero sale e la
+   memoria sul telefono si butta. Senza, la descrizione sbagliata gia'
+   salvata resterebbe li' per sempre: la correzione varrebbe solo per gli
+   attori mai cercati prima. */
+const WIKI_V = 2;
+
+function wikiNudo(s){
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/* La pagina parla davvero di questa persona?
+ *
+ * Il controllo di prima guardava soltanto se il testo nominava un attore,
+ * e la pagina di un film lo fa per forza — "e' interpretato da Filippo
+ * Scotti, Toni Servillo…". Cosi' nella scheda di un'attrice e' finita la
+ * trama di un film di Sorrentino: tutto vero, e tutto di un'altra cosa.
+ *
+ * Adesso si chiede anche che la pagina parli di LEI: il suo nome nel
+ * titolo, e il nome all'inizio del testo — che e' come comincia ogni
+ * biografia, "Carmen Pommella (Napoli, …) e' un'attrice italiana".
+ * Una pagina che si chiama come un film non e' la biografia di nessuno.
+ */
+function wikiVaBene(p, nome){
+  if (!p || !p.extract) return false;
+  if (!/attor|attric|regist|interpret|doppiat/i.test(p.extract)) return false;
+  const parole = wikiNudo(nome).split(' ').filter(w => w.length >= 3);
+  if (!parole.length) return false;
+  const titolo = wikiNudo(p.title);
+  if (!parole.some(w => titolo.includes(w))) return false;
+  // Il titolo e' il nome e basta: non c'e' altro da chiedere.
+  if (titolo === wikiNudo(nome)) return true;
+  /* Se no, il nome deve aprire il testo. Sessanta caratteri, non
+     centoventi: in centoventi ci sta anche "Il teatro napoletano del
+     Novecento ha formato molti interpreti. Fra questi Carmen Pommella",
+     che la nomina senza parlare di lei. */
+  const inizio = wikiNudo(p.extract).slice(0, 60);
+  return parole.every(w => inizio.includes(w));
+}
 
 async function wikiAttore(nome){
   const chiave = String(nome || '').trim();
   if (!chiave) return null;
   let memo = {};
-  try { memo = JSON.parse(localStorage.getItem(WIKI_MEMO) || '{}'); } catch (_) {}
+  try {
+    const salvato = JSON.parse(localStorage.getItem(WIKI_MEMO) || 'null');
+    if (salvato && salvato.v === WIKI_V) memo = salvato.voci || {};
+  } catch (_) {}
   if (Object.prototype.hasOwnProperty.call(memo, chiave)) return memo[chiave];
 
   let trovato = null;
   try {
+    /* Cinque risultati, non uno: il primo per Wikipedia e' il piu'
+       pertinente alla ricerca, non il piu' giusto per noi — e la pagina
+       di un film in cui la persona ha recitato batte spesso la sua. Si
+       scorrono nell'ordine della ricerca e si tiene il primo che parla
+       davvero di lei. */
     const u = 'https://it.wikipedia.org/w/api.php?action=query&format=json&origin=*'
-      + '&generator=search&gsrlimit=1&gsrsearch=' + encodeURIComponent(chiave + ' attore')
+      + '&generator=search&gsrlimit=5&gsrsearch=' + encodeURIComponent(chiave + ' attore')
       + '&prop=extracts|pageimages&exintro=1&explaintext=1&redirects=1'
       + '&piprop=thumbnail&pithumbsize=240';
     const r = await fetch(u);
     if (!r.ok) throw new Error(r.status);
     const j = await r.json();
-    const p = j && j.query && j.query.pages && Object.values(j.query.pages)[0];
-    if (p && p.extract && /attor|attric|regist|interpret|doppiat/i.test(p.extract)) {
+    const pagine = Object.values((j && j.query && j.query.pages) || {})
+      .sort((a, b) => (a.index || 0) - (b.index || 0));
+    const p = pagine.find(x => wikiVaBene(x, chiave));
+    if (p) {
       const frasi = p.extract.split('. ');
       trovato = {
         testo: (frasi.slice(0, 2).join('. ') + (frasi.length > 2 ? '.' : '')).slice(0, 340),
@@ -10984,7 +11033,7 @@ async function wikiAttore(nome){
   // Non deve crescere all'infinito: una troupe per volta basta.
   const ch = Object.keys(memo);
   if (ch.length > 120) ch.slice(0, ch.length - 120).forEach(k => delete memo[k]);
-  try { localStorage.setItem(WIKI_MEMO, JSON.stringify(memo)); } catch (_) {}
+  try { localStorage.setItem(WIKI_MEMO, JSON.stringify({ v: WIKI_V, voci: memo })); } catch (_) {}
   return trovato;
 }
 
