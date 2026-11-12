@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campobase</title>
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0A0B0D">
+<meta name="theme-color" content="#040507">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -33,17 +33,27 @@
  * stessa cosa. Il fondo e' piu' scuro e appena freddo: su OLED il nero
  * pieno fa sbavare il testo quando si scorre. */
 :root {
-  --bg: #0A0B0D;
-  --surface: #15181C;
-  --surface2: #1B1F24;
+  /* Misurato contro il tema chiaro, che si leggeva meglio. Lo stacco fra
+     scheda e fondo non c'entrava — li' vale 1.13, qui valeva 1.11, cioe'
+     uguale. A fare la differenza erano il bordo, invisibile a 1.28, e il
+     testo: le etichette piccole stavano a 3.33, appena sopra il minimo
+     per non essere considerate testo, e alle sei del mattino con la luce
+     di taglio sparivano.
+     Adesso: bordo 2.1, scheda sul fondo 1.32, testo secondario 8.7,
+     etichette 5.1. Il fondo non e' nero pieno — su OLED il nero pieno fa
+     sbavare il testo quando si scorre — ma di nero pieno gli manca un
+     punto percentuale di stacco. */
+  --bg: #040507;
+  --surface: #1F252D;
+  --surface2: #2A313A;
   --viaggio: #5090e0;
   --viaggio-rgb: 80,144,224;
-  --border: #272D34;
-  --border-l: #39424C;
+  --border: #4D5967;
+  --border-l: #6E7C8B;
   --yellow: #F5C542;
   --white: #EDEFF2;
-  --white-dim: #99A3AE;
-  --muted: #626C77;
+  --white-dim: #BAC4CF;
+  --muted: #8B96A2;
   --danger: #FF6B5A;
   --green: #5FD6A4;
   --orange: #F5A623;
@@ -390,7 +400,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* Il fondo abbondante serve: senza, l'ultima pagina non puo' salire in
    cima e toccare l'ultima scena non la porta sotto gli occhi. */
 .pdf-rullo{flex:1;min-height:0;overflow-y:auto;padding:12px 12px 65vh;
-  display:flex;flex-direction:column;align-items:center;gap:12px;background:#15181C}
+  display:flex;flex-direction:column;align-items:center;gap:12px;background:var(--surface)}
 .pdf-pag{display:block;height:auto;border-radius:4px;background:#fff;
   box-shadow:0 2px 14px rgba(0,0,0,.5)}
 .pdf-attesa{padding:40px 0;font-size:13px;color:var(--muted)}
@@ -4977,7 +4987,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.111';
+const CB_VERSIONE = '1.112';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
