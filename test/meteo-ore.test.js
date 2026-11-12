@@ -78,7 +78,7 @@ const fin = await p.evaluate(a=>{
     gradi:  ore.map(o=>o.querySelector('.mt-t').textContent),
     ventose: ore.map(o=>o.classList.contains('ventoso')),
     luce: [...el.querySelectorAll('.mt-luce .v')].map(x=>x.textContent),
-    nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()
+    nota: (el.querySelector('.mt-nota')?.textContent || '').replace(/\s+/g,' ').trim()
   };
 }, PREV);
 ok('si apre',                 fin.aperta, true);
@@ -105,7 +105,7 @@ const calmo = await p.evaluate(a=>{
   meteoApri(new Date('2026-11-12T06:00:00'));
   const el = document.getElementById('odgMeteo');
   return {ventose: [...el.querySelectorAll('.mt-o.ventoso')].length,
-          nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
+          nota: (el.querySelector('.mt-nota')?.textContent || '').replace(/\s+/g,' ').trim()};
 }, PREV);
 ok('con poco vento nessuna riga accesa', calmo.ventose, 0);
 ok('e sotto resta vuoto',                calmo.nota, '');
@@ -120,7 +120,7 @@ const alle = (ora, data) => p.evaluate(a=>{
   const el = document.getElementById('odgMeteo');
   return {orari: [...el.querySelectorAll('.mt-h')].map(x=>x.textContent),
           ventose: [...el.querySelectorAll('.mt-o')].map(o=>o.classList.contains('ventoso')),
-          nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
+          nota: (el.querySelector('.mt-nota')?.textContent || '').replace(/\s+/g,' ').trim()};
 }, {ora, data, prev:PREV});
 
 const OGGI = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
@@ -157,10 +157,13 @@ const corta = await p.evaluate(a=>{
   meteoApri(new Date(a.oggi + 'T20:15:00'));
   const el = document.getElementById('odgMeteo');
   return {quante: el.querySelectorAll('.mt-h').length,
-          nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
+          nota: (el.querySelector('.mt-nota')?.textContent || '').replace(/\s+/g,' ').trim()};
 }, {prev:PREV, oggi:OGGI});
+/* Niente riga a spiegarlo: l'elenco si spiega da solo, e se le ore che
+   vedi sono passate lo dici guardando l'orologio. Quello che conta e'
+   che non resti una schermata vuota. */
 ok('una previsione già tutta passata si vede lo stesso', corta.quante, 6);
-ok('e la riga lo dice',               /La giornata è finita/.test(corta.nota), true);
+ok('e sotto non c\'è niente',         corta.nota, '');
 
 /* Il caso che conta: sono le 13, il wrap era previsto alle 12, e si sta
    ancora girando. Il meteo non deve essere sparito. */
