@@ -130,6 +130,26 @@ ok('ieri spento',          celle.ieri,   [true, false]);
 ok('oggi acceso, col bordo', celle.oggi,   [false, true]);
 ok('domani acceso',        celle.domani, [false, false]);
 
+console.log('\n── la barra delle scene nel piano conta dalla stessa regola ──');
+/* Sei scene nel piano, una divisa su due giornate (la 2, il 9 e il 13):
+   e' una scena sola, e non e' fatta finche' deve tornare. */
+const barra = (mondo) => p.evaluate(m=>{
+  const vero = Date; const fisso = new vero(2026,10,12,10,0).getTime();
+  // sceneFatte() senza argomenti legge l'orologio: lo si ferma al 12.
+  window.Date = class extends vero { constructor(...a){ super(...(a.length?a:[fisso])); } static now(){ return fisso; } };
+  try {
+    pdlData = {settimane:[{giorni:m.piano}]}; pdlShootingData = m.mano || {};
+    odgPassati = m.odg || []; odgCorrente = m.corrente || null;
+    renderPdlStats();
+    return document.querySelectorAll('#pdlProgBars .pdl-barra')[0].querySelector('b').textContent;
+  } finally { window.Date = vero; }
+}, mondo);
+ok('solo dal piano',            await barra({piano:PIANO}), '5/8 · 63%');
+ok('con l\'OdG di oggi che riapre la 36',
+   await barra({piano:PIANO, odg:ODG11, corrente:OGGI}), '3/8 · 38%');
+ok('una segnata a mano si aggiunge',
+   await barra({piano:PIANO, mano:{22:{scenes:{'70':'done'}}}}), '6/8 · 75%');
+
 ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();

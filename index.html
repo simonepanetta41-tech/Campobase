@@ -4993,7 +4993,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.115';
+const CB_VERSIONE = '1.116';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -10804,6 +10804,8 @@ async function odgPassatiCarica(){
     } catch (e) { console.log('[scene fatte] ordini del giorno passati non letti:', e.message); }
   }
   sceneFatteAggiorna();
+  // E la barra delle scene nel piano, che conta dalla stessa regola.
+  try { if (pdlData && document.getElementById('pdlProgBars')) renderPdlStats(); } catch (_) {}
 }
 
 /* Lo spoglio potrebbe essere gia' a schermo, disegnato prima che
@@ -13126,7 +13128,22 @@ function renderPdlDashboard() {
 
 function renderPdlStats() {
   const allSc=getPdlAllGiorni().flatMap(g=>g.scene||[]);
-  const girate=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='done').length,0);
+  /* Le scene girate le dicono i documenti, con la stessa regola che le
+   * spegne nello spoglio (sceneFatte): gli ordini del giorno dei giorni
+   * passati, e il piano dove l'ordine del giorno manca. Prima si
+   * contavano solo quelle segnate a mano, e la barra stava a zero.
+   *
+   * Si conta per scena, non per riga del piano: una scena divisa su due
+   * giornate e' una scena sola, ed e' fatta quando non deve piu' tornare.
+   * Le marcature a mano si aggiungono: sono una cosa detta da chi c'era. */
+  const chiaveSc = n => catNumero(n) || String(n == null ? '' : n).trim().toUpperCase();
+  const delPiano = new Set(allSc.map(s => chiaveSc(s && s.numero)).filter(Boolean));
+  const fatteDoc = typeof sceneFatte === 'function' ? sceneFatte() : new Set();
+  const fatteMano = new Set();
+  Object.values(pdlShootingData).forEach(d => Object.entries(d.scenes || {})
+    .forEach(([n, v]) => { if (v === 'done') fatteMano.add(chiaveSc(n)); }));
+  const totScene = delPiano.size;
+  const girate = [...delPiano].filter(k => fatteDoc.has(k) || fatteMano.has(k)).length;
   const standby=Object.values(pdlShootingData).reduce((a,d)=>a+Object.values(d.scenes||{}).filter(v=>v==='standby').length,0);
   const segnate=Object.values(pdlShootingData).filter(d=>d.status==='complete').length;
   const tot=pdlTotali(pdlData);
@@ -13150,7 +13167,7 @@ function renderPdlStats() {
     [tot.giorni || '—','Giorni totali'],[completi,'Giornate girate'],
     [girate,'Scene girate'],[standby,'In stand-by']
   ].map(([n,k])=>`<div><span class="n num">${n}</span><span class="k">${k}</span></div>`).join('');
-  const pct=allSc.length>0?Math.round(girate/allSc.length*100):0;
+  const pct=totScene>0?Math.round(girate/totScene*100):0;
   const gPct=tot.giorni>0?Math.round(completi/tot.giorni*100):0;
   const barra=(nome,fatto,tot,perc,colore,nota)=>`<div class="pdl-barra">
     <div class="r"><span>${nome}</span><b>${fatto}/${tot} · ${perc}%</b></div>
@@ -13161,7 +13178,7 @@ function renderPdlStats() {
      nessuno le ha segnate a mano, ma quella riga comparendo tutti i
      giorni ripete una cosa che si capisce al primo sguardo. */
   document.getElementById('pdlProgBars').innerHTML =
-    barra('Scene', girate, allSc.length, pct, 'var(--green)') +
+    barra('Scene', girate, totScene, pct, 'var(--green)') +
     barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)');
 }
 

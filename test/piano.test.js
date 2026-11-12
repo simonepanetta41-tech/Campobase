@@ -29,6 +29,19 @@ const b=await chromium.launch();
 const p=await b.newPage({viewport:{width:390,height:844},deviceScaleFactor:2});
 p.setDefaultTimeout(15000);
 const err=[]; p.on('pageerror',e=>err.push(e.message));
+/* L'orologio e' fermo a prima dell'inizio delle riprese. Le scene girate
+   adesso le dicono i documenti — un giorno del piano gia' passato vale
+   come girato — e piano.json ha date vere: senza un orologio fermo questo
+   controllo cambierebbe risultato col calendario. Fermo a gennaio, i
+   documenti non dicono niente e restano le marcature a mano, che e'
+   quello che qui si controlla. */
+await p.addInitScript(()=>{
+  const Vero = Date, fisso = new Vero(2026,0,15,10,0).getTime();
+  window.Date = class extends Vero {
+    constructor(...a){ super(...(a.length ? a : [fisso])); }
+    static now(){ return fisso; }
+  };
+});
 await p.addInitScript(()=>{window.supabase={createClient:()=>({
   auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
   from:()=>({select(){return this},eq(){return this},in:async()=>({data:[]}),order(){return this},
