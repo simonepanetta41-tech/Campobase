@@ -584,6 +584,11 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .sp-sc:active{background:rgba(245,197,66,.14);border-color:var(--yellow)}
 /* Una scena gia' girata resta al suo posto e si apre come le altre, ma
    va sullo sfondo: quello che salta all'occhio e' quello che manca. */
+.odg-manca{padding:16px;border-color:rgba(245,197,66,.45)}
+.odg-manca .t{font-size:15px;font-weight:600;color:var(--white)}
+.odg-manca .s{font-size:13px;color:var(--white-dim);margin:6px 0 14px;line-height:1.45}
+.odg-riprova{width:100%;min-height:46px;border-radius:10px;border:none;background:var(--yellow);
+  color:#111;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
 .sp-sc.fatta{background:none;border-color:var(--border);color:var(--muted);opacity:.55}
 .sp-nota{display:none;margin-top:9px}
 .sp-nota.on{display:block}
@@ -5007,7 +5012,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.119';
+const CB_VERSIONE = '1.120';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9494,21 +9499,33 @@ Ometti i campi che il documento non ha, con stringa vuota. Non inventare righe. 
 
 /* Estrae un ordine del giorno dal testo di un PDF.
    L'intestazione non costa niente; le tabelle sono una chiamata sola. */
-async function odgEstrai(doc, onPasso) {
-  const passo = onPasso || (() => {});
-  const d = typeof doc === 'string' ? { testo: doc } : doc;
-  const testo = d.testo;
-  passo('Lettura dell\'intestazione');
-  const testa = odgIntestazioneDa(d);
-
-  passo('Scene, cast e troupe');
+/* Le tabelle dell'ordine del giorno: scene, cast, troupe, fabbisogni.
+ *
+ * Sta per conto suo perche' si deve poter rifare da sola. L'ordine del
+ * giorno 24 e' arrivato con gli orari giusti e senza scene ne' attori: il
+ * modello si era fermato a meta' risposta, il JSON non si chiudeva, e il
+ * guasto finiva in una riga di console che sul telefono nessuno legge.
+ *
+ * Tre cose, quindi:
+ *   - il tetto della risposta sale da 8000 a 16000. La troupe sono
+ *     novanta righe, e da quando si leggono anche i fabbisogni la
+ *     risposta intera non ci stava piu';
+ *   - il testo si cerca fra i blocchi per tipo, non si prende il primo:
+ *     se il modello ragiona prima di rispondere, il primo non e' testo;
+ *   - quando va male si dice perche' (pdlDiagnosi), e il motivo resta
+ *     nell'ordine del giorno, dove la schermata lo mostra con un tasto
+ *     per riprovare.
+ */
+async function odgTabelle(testo) {
   let tab = { scene: [], domani: null, cast: [], troupe: [], contatti: [] };
+  let r = null, grezzo = '';
   try {
-    const r = await callApi('api/pdl', {
-      system: ODG_SYS, max_tokens: 8000,
-      messages: [{ role: 'user', content: [{ type: 'text', text: testo.slice(0, 40000) }] }]
+    r = await callApi('api/pdl', {
+      system: ODG_SYS, max_tokens: 16000,
+      messages: [{ role: 'user', content: [{ type: 'text', text: String(testo || '').slice(0, 40000) }] }]
     });
-    const grezzo = r?.content?.[0]?.text || '';
+    grezzo = ((r && r.content) || []).filter(b => b && b.type === 'text')
+      .map(b => b.text || '').join('') || r?.content?.[0]?.text || '';
     const j = grezzo.slice(grezzo.indexOf('{'), grezzo.lastIndexOf('}') + 1);
     const p = JSON.parse(j);
     tab = {
@@ -9522,9 +9539,11 @@ async function odgEstrai(doc, onPasso) {
     if (tab.domani) tab.domani.fabbisogni = fabPulisci(tab.domani.fabbisogni);
   } catch (e) {
     // L'intestazione resta valida anche se le tabelle non si leggono: meglio
-    // un OdG con gli orari e senza le scene che nessun OdG.
-    console.log('[odg] tabelle non lette:', e.message);
-    tab.errore = e.message;
+    // un OdG con gli orari e senza le scene che nessun OdG. Ma si dice.
+    let perche = e.message;
+    try { if (r) perche = pdlDiagnosi(r, grezzo); } catch (_) {}
+    console.log('[odg] tabelle non lette:', perche);
+    tab.errore = perche;
   }
 
   // Gli orari dentro le tabelle arrivano come li ha scritti il modello.
@@ -9533,6 +9552,58 @@ async function odgEstrai(doc, onPasso) {
   const sist = o => { const v = odgOra(o); return v || (o || ''); };
   tab.cast.forEach(c => { c.pickup = sist(c.pickup); c.set = sist(c.set); });
   tab.troupe.forEach(c => { c.partenza = sist(c.partenza); c.set = sist(c.set); });
+  return tab;
+}
+
+/* Rifare solo le tabelle dell'ordine del giorno a schermo, dal testo che
+   e' gia' salvato con lui: niente PDF da ricaricare, niente mail da
+   reinoltrare. Quello che esce si salva sul cloud, quindi basta che lo
+   faccia uno e lo vedono tutti. */
+async function odgRitenta() {
+  const d = odgCorrente;
+  if (!d || !d.testo || odgInCorso) return;
+  odgInCorso = true; odgRender();
+  try {
+    odgPasso('Scene, cast e troupe');
+    const tab = await odgTabelle(d.testo);
+    if (tab.errore) {
+      d.errore = tab.errore;
+      showToast('Non ci sono riuscito nemmeno stavolta. Riprova tra poco.', 'red', 6000);
+      return;
+    }
+    Object.assign(d, tab);
+    delete d.errore;
+    odgAggiustaPagine(d);
+    await odgSalva(d);
+    showToast('Scene, cast e troupe letti.');
+  } catch (e) {
+    showToast(e.message, 'red', 5000);
+  } finally {
+    odgInCorso = false;
+    odgRicalcola();
+    odgRender();
+    if (typeof sceneFatteAggiorna === 'function') sceneFatteAggiorna();
+  }
+}
+
+async function odgEstrai(doc, onPasso) {
+  const passo = onPasso || (() => {});
+  const d = typeof doc === 'string' ? { testo: doc } : doc;
+  const testo = d.testo;
+  passo('Lettura dell\'intestazione');
+  const testa = odgIntestazioneDa(d);
+
+  passo('Scene, cast e troupe');
+  let tab = await odgTabelle(testo);
+  /* Una seconda volta, da solo. Il telefono che riceve la posta analizza
+     per tutta la troupe, e di solito nessuno lo sta guardando: se le
+     tabelle non si leggono al primo colpo, riprovare costa trenta secondi
+     e risparmia a sessanta persone un foglio senza scene. */
+  if (tab.errore) {
+    passo('Scene, cast e troupe: secondo tentativo');
+    const due = await odgTabelle(testo);
+    if (!due.errore) tab = due;
+  }
 
   return Object.assign({}, testa, tab);
 }
@@ -12654,6 +12725,17 @@ function odgPienoHtml(d) {
         ${mie.length ? `<span class="fab-bollo">${esc(mie[0].reparto)}</span>` : ''}
         <span class="chev">›</span></a>
     </div>`; })() : ''}
+
+  ${/* Senza scene per un errore dichiarato, oppure senza scene, senza
+        cast e senza troupe tutti insieme: un foglio vero la troupe ce
+        l'ha sempre, quindi vuoto del tutto vuol dire non letto. */
+     !(d.scene || []).length && (d.errore || (!(d.cast || []).length && !(d.troupe || []).length))
+     ? `<div class="odg-sez">SCENE DEL GIORNO</div>
+  <div class="card odg-manca">
+    <div class="t">Scene, cast e troupe non letti</div>
+    <div class="s">Gli orari qui sopra sono giusti. Il resto del foglio non è stato letto fino in fondo.</div>
+    ${d.testo ? `<button class="odg-riprova" onclick="odgRitenta()">Rileggi</button>` : ''}
+  </div>` : ''}
 
   ${(d.scene || []).length ? `<div class="odg-sez">SCENE DEL GIORNO</div>
   <div class="card"><ul class="odg-scene">${d.scene.map(s => odgStacco(s)
