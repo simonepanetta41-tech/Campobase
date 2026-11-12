@@ -4977,7 +4977,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.110';
+const CB_VERSIONE = '1.111';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12469,7 +12469,7 @@ function odgPienoHtml(d) {
       ${(d.previsione.ore||[]).length ? 'onclick="meteoApri()"' : ''}>
     <div class="g"><span class="s">${d.previsione.segno}</span>
       <span class="c"><span class="t">${esc(d.previsione.cielo)}</span></span>
-      ${(d.previsione.ore||[]).length ? '<span class="piu">più info</span>' : ''}</div>
+      ${(d.previsione.ore||[]).length ? '<span class="piu">Più info</span>' : ''}</div>
     <div class="n">
       ${d.previsione.max!=null?`<div><span class="k">temp</span><span class="v num">${d.previsione.min}–${d.previsione.max}°</span></div>`:''}
       ${d.previsione.pioggia!=null?`<div><span class="k">pioggia</span><span class="v num">${d.previsione.pioggia}%</span></div>`:''}
