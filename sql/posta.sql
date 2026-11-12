@@ -36,6 +36,11 @@ create table if not exists public.posta (
   allegati       jsonb not null default '[]'::jsonb,
 
   -- nuova | in analisi | fatta | senza allegati | errore | scartata
+  --   | da verificare  <- arrivata da un mittente diverso da quello
+  --     atteso per il film (projects.mittente). Il Worker la salva con
+  --     tutti gli allegati ma non avvisa la troupe e l'app non la
+  --     prende: prendi_posta guarda solo nuova, errore e in analisi. Per
+  --     farla analizzare: update posta set stato='nuova' where id=...
   stato          text not null default 'nuova',
   nota           text,
 

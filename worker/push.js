@@ -422,3 +422,46 @@ export async function avvisaPosta(env, projectId, fatti, oggetto) {
   });
   return righe.length;
 }
+
+/* E quando una mail viene messa da parte, lo sa solo il capo.
+ *
+ * Qui il rischio e' al contrario di tutto il resto: una mail messa da
+ * parte per sbaglio e' un ordine del giorno che la mattina non c'e', e
+ * nessuno se ne accorge finche' non serve. Per questo chi ha aperto il
+ * film riceve un avviso: il rimedio e' una riga di SQL, ma bisogna sapere
+ * che c'e' da rimediare.
+ *
+ * Solo a lui, non alla troupe: la troupe non puo' farci niente, e una
+ * notifica che non si puo' agire e' rumore.
+ */
+export async function avvisaMittenteStrano(env, film, chi, oggetto) {
+  let capi = await db(env,
+    `film_membri?select=user_id&project_id=eq.${film.id}&ruolo=eq.capo`);
+
+  /* Il ripiego sul proprietario non e' teoria: la riga 'capo' la scrive
+     troupe.sql ai film che esistevano allora, e un film aperto dopo
+     entra in film_membri come 'membro'. Senza questo, su quei film
+     l'avviso non andrebbe a nessuno. */
+  if (!capi?.length && film.user_id) capi = [{ user_id: film.user_id }];
+  if (!capi?.length) return 0;
+
+  const da = String(chi || '').replace(/\s+/g, ' ').trim().slice(0, 70);
+  const testo = 'Mail messa da parte\n' + (da ? 'Arrivata da ' + da : 'Mittente non riconosciuto');
+
+  const adesso = new Date();
+  const righe = capi.map(c => ({
+    user_id: c.user_id,
+    project_id: film.id,
+    quando: adesso.toISOString(),
+    genere: 'posta',
+    testo,
+    chiave: `${c.user_id}:mittente:${adesso.toISOString().slice(0, 16)}`
+  }));
+
+  await db(env, 'push_appuntamenti?on_conflict=chiave', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify(righe)
+  });
+  return righe.length;
+}
