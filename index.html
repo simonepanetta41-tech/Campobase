@@ -4486,15 +4486,13 @@ function spoglioRender(d){
            si aggiungono da Impostazioni → Categorie di analisi.</div>`
       : '<div class="sp-vuoto">Nessuna criticità segnalata in questa sceneggiatura.</div>');
 
+  /* "71 scene · 86 segnalazioni" non si scrive piu' in testa: sono due
+     numeri che non cambiano una decisione di nessuno, e stanno sopra la
+     cosa che invece si legge. Il conto serve ancora qui sotto, per dire
+     quante segnalazioni restano fuori dalle categorie scelte. */
   const conta = document.getElementById('spConta');
-  let viste = 0;
-  if (conta) {
-    // Quello che si vede, non quello che c'e': se il conto dicesse di piu'
-    // di quello a schermo, sembrerebbe roba persa.
-    viste = ordinati.reduce((s,g) => s + g.voci.reduce((t,v) => t + v.scene.length, 0), 0);
-    conta.textContent = (d.totale_scene ? d.totale_scene + ' scene · ' : '') +
-      viste + ' segnalazion' + (viste === 1 ? 'e' : 'i');
-  }
+  if (conta) conta.textContent = '';
+  const viste = ordinati.reduce((s,g) => s + g.voci.reduce((t,v) => t + v.scene.length, 0), 0);
 
   /* Quello che resta fuori si dice sempre, anche quando a schermo c'e'
    * qualcosa.
@@ -4935,7 +4933,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.104';
+const CB_VERSIONE = '1.105';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9036,13 +9034,32 @@ function fabOrdina(fabbisogni, mioReparto) {
  */
 
 /* Il numero nudo di una scena, per confrontarlo.
+ *
  * Lo spoglio le scrive "SC.21 - EST. ACCAMPAMENTO - GIORNO (p.14)",
- * l'ordine del giorno le chiama "21", "32END", "65C". Si confronta solo
+ * l'ordine del giorno le chiama "21", "65C", "36PT". Si confronta solo
  * il numero, e per intero: senza l'ancora di fine, la scena 2 si
- * prenderebbe addosso tutto quello che riguarda la 21 e la 25. */
+ * prenderebbe addosso tutto quello che riguarda la 21 e la 25.
+ *
+ * Il "PT" fa eccezione, e di proposito. Vuol dire "parte": quando una
+ * scena non si chiude in giornata, il giorno dopo torna sull'ordine del
+ * giorno come 36PT. Ma sulla sceneggiatura, e quindi nello spoglio, la
+ * scena resta la 36 — e se quella e' un camera car, lo e' anche la parte
+ * che si gira oggi. Senza questa riga, il giorno in cui una scena si
+ * spezza in due le sue segnalazioni sparirebbero proprio quando serve
+ * ricordarsele.
+ *
+ * Le lettere invece restano: 36A e' un'altra scena, scritta a parte sulla
+ * sceneggiatura, e non eredita niente dalla 36.
+ */
 function catNumero(s) {
   const m = /^\s*(?:SC\s*\.?\s*)?([0-9]+[A-Za-z]*)/i.exec(String(s || '').trim());
-  return m ? m[1].toUpperCase() : '';
+  if (!m) return '';
+  const tutto = m[1].toUpperCase();
+  // L'ordinale deve portare la sua lettera — "1A PT", "2ª PT" — se no il
+  // numero della scena verrebbe scambiato per l'ordinale e sparirebbe.
+  const senza = tutto.replace(/(?:\d+[AÂª°])?(?:PARTE|PTE|PT)$/, '');
+  // E se togliendo non resta un numero, non era una parte: era il nome.
+  return /\d/.test(senza) ? senza : tutto;
 }
 
 /* Le categorie che toccano una scena, il mio reparto per primo. */
@@ -12818,13 +12835,13 @@ function renderPdlStats() {
     <div class="r"><span>${nome}</span><b>${fatto}/${tot} · ${perc}%</b></div>
     <div class="v"><div style="width:${perc}%;background:${colore}"></div></div>
     ${nota?`<div class="d">${nota}</div>`:''}</div>`;
-  /* Da dove viene il numero si dice, se non l'ha messo una persona: una
-     barra che si muove da sola senza spiegare perche' e' una barra di cui
-     non si fida nessuno. */
-  const nota = daOdg > segnate ? 'dall\'ordine del giorno ' + odgCorrente.numero : '';
+  /* La provenienza del numero non si scrive piu' sotto la barra. Era
+     nata per spiegare perche' le giornate si muovono da sole quando
+     nessuno le ha segnate a mano, ma quella riga comparendo tutti i
+     giorni ripete una cosa che si capisce al primo sguardo. */
   document.getElementById('pdlProgBars').innerHTML =
     barra('Scene', girate, allSc.length, pct, 'var(--green)') +
-    barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)', nota);
+    barra('Giornate', completi, tot.giorni, gPct, 'var(--yellow)');
 }
 
 function renderPdlStandby() {

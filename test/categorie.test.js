@@ -65,13 +65,14 @@ const una = await p.evaluate(()=>{
   return {animali: /Animali/i.test(t), stunt: /Stunt(?!\s*&)/i.test(t),
           mezzi: /Mezzi/i.test(t),
           categorie: [...document.querySelectorAll('#catsGrid .sp-cat')].length,
-          conta: (t.match(/(\d+)\s+segnalazion/)||[])[1]};
+          conta: document.querySelectorAll('#spoglioSection .sp-sc').length};
 });
 ok('c\'è quella spuntata',        una.animali, true);
 ok('le altre no',                [una.stunt, una.mezzi], [false, false]);
 ok('una categoria sola a schermo', una.categorie, 1);
-// Il conto dice quello che si vede: dicesse tre, sembrerebbe roba persa.
-ok('e il conto è di quella',     una.conta, '1');
+// A schermo c'e' solo quello che e' spuntato: tre pastiglie vorrebbero
+// dire che si vedono anche le categorie escluse.
+ok('e le scene sono le sue',     una.conta, 1);
 
 console.log('\n── il proprio reparto apre la pagina ──');
 const mio = await p.evaluate(()=>{

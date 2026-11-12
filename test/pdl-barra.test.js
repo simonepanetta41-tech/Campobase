@@ -51,7 +51,9 @@ console.log('\n── col 23 in mano, 22 sono fatte ──');
 const a = await barre(23, 0);
 ok('ventidue su trentasette', a.etichetta, '22/37 · 59%');
 ok('la barra è al 59%',       a.larghezza, '59%');
-ok('e dice da dove viene',    a.nota, 'dall\'ordine del giorno 23');
+/* La provenienza non si scrive piu' sotto la barra: compariva tutti i
+   giorni per spiegare una cosa che si capisce al primo sguardo. */
+ok('senza didascalia sotto',  a.nota, '');
 
 console.log('\n── quello di oggi non si conta ──');
 // Oggi e' l'ODG 22: la giornata e' in corso, le fatte sono 21.

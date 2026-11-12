@@ -53,6 +53,20 @@ const num = s => p.evaluate(x=>catNumero(x), s);
 ok('"SC.21 - EST. ACCAMPAMENTO"', await num('SC.21 - EST. ACCAMPAMENTO - GIORNO (p.14)'), '21');
 ok('"Sc. 32END - INT."',          await num('Sc. 32END - INT. CASA'), '32END');
 ok('"65C"',                       await num('65C'), '65C');
+
+/* "PT" vuol dire parte: una scena che non si e' chiusa in giornata torna
+   il giorno dopo come 36PT, ma sulla sceneggiatura resta la 36 — e se
+   quella e' un camera car, lo e' anche il pezzo che si gira oggi.
+   Dall'ordine del giorno 23 di Missione San Gennaro, dove la scena e'
+   scritta "36PT" nella riga delle scene e "36pt" fra i fabbisogni. */
+ok('"36PT" è la 36',              await num('36PT'), '36');
+ok('"36pt" anche minuscolo',      await num('36pt'), '36');
+ok('"SC. 36PT"',                  await num('SC. 36PT'), '36');
+ok('"36 1aPT"',                   await num('36 1aPT'), '36');
+/* Ma una lettera non e' una parte: 36A e' un'altra scena, scritta a
+   parte sulla sceneggiatura, e non eredita niente dalla 36. */
+ok('"36A" resta la 36A',          await num('36A'), '36A');
+ok('"25A" resta la 25A',          await num('25A'), '25A');
 ok('"  21 "',                     await num('  21 '), '21');
 ok('una riga senza numero',       await num('TRASFERIMENTO'), '');
 ok('niente',                      await num(''), '');
@@ -68,6 +82,17 @@ ok('la 21: camera car e animali', (await cat('21')).sort(), ['Animali','Camera c
 ok('la 25: camera car e stunt',   (await cat('25')).sort(), ['Camera car','Stunt']);
 ok('la 24: solo animali',          await cat('24'), ['Animali']);
 ok('la 99: niente',                await cat('99'), []);
+
+/* Il caso di oggi: lo spoglio dice che la 36 e' un camera car, l'ordine
+   del giorno chiama quel pezzo 36PT. */
+ok('la 36PT prende quello della 36', await p.evaluate(a=>
+  catDiScena('36PT', spoglioDati(a), null).map(c=>c.nome),
+  {...ANALISI, camera_car:{presente:true, scene:[{scena:'SC.36 - EST. STRADE BIANCHE - GIORNO (p.29)'}]}}),
+  ['Camera car']);
+ok('ma la 36A no',                 await p.evaluate(a=>
+  catDiScena('36A', spoglioDati(a), null).map(c=>c.nome),
+  {...ANALISI, camera_car:{presente:true, scene:[{scena:'SC.36 - EST. STRADE BIANCHE - GIORNO (p.29)'}]}}),
+  []);
 
 console.log('\n── ⚠ il confronto dei numeri è per intero ──');
 /* Se "2" si prendesse le scene 21, 24 e 25, la mattina leggeresti stunt

@@ -57,17 +57,18 @@ ok('i numeri',  await p.evaluate(()=>[...document.querySelectorAll('#statsRow .n
    ['184','96','88','7']);
 ok('giorno e notte sotto interno', await p.evaluate(()=>document.querySelectorAll('#statsRow .u')[0].textContent), '60 g · 36 n');
 ok('la scena con più attori', await p.evaluate(()=>[...document.querySelectorAll('#statsRow .u')].pop().textContent), 'sc. 12');
-/* Il conto dice quello che si vede, non quello che c'e': lo spoglio
-   mostra solo le categorie scelte, e un conto piu' alto di quello a
-   schermo sembrerebbe roba persa. Quante ne restano fuori sta scritto in
-   fondo, e i due numeri insieme fanno il totale. */
-ok('il conteggio in testa', await p.evaluate(()=>{
-  const viste = +(document.getElementById('spConta').textContent.match(/(\d+)\s+segnalazion/)||[])[1];
+/* I conti devono tornare: le segnalazioni a schermo piu' quelle lasciate
+   fuori dalle categorie scelte fanno tutte quelle trovate. Il numero si
+   conta dalle pastiglie delle scene, non da un'etichetta: in testa non
+   c'e' piu' scritto niente, e un conto letto da una scritta smette di
+   controllare il giorno in cui la scritta cambia. */
+ok('i conti tornano', await p.evaluate(()=>{
+  const viste = document.querySelectorAll('#spoglioSection .sp-sc').length;
   const fuori = +((document.getElementById('spFuori').textContent.match(/Altre\s+(\d+)/)||[])[1] || 0);
   const tutte = Object.values(spoglioDati(window.analysisData)).reduce((s,v)=>s+(v.scene?.length||0),0);
-  return {testa: document.getElementById('spConta').textContent.startsWith('184 scene · '),
+  return {testa: document.getElementById('spConta').textContent.trim(),
           somma: viste + fuori, tutte};
-}), {testa:true, somma:7, tutte:7});
+}), {testa:'', somma:7, tutte:7});
 
 console.log('\n── i reparti ──');
 /* Si vede solo quello che e' scelto; senza una scelta esplicita vale il

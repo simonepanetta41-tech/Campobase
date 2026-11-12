@@ -75,7 +75,7 @@ const v = await p.evaluate(()=>({
   // Quello che si vede, non una variabile: e' la prova che serve.
   /* Le categorie partono chiuse, quindi il dettaglio non e' ancora scritto:
      la prova che lo spoglio e' arrivato e' il conteggio in cima. */
-  spoglio: (document.getElementById('spoglioSection').textContent.match(/(\d+)\s+segnalazion/)||[])[1],
+  spoglio: document.querySelectorAll('#spoglioSection .sp-sc').length,
   piano: pdlData && pdlData.titolo,
   giorni: pdlData && pdlTotali(pdlData).giorni,
   cruscotto: document.getElementById('pdlDashboard').style.display,
@@ -85,7 +85,7 @@ const v = await p.evaluate(()=>({
   scheda: document.getElementById('odgSection').style.display !== 'none',
   spoglioNascosto: document.getElementById('spoglioSection').style.display === 'none'
 }));
-ok('lo spoglio è caricato',   v.spoglio, '2');
+ok('lo spoglio è caricato',   v.spoglio, 2);
 ok("l'analisi ha un id",      v.analisi, 'an1');
 ok('il piano è caricato',     v.piano, 'Missione San Gennaro');
 ok('con le sue giornate',     v.giorni, 37);

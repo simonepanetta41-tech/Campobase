@@ -78,7 +78,7 @@ ok('le sue categorie', await p.evaluate(()=>document.querySelectorAll('.sp-cat')
    prova, e poi va aggiornato senza che nessuno sappia piu' perche'. */
 ok('e in fondo cosa resta fuori', await p.evaluate(()=>{
   const n = document.getElementById('spFuori');
-  const viste = +(document.getElementById('spConta').textContent.match(/(\d+)\s+segnalazion/)||[])[1];
+  const viste = document.querySelectorAll('#spoglioSection .sp-sc').length;
   const fuori = +(n.textContent.match(/Altre\s+(\d+)/)||[])[1];
   const tutte = Object.values(spoglioDati(window.analysisData))
     .reduce((s,v)=>s+(v.scene?.length||0),0);
