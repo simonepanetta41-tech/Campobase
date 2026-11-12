@@ -5012,7 +5012,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.120';
+const CB_VERSIONE = '1.121';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9486,6 +9486,7 @@ Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
  "contatti":[{"nome":"","ruolo":"","tel":""}]}
 
 scene: le scene del giorno, nell'ordine della tabella "SC. E/I G/N AMBIENTE SINOSSI ID DAY PAG". n e' il numero esatto con le lettere (32END, 65C, 32PT). ie: E, I oppure I/E. m: G o N. ids: i numeri del cast, separati da virgola.
+Una riga della tabella puo' andare a capo quando la sinossi e' lunga: allora la sinossi e gli ID arrivano spezzati su piu' righe, SOPRA e SOTTO la riga che porta il numero di scena. Una scena comincia SOLO dove c'e' il suo numero seguito da E/I e G/N; una riga di soli numeri e virgole ("1, 2, 7,") e' un pezzo della colonna ID della scena vicina, non una scena. Il totale "Tot. pag." e la colonna SCENE del cast ti dicono quante e quali scene ci sono: non crearne altre.
 pag: SOLO l'ultima colonna, PAG: "1/8", "3 3/8", "2". DAY e PAG sono due colonne diverse e vicine: DAY e' il numero della giornata di lavorazione ed e' lo stesso per tutte le scene del giorno, PAG sono gli ottavi di pagina di quella scena. Non attaccarle: una riga "ID 1, 19 | DAY 4 | PAG 1/8" ha pag "1/8", non "4 1/8". Se la somma dei pag delle scene non somiglia al "Tot. pag." in fondo alla tabella, hai preso dentro la colonna DAY.
 Fra una scena e l'altra la tabella puo' avere una riga senza numero, con una scritta sola in maiuscolo (TRASFERIMENTO, DRONE UNIT, SECOND UNIT, PRANZO, SPOSTAMENTO): e' uno stacco nella giornata, non una scena. Rendila come {"n":"","nota":"TRASFERIMENTO"} al posto suo nell'elenco, senza attaccarla alla scena prima o dopo.
 domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null. Se sotto quella tabella c'e' una sua griglia di fabbisogni, va in domani.fabbisogni con le stesse regole di sotto.
@@ -9537,6 +9538,7 @@ async function odgTabelle(testo) {
       contatti:   Array.isArray(p.contatti) ? p.contatti : []
     };
     if (tab.domani) tab.domani.fabbisogni = fabPulisci(tab.domani.fabbisogni);
+    odgRicuciScene(tab, testo);
   } catch (e) {
     // L'intestazione resta valida anche se le tabelle non si leggono: meglio
     // un OdG con gli orari e senza le scene che nessun OdG. Ma si dice.
@@ -9553,6 +9555,71 @@ async function odgTabelle(testo) {
   tab.cast.forEach(c => { c.pickup = sist(c.pickup); c.set = sist(c.set); });
   tab.troupe.forEach(c => { c.partenza = sist(c.partenza); c.set = sist(c.set); });
   return tab;
+}
+
+/* Una scena spezzata in due si ricuce.
+ *
+ * Quando la sinossi e' lunga la riga della tabella va a capo, e nel testo
+ * del PDF i pezzi arrivano sparsi sopra e sotto la riga col numero:
+ *
+ *     1, 2, 7,
+ *     Colonna e Navarra cenano e chiedono informazioni sulla strada. ...
+ *     16   I/E   N   OSTERIA   15, 16,   3   6 6/8
+ *     Arriva Ginetto il bullo ma Navarra lo schiaffeggia.
+ *     17
+ *
+ * Il modello ha letto "1, 2, 7," come l'inizio di una scena 1: sullo
+ * schermo due scene, e sotto la 1 le categorie dello spoglio della vera
+ * scena 1, che quel giorno non si gira.
+ *
+ * Una scena inventata cosi' si riconosce da due cose insieme, e servono
+ * tutte e due:
+ *   - nel testo non c'e' nessuna riga che cominci col suo numero seguito
+ *     da I, E o I/E, come ce l'hanno le scene vere di questo foglio;
+ *   - nessun attore del cast la ha fra le sue scene.
+ * Una sola non basta: altri fogli scrivono la tabella in un altro ordine,
+ * e una scena senza attori esiste (un paesaggio, un drone). E se nemmeno
+ * una scena del foglio passa la prima prova, questo formato non lo
+ * conosciamo e non si tocca niente.
+ *
+ * Il pezzo inventato si riattacca alla scena vera che lo segue, o a
+ * quella prima se e' l'ultimo: sinossi e ID in fila, il resto dalla vera.
+ */
+function odgRicuciScene(tab, testo) {
+  const scene = (tab && tab.scene) || [];
+  if (scene.length < 2 || !testo) return;
+  const haRiga = n => {
+    const k = String(n || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+    return !!k && new RegExp('^\\s*' + k + '\\s+(I\\s*/\\s*E|E\\s*/\\s*I|INT\\.?|EST\\.?|I|E)\\s', 'im').test(testo);
+  };
+  const nelCast = new Set();
+  for (const c of tab.cast || [])
+    String(c && c.scene || '').split(/[,;\s]+/).forEach(x => { if (x) nelCast.add(x.trim().toUpperCase()); });
+
+  const vera = scene.map(s => !s.n || haRiga(s.n));           // gli stacchi (senza n) non si giudicano
+  if (!scene.some((s, i) => s.n && vera[i])) return;          // formato sconosciuto
+  if (!nelCast.size) return;                                  // senza cast manca la seconda prova
+  const finta = scene.map((s, i) => !!s.n && !vera[i] && !nelCast.has(String(s.n).trim().toUpperCase()));
+  if (!finta.some(Boolean)) return;
+
+  const unisci = (a, b, sep) => [a, b].map(x => String(x || '').trim()).filter(Boolean).join(sep);
+  const tenute = [];
+  for (let i = 0; i < scene.length; i++) {
+    if (!finta[i]) { tenute.push(scene[i]); continue; }
+    const f = scene[i];
+    let j = i + 1; while (j < scene.length && (finta[j] || !scene[j].n)) j++;
+    if (j < scene.length) {                                   // la vera viene dopo
+      scene[j].sinossi = unisci(f.sinossi, scene[j].sinossi, ' ');
+      scene[j].ids = unisci(f.ids, scene[j].ids, ', ');
+    } else {                                                  // era l'ultima: a quella prima
+      let k = tenute.length - 1; while (k >= 0 && !tenute[k].n) k--;
+      if (k < 0) { tenute.push(f); continue; }
+      tenute[k].sinossi = unisci(tenute[k].sinossi, f.sinossi, ' ');
+      tenute[k].ids = unisci(tenute[k].ids, f.ids, ', ');
+    }
+    console.log('[odg] scena ' + f.n + ' ricucita: era un pezzo di riga andato a capo');
+  }
+  tab.scene = tenute;
 }
 
 /* Rifare solo le tabelle dell'ordine del giorno a schermo, dal testo che
@@ -11338,6 +11405,10 @@ const ODG_LUOGHI_V = 1;
 function odgRicalcola() {
   const d = odgCorrente;
   if (!d) return;
+  /* Un ordine del giorno gia' salvato con una scena spezzata si ricuce
+     qui, su ogni telefono che lo apre: testo e cast sono salvati con lui,
+     non serve richiamare il modello. */
+  try { if (d.testo) odgRicuciScene(d, d.testo); } catch (_) {}
   if (d.giriTesto) {
     const p = odgPickUp(d.giriTesto, profilo());
     if (p) d.pickup = p;

@@ -110,6 +110,56 @@ const male = await p.evaluate(async a=>{
 }, {base:BASE, tronca:TRONCA});
 ok('se va male resta com\'era, e si può riprovare', male, {scene:0, errore:true, inCorso:false});
 
+console.log('\n── ⚠ una scena spezzata in due si ricuce ──');
+/* Il testo e' quello vero dell'ordine del giorno 24, come lo legge
+   l'app: la riga della scena 16 va a capo e i pezzi finiscono sopra e
+   sotto. Il modello ne aveva fatto una scena 1 e una scena 16. */
+const TESTO24 = [
+  'SC.   E/I G/N   AMBIENTE   SINOSSI   ID   DAY   PAG',
+  '1, 2, 7,',
+  'Colonna e Navarra cenano e chiedono informazioni sulla strada. La Volpe li approccia per consigliarli.',
+  '16   I/E   N   OSTERIA   15, 16,   3   6 6/8',
+  'Arriva Ginetto il bullo ma Navarra lo schiaffeggia.',
+  '17',
+  'Tot. pag.: 6 6/8',
+  'CAST',
+  'ID   RUOLO   CAST   SCENE   P/UP   CB   M.UP   HAIR   COST.   PRONTI   SET',
+  '1   PRINCIPE COLONNA   ROCCO PAPALEO   16   11.20   11.50   12.50   11.55   12.30   13.35   13.45'
+].join('\n');
+const CAST16 = [{id:'1', scene:'16'}, {id:'2', scene:'16'}];
+const ricuci = (scene, cast, testo) => p.evaluate(a=>{
+  const tab = {scene:a.scene, cast:a.cast}; odgRicuciScene(tab, a.testo);
+  return tab.scene.map(s=>({n:s.n, sinossi:s.sinossi, ids:s.ids, ie:s.ie}));
+}, {scene, cast, testo});
+const SPEZZATA = [
+  {n:'1', ie:'E', m:'G', ambiente:'Osteria', sinossi:'Colonna e Navarra cenano e chiedono informazioni sulla strada. La Volpe li approccia per consigliarli.', ids:'1, 2, 7'},
+  {n:'16', ie:'I/E', m:'N', ambiente:'Osteria', sinossi:'Arriva Ginetto il bullo ma Navarra lo schiaffeggia.', ids:'15, 16, 17', pag:'6 6/8'}];
+let rc = await ricuci(SPEZZATA, CAST16, TESTO24);
+ok('una scena sola, la 16', rc.map(s=>s.n), ['16']);
+ok('con la sinossi intera, nell\'ordine giusto', rc[0].sinossi,
+   'Colonna e Navarra cenano e chiedono informazioni sulla strada. La Volpe li approccia per consigliarli. Arriva Ginetto il bullo ma Navarra lo schiaffeggia.');
+ok('e tutti gli ID', rc[0].ids, '1, 2, 7, 15, 16, 17');
+ok('interno/esterno dalla riga vera', rc[0].ie, 'I/E');
+
+console.log('\n── ⚠ e non si ricuce quello che non è rotto ──');
+/* Due scene vere restano due. */
+const DUE = [{n:'16', sinossi:'a', ids:'1'}, {n:'17', sinossi:'b', ids:'2'}];
+const TESTO2 = '16   I/E   N   OSTERIA   1   3   2\n17   E   G   STRADA   2   3   1\n';
+ok('due scene vere', (await ricuci(DUE, [{scene:'16, 17'}], TESTO2)).map(s=>s.n), ['16','17']);
+/* Una scena senza attori (un paesaggio) ha la sua riga: resta. */
+ok('una scena senza attori resta',
+   (await ricuci(DUE, [{scene:'16'}], TESTO2)).map(s=>s.n), ['16','17']);
+/* Un foglio scritto in un altro ordine: nessuna scena passa la prova
+   della riga, quindi il formato non si conosce e non si tocca niente. */
+ok('formato sconosciuto: non si tocca',
+   (await ricuci(SPEZZATA, CAST16, 'INT   CASA MARA\n60   N6   2/8   1, 2, 6\n')).map(s=>s.n), ['1','16']);
+/* Senza cast manca la seconda prova. */
+ok('senza cast: non si tocca', (await ricuci(SPEZZATA, [], TESTO24)).map(s=>s.n), ['1','16']);
+/* Gli stacchi (TRASFERIMENTO) non hanno numero e non si giudicano. */
+ok('gli stacchi restano',
+   (await ricuci([{n:'16',sinossi:'a',ids:'1'},{n:'',nota:'TRASFERIMENTO'},{n:'17',sinossi:'b',ids:'2'}],
+                 [{scene:'16, 17'}], TESTO2)).length, 3);
+
 ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();
