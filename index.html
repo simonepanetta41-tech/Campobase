@@ -347,7 +347,10 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-prev .s{font-size:22px;line-height:1}
 .odg-prev .c{flex:1;min-width:0}
 .odg-prev .t{display:block;font-size:14.5px;color:var(--white)}
-.odg-prev .u{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
+/* Il comune e la fascia oraria non stanno piu' qui: erano una riga in
+   piu' su una scheda che si legge di corsa, e il nome del posto — che
+   serve per accorgersi se il meteo guarda il comune sbagliato — sta in
+   testa alla finestra che si apre. */
 .odg-prev .n{display:flex}
 .odg-prev .n>div{flex:1;min-width:0;padding:10px 6px;text-align:center;border-right:1px solid var(--border)}
 .odg-prev .n>div:last-child{border-right:none}
@@ -418,7 +421,11 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* ── METEO ORA PER ORA ───────────────────────────────────────────────────── */
 .odg-prev.apribile{cursor:pointer;position:relative}
 .odg-prev.apribile:active{background:var(--surface2)}
-.odg-prev .piu{display:block;padding:0 16px 12px;font-size:11px;color:var(--yellow);opacity:.8}
+/* Il tasto dice dove toccare, ma si tocca tutta la scheda: il quadrato
+   e' un invito, non l'unico punto buono. */
+.odg-prev .piu{flex:0 0 auto;font-size:11px;white-space:nowrap;
+  padding:7px 11px;border-radius:9px;border:1px solid rgba(245,197,66,.45);
+  color:var(--yellow);background:rgba(245,197,66,.08)}
 #odgMeteo{position:fixed;inset:0;z-index:310;background:var(--bg);display:none;
   flex-direction:column;overflow:hidden;
   padding:0 0 calc(env(safe-area-inset-bottom) + 30px)}
@@ -4970,7 +4977,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.109';
+const CB_VERSIONE = '1.110';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12461,15 +12468,13 @@ function odgPienoHtml(d) {
   ${d.previsione ? `<div class="card odg-prev${(d.previsione.ore||[]).length ? ' apribile' : ''}"
       ${(d.previsione.ore||[]).length ? 'onclick="meteoApri()"' : ''}>
     <div class="g"><span class="s">${d.previsione.segno}</span>
-      <span class="c"><span class="t">${esc(d.previsione.cielo)}</span>
-      <span class="u">${esc(d.previsione.comune)} · dalle ${d.previsione.da} alle ${d.previsione.a}</span></span></div>
+      <span class="c"><span class="t">${esc(d.previsione.cielo)}</span></span>
+      ${(d.previsione.ore||[]).length ? '<span class="piu">più info</span>' : ''}</div>
     <div class="n">
       ${d.previsione.max!=null?`<div><span class="k">temp</span><span class="v num">${d.previsione.min}–${d.previsione.max}°</span></div>`:''}
       ${d.previsione.pioggia!=null?`<div><span class="k">pioggia</span><span class="v num">${d.previsione.pioggia}%</span></div>`:''}
       ${d.previsione.vento!=null?`<div><span class="k">vento</span><span class="v num">${d.previsione.vento} km/h</span></div>`:''}
-    </div>
-    ${(d.previsione.ore||[]).length ? '<span class="piu">ora per ora ›</span>' : ''}
-    </div>`
+    </div></div>`
    : (d.meteo || d.previsioneNota) ? `<div class="card odg-meteo">
        <span class="t">${esc(d.meteo || 'Meteo non indicato nell\'OdG')}</span>
        ${d.previsioneNota ? `<span class="s">previsione non disponibile · ${esc(d.previsioneNota)}</span>` : ''}

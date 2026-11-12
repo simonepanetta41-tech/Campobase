@@ -172,7 +172,8 @@ console.log('\n── come si vede nella scheda ──');
 await p.evaluate(()=>{
   odgCorrente={data:'2026-11-10',numero:21,scene:[],
     previsione:{comune:'Masseria Accetta Grande',cielo:'Sereno',segno:'☀',min:10,max:15,
-                pioggia:10,vento:9,da:7,a:19}};
+                pioggia:10,vento:9,da:7,a:19,
+                ore:[{h:7,g:0,t:10,p:10,vt:9,c:0},{h:8,g:0,t:12,p:10,vt:9,c:0}]}};
   document.getElementById('authPage').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('homePage').style.display='none';
@@ -181,8 +182,17 @@ await p.evaluate(()=>{
 });
 await p.waitForTimeout(300);
 const testo=await p.evaluate(()=>document.getElementById('odgCorpo').textContent);
-ok('dice il posto',   /Masseria Accetta Grande/.test(testo), true);
-ok('e le temperature',/10/.test(testo) && /15/.test(testo), true);
+ok('le temperature ci sono',/10/.test(testo) && /15/.test(testo), true);
+/* Il nome del posto non sta piu' sulla scheda — era una riga in piu' su
+   una pagina che si legge di corsa — ma non si puo' perdere: e' l'unico
+   modo per accorgersi che il meteo sta guardando il comune sbagliato,
+   che e' gia' successo (una troupe in Puglia con la previsione di
+   Treviso). Adesso sta in testa alla finestra, a un tocco di distanza. */
+ok('la scheda non lo ripete', /Masseria Accetta Grande/.test(testo), false);
+ok('ma la finestra lo dice',  await p.evaluate(()=>{
+  meteoApri(new Date('2026-11-10T06:00:00'));
+  return document.querySelector('#odgMeteo .sc-h').textContent;
+}), 'Masseria Accetta Grande · martedì 10 novembre');
 
 ok('nessun errore di pagina', err.filter(e=>!/supabase/.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');

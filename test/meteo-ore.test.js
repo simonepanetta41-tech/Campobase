@@ -56,7 +56,7 @@ console.log('\n── la scheda in cima si apre solo se c\'è cosa aprire ──
 const riassunto = (prev) => p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', previsione:a, scene:[]};
   const h = odgPienoHtml(odgCorrente);
-  return {apribile: /odg-prev apribile/.test(h), invito: /ora per ora/.test(h)};
+  return {apribile: /odg-prev apribile/.test(h), invito: /più info/.test(h)};
 }, prev);
 ok('con le ore è apribile',   await riassunto(PREV), {apribile:true, invito:true});
 /* Una previsione vecchia, salvata prima che le ore si tenessero: la
