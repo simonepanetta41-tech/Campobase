@@ -5012,7 +5012,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.122';
+const CB_VERSIONE = '1.123';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9650,6 +9650,7 @@ async function odgRitenta() {
     odgRicalcola();
     odgRender();
     if (typeof sceneFatteAggiorna === 'function') sceneFatteAggiorna();
+    odgStralciRipara();
   }
 }
 
@@ -11002,6 +11003,7 @@ async function odgRipristina() {
   odgRicalcola();
   odgRender();
   odgPassatiCarica();     // non si aspetta: lo spoglio si ridisegna quando arriva
+  odgStralciRipara();     // idem: se gli stralci sono senza rientri, li rilegge dal PDF
 }
 
 /* Un film si chiude quando si esce dall'account: il prossimo che entra
@@ -12250,6 +12252,39 @@ async function odgByteDi(att){
     console.log('[stralci] PDF non recuperato dal cloud:', e.message);
     return null;
   }
+}
+
+/* Gli stralci riletti dal PDF, per un ordine del giorno gia' salvato.
+ *
+ * Quando gli stralci non erano stati riconosciuti all'arrivo, dal testo
+ * dell'allegato si recupera solo la forma piatta: tutto di fila, senza
+ * rientri, e una scena di sei pagine cosi' non si legge. La forma buona —
+ * azione, nome, battuta, e il foglio vero della produzione — vuole il
+ * PDF. Il PDF c'e': sul telefono che l'ha ricevuto o nel secchio della
+ * posta. Lo si rilegge una volta e si salva per tutti.
+ */
+let odgStralciInCorso = false;
+async function odgStralciRipara(){
+  const d = odgCorrente;
+  if (!d || odgStralciInCorso || (d.sceneggiatura || []).length) return;
+  const att = (d.allegati || []).find(a => a && a.tipo === 'stralci');
+  if (!att || typeof pdfjsLib === 'undefined') return;
+  odgStralciInCorso = true;
+  try {
+    const buf = await odgByteDi(att);
+    if (!buf) return;
+    // Una copia: pdf.js si prende il buffer, e quello in memoria serve ancora.
+    const f = new File([buf.slice(0)], att.nome || 'stralci.pdf', { type: 'application/pdf' });
+    const r = await odgTestoDaPdf(f, true);
+    const scene = stralciDaRighe(r.righe || []);
+    if (!scene.length || odgCorrente !== d) return;
+    d.sceneggiatura = scene;
+    d.stralci = odgStralci(r.testo);
+    await odgSalva(d);
+    odgRender();
+  } catch (e) {
+    console.log('[stralci] non riletti dal PDF:', e.message);
+  } finally { odgStralciInCorso = false; }
 }
 
 async function odgApriScena(n){
