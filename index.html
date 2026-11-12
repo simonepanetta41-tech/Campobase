@@ -4964,7 +4964,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.107';
+const CB_VERSIONE = '1.108';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9130,8 +9130,9 @@ function meteoApri(adesso) {
       </div></div>` : ''}
       <div class="card"><div class="mt-ore">${righe}</div></div>
       <div class="mt-nota">${finita
-        ? `Le ore di lavoro di oggi sono passate: questa è la giornata com’è andata.`
-        : `Dalle ${ore[0].h} alle ${p.a}, le ore che restano della giornata.`}${
+        ? `La giornata è finita: questa è com’è andata.`
+        : `Dalle ${ore[0].h} a${ore[ore.length-1].h >= 23 ? ' mezzanotte' : 'lle ' + ore[ore.length-1].h}.` +
+          (p.a && ore[ore.length-1].h > p.a ? ` Il wrap è previsto alle ${p.a}, ma le ore dopo restano qui.` : '')}${
         tirato.length ? ` Il vento supera i ${METEO_VENTO} km/h ${tirato.length === 1
           ? 'alle ' + String(tirato[0].h).padStart(2,'0') + ':00'
           : 'per ' + tirato.length + ' ore'}: in presa diretta si sente.` : ''}</div>
@@ -12177,14 +12178,25 @@ async function odgPrevisione(d){
   const h = j && j.hourly;
   if (!h || !h.time || !h.time.length) throw new Error('niente ore');
 
-  // Solo le ore della giornata di lavoro: dalla convocazione alla fine,
-  // perche' il resto non riguarda nessuno.
   const ora = x => { const m = String(x||'').match(/^(\d{1,2})/); return m ? +m[1] : null; };
   const da = ora(d.convocazione) ?? 7;
   const a  = ora(d.fineLavorazione) ?? ora(d.fineRiprese) ?? 20;
-  const idx = h.time.map((t,i)=>({t,i}))
-    .filter(x => { const o = +x.t.slice(11,13); return o >= da && o <= Math.max(da+1, a); })
-    .map(x => x.i);
+
+  /* Due intervalli, e servono tutti e due.
+   *
+   * Il riassunto in cima — la parola, i gradi, la pioggia, il vento — si
+   * fa sulle ore di lavoro: e' il meteo della giornata, e allungarlo alla
+   * sera abbasserebbe il minimo con temperature che nessuno lavora.
+   *
+   * L'elenco ora per ora invece arriva a mezzanotte. Il wrap sull'ordine
+   * del giorno e' quello previsto, e di previsto sui set ci sono poche
+   * cose: fermandosi li', la sera che si tira oltre il meteo sparisce
+   * proprio quando si vuole sapere se mettersi la cerata per il wrap.
+   */
+  const dentro = (i, fino) => { const o = +h.time[i].slice(11,13); return o >= da && o <= fino; };
+  const tutti = h.time.map((_,i)=>i);
+  const idx    = tutti.filter(i => dentro(i, Math.max(da+1, a)));
+  const idxOre = tutti.filter(i => dentro(i, 23));
   if (!idx.length) return null;
 
   const val = (arr) => idx.map(i => arr && arr[i]).filter(v => v != null);
@@ -12226,7 +12238,7 @@ async function odgPrevisione(d){
      * quello — e' quello che serve al primo sguardo — ma sotto, per chi
      * vuole guardare, c'e' la giornata com'e' fatta davvero: quando
      * arriva la pioggia, a che ora rinforza il vento. */
-    ore: idx.map(i => ({
+    ore: idxOre.map(i => ({
       h:  +String(h.time[i]).slice(11, 13),
       t:  h.temperature_2m          && h.temperature_2m[i]          != null ? Math.round(h.temperature_2m[i]) : null,
       p:  h.precipitation_probability && h.precipitation_probability[i] != null ? h.precipitation_probability[i] : null,
@@ -12257,7 +12269,7 @@ async function odgPrevisione(d){
 /* La versione sale quando cambia cosa si chiede o come si cerca il posto:
    le previsioni gia' salvate si rifanno da sole, se no chi ha l'OdG di
    ieri resta con una scheda che non si puo' aprire. */
-const ODG_METEO_V = 5;
+const ODG_METEO_V = 6;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
