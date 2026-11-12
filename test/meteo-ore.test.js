@@ -19,17 +19,17 @@ const ok=(n,got,exp)=>{const b=JSON.stringify(got)===JSON.stringify(exp);if(!b)k
   console.log(`  ${b?'ok ':'KO '} ${String(n).padEnd(48)} ${JSON.stringify(got)}  atteso ${JSON.stringify(exp)}`);};
 
 const ORE = [
-  {h:7,  t:9,  p:10, vt:8,  c:2},
-  {h:8,  t:11, p:10, vt:10, c:3},
-  {h:9,  t:13, p:5,  vt:19, c:3},   // appena sotto la soglia
-  {h:10, t:15, p:5,  vt:20, c:2},   // esattamente la soglia: tira
-  {h:11, t:17, p:0,  vt:27, c:2},
-  {h:12, t:18, p:70, vt:14, c:63},
+  {h:7,  g:0, t:9,  p:10, vt:8,  c:2},
+  {h:8,  g:0, t:11, p:10, vt:10, c:3},
+  {h:9,  g:0, t:13, p:5,  vt:19, c:3},   // appena sotto la soglia
+  {h:10, g:0, t:15, p:5,  vt:20, c:2},   // esattamente la soglia: tira
+  {h:11, g:0, t:17, p:0,  vt:27, c:2},
+  {h:12, g:0, t:18, p:70, vt:14, c:63},
   /* Oltre il wrap previsto, che sull'ordine del giorno era alle 12:
      la sera che si tira oltre, il meteo deve esserci ancora. */
-  {h:13, t:17, p:60, vt:12, c:63},
-  {h:22, t:11, p:30, vt:9,  c:3},
-  {h:23, t:10, p:20, vt:8,  c:3}
+  {h:13, g:0, t:17, p:60, vt:12, c:63},
+  {h:22, g:0, t:11, p:30, vt:9,  c:3},
+  {h:23, g:0, t:10, p:20, vt:8,  c:3}
 ];
 const PREV = {v:5, comune:'Laterza', cielo:'Nuvoloso', segno:'☁️', min:9, max:18,
               pioggia:70, vento:27, da:7, a:12, ore:ORE, alba:'07:03', tramonto:'17:59'};
@@ -96,9 +96,9 @@ ok('20 e 27 sono accesi',         fin.ventose.slice(3,5), [true,true]);
 ok('e 14 torna spento',           fin.ventose[5], false);
 ok('e la sera è calma',           fin.ventose.slice(6), [false,false,false]);
 ok('la nota conta le ore vere',   /supera i 20 km\/h per 2 ore/.test(fin.nota), true);
-ok('e arriva a mezzanotte',       /Dalle 7 a mezzanotte/.test(fin.nota), true);
-/* Il wrap previsto si nomina, ma le ore dopo restano: e' tutto il punto. */
-ok('e dice del wrap previsto',    /wrap è previsto alle 12/.test(fin.nota), true);
+/* La nota dice una cosa sola: il vento. Gli orari si leggono
+   dall'elenco, che e' li' sopra, e ripeterli sotto era rumore. */
+ok('la nota parla solo del vento', fin.nota, 'Il vento supera i 20 km/h per 2 ore: in presa diretta si sente.');
 
 const calmo = await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', previsione:{...a, ore:a.ore.map(o=>({...o, vt:6}))}, scene:[]};
@@ -126,14 +126,14 @@ const OGGI = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOSt
 const m = await alle(9, OGGI);
 ok('alle 9:15 si parte dalle 9',  m.orari[0], '09:00');
 ok('e la mattina è sparita',      m.orari.length, 7);
-ok('la nota parte da lì',         /Dalle 9 a mezzanotte/.test(m.nota), true);
+ok('la nota resta sul vento',     /supera i 20/.test(m.nota), true);
 /* Il vento si conta su quello che si vede: dire "per 2 ore" mostrandone
    una sola sarebbe una riga che contraddice la schermata sotto. */
 ok('e conta il vento che resta',  /per 2 ore/.test(m.nota), true);
 
 const tardi = await alle(20, OGGI);
 ok('alle 20 restano la 22 e la 23',   tardi.orari, ['22:00','23:00']);
-ok('e la nota arriva a mezzanotte',   /Dalle 22 a mezzanotte/.test(tardi.nota), true);
+ok('e senza vento la nota sparisce',  tardi.nota, '');
 
 /* Su un ordine del giorno che non e' di oggi non e' passato niente.
    L'orologio deve stare su un ALTRO giorno: mettendolo sulla stessa data
@@ -166,6 +166,94 @@ ok('e la riga lo dice',               /La giornata è finita/.test(corta.nota), 
 const oltre = await alle(13, OGGI);
 ok('oltre il wrap il meteo c\'è ancora', oltre.orari, ['13:00','22:00','23:00']);
 
+console.log('\n── ⚠ la notturna che sfonda la mezzanotte ──');
+/* Convocazione alle 18, wrap previsto alle 02. La fine viene "prima"
+   dell'inizio, e contando dentro il giorno la giornata di lavoro
+   risultava lunga due ore invece di otto. Qui le ore si contano di fila:
+   le 02 di domani sono l'ora 26. */
+const NOTTE = [
+  {h:18, g:0, t:14, p:10, vt:9,  c:2},
+  {h:21, g:0, t:11, p:20, vt:12, c:3},
+  {h:23, g:0, t:10, p:40, vt:16, c:3},
+  {h:0,  g:1, t:9,  p:60, vt:22, c:61},
+  {h:2,  g:1, t:8,  p:70, vt:25, c:61},
+  {h:5,  g:1, t:7,  p:30, vt:11, c:3}
+];
+const nott = await p.evaluate(a=>{
+  odgCorrente = {data:'2026-11-12', scene:[],
+    previsione:{...a.prev, da:18, a:2, ore:a.ore}};
+  meteoApri(new Date('2026-11-12T17:00:00'));
+  const el = document.getElementById('odgMeteo');
+  return {orari: [...el.querySelectorAll('.mt-h')].map(x=>x.textContent),
+          stacchi: [...el.querySelectorAll('.mt-giorno')].map(x=>x.textContent.trim()),
+          ventose: [...el.querySelectorAll('.mt-o')].map(o=>o.classList.contains('ventoso'))};
+}, {prev:PREV, ore:NOTTE});
+ok('ci sono anche le ore di domani', nott.orari, ['18:00','21:00','23:00','00:00','02:00','05:00']);
+ok('con una riga dove cambia giorno', nott.stacchi.length, 1);
+ok('e la riga dice che giorno è',     /13 novembre/.test(nott.stacchi[0]), true);
+ok('il vento si accende anche di notte', nott.ventose, [false,false,false,true,true,false]);
+
+/* All'una e mezza di notte la giornata di lavoro e' ancora quella di
+   ieri: sono le ore 25, non le ore 1. Se il conto ripartisse da zero,
+   alle 01.30 ricomparirebbero tutte le ore del pomeriggio appena
+   passato. */
+const dopoMezzanotte = await p.evaluate(a=>{
+  odgCorrente = {data:'2026-11-12', scene:[],
+    previsione:{...a.prev, da:18, a:2, ore:a.ore}};
+  meteoApri(new Date('2026-11-13T01:30:00'));
+  return [...document.querySelectorAll('#odgMeteo .mt-h')].map(x=>x.textContent);
+}, {prev:PREV, ore:NOTTE});
+ok('all\'1.30 restano solo le 02 e le 05', dopoMezzanotte, ['02:00','05:00']);
+
+console.log('\n── ⚠ il riassunto di una notturna ──');
+/* Qui stava il guasto vero. Con convocazione alle 18 e wrap alle 02, il
+   confronto fra numeri di ora leggeva la giornata al contrario e il
+   riassunto in cima finiva per descrivere UN'ORA invece di otto: la
+   parola, i gradi, la pioggia e il vento di una notte intera venivano
+   dalle 18:00 e basta. */
+const estratto = await p.evaluate(async () => {
+  // Il servizio finto: due giorni di fila, una temperatura per ora.
+  const ore = [];
+  for (const g of ['2026-11-12','2026-11-13'])
+    for (let h = 0; h < 24; h++) ore.push(g + 'T' + String(h).padStart(2,'0') + ':00');
+  const n = ore.length;
+  window.odgPosto = async () => ({lat:40.6, lon:16.8, nome:'Laterza'});
+  window.fetch = async () => ({ ok:true, json: async () => ({
+    hourly: {
+      time: ore,
+      // 20° di giorno, 5° di notte: se il riassunto prende le ore
+      // sbagliate, il minimo lo dice.
+      temperature_2m: ore.map(t => (+t.slice(11,13) >= 8 && +t.slice(11,13) <= 17) ? 20 : 5),
+      precipitation_probability: new Array(n).fill(10),
+      weather_code: new Array(n).fill(2),
+      wind_speed_10m: new Array(n).fill(7)
+    },
+    daily: { sunrise:['2026-11-12T07:03'], sunset:['2026-11-12T17:59'] }
+  })});
+  const p1 = await odgPrevisione({data:'2026-11-12', convocazione:'18.00', fineLavorazione:'02.00'});
+  const p2 = await odgPrevisione({data:'2026-11-12', convocazione:'07.00', fineLavorazione:'18.00'});
+  return {
+    notte: {da:p1.da, a:p1.a, min:p1.min, max:p1.max,
+            prima:p1.ore[0].h, ultima:p1.ore[p1.ore.length-1].h,
+            ultimaG:p1.ore[p1.ore.length-1].g, quante:p1.ore.length},
+    giorno:{da:p2.da, a:p2.a, min:p2.min, max:p2.max,
+            prima:p2.ore[0].h, ultima:p2.ore[p2.ore.length-1].h,
+            ultimaG:p2.ore[p2.ore.length-1].g, quante:p2.ore.length}
+  };
+});
+/* Notturna: 18 → 02 sono nove ore di lavoro, tutte di notte, quindi il
+   riassunto deve dire 5°. L'elenco arriva a quattro ore oltre il wrap. */
+ok('la giornata di lavoro è lunga 9 ore', estratto.notte.quante >= 9, true);
+ok('e il riassunto è tutto notte',        [estratto.notte.min, estratto.notte.max], [5,5]);
+ok('l\'elenco arriva alle 06 di domani',  [estratto.notte.ultima, estratto.notte.ultimaG], [6,1]);
+ok('e parte dalla convocazione',          estratto.notte.prima, 18);
+
+/* Giornata normale: niente cambia. L'elenco si ferma a mezzanotte e il
+   riassunto vede sia le ore calde sia la prima e l'ultima piu' fresche. */
+ok('la giornata resta a mezzanotte',      [estratto.giorno.ultima, estratto.giorno.ultimaG], [23,0]);
+ok('e il riassunto vede il giorno',       [estratto.giorno.min, estratto.giorno.max], [5,20]);
+ok('da 7 a 18',                           [estratto.giorno.da, estratto.giorno.a], [7,18]);
+
 console.log('\n── si chiude ──');
 ok('chiusa', await p.evaluate(()=>{meteoChiudi();
   return document.getElementById('odgMeteo').classList.contains('on');}), false);
@@ -173,7 +261,7 @@ ok('chiusa', await p.evaluate(()=>{meteoChiudi();
 console.log('\n── un\'ora senza dati non inventa niente ──');
 ok('trattino al posto dei gradi', await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', scene:[],
-    previsione:{...a, ore:[{h:7, t:null, p:null, vt:null, c:null}]}};
+    previsione:{...a, ore:[{h:7, g:0, t:null, p:null, vt:null, c:null}]}};
   meteoApri(new Date('2026-11-12T06:00:00'));
   const o = document.querySelector('#odgMeteo .mt-o');
   return {gradi:o.querySelector('.mt-t').textContent, righe:o.querySelectorAll('.mt-r').length};

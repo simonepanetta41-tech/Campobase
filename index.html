@@ -444,6 +444,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .mt-luce .k{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
 .mt-luce .v{display:block;margin-top:4px;font-family:'DM Mono',monospace;font-size:20px;color:var(--white)}
 .mt-nota{margin-top:18px;padding:0 2px;font-size:12.5px;line-height:1.6;color:var(--muted)}
+.mt-nota:empty{display:none}
+/* Dove il giorno cambia: le 02 di domani e le 02 di oggi hanno lo stesso
+   numero, e senza questa riga si legge l'ora sbagliata. */
+.mt-giorno{padding:11px 15px;font-size:10.5px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--yellow);background:rgba(245,197,66,.06);
+  border-bottom:1px solid var(--border)}
 
 /* Le categorie dello spoglio sotto una scena del giorno. Il proprio
    reparto in giallo, il resto grigio: si legge di sfuggita scorrendo. */
@@ -4964,7 +4970,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.108';
+const CB_VERSIONE = '1.109';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9084,10 +9090,22 @@ const METEO_VENTO = 20;   // km/h: da qui in su il vento si fa sentire
 function meteoDaFare(prev, data, adesso) {
   const ore = (prev && prev.ore) || [];
   const ora = adesso || new Date();
-  const oggi = new Date(ora.getTime() - ora.getTimezoneOffset() * 60000)
+  const giorno = (t) => new Date(t.getTime() - t.getTimezoneOffset() * 60000)
     .toISOString().slice(0, 10);
-  if (!data || data !== oggi) return { ore, finita: false };
-  const restano = ore.filter(o => o.h >= ora.getHours());
+  const oggi = giorno(ora);
+  /* Dove siamo, contando dall'inizio di quella giornata.
+   *
+   * All'una e mezza di notte di una notturna cominciata ieri, la giornata
+   * di lavoro e' ancora quella di ieri: sono le ore 25, non le ore 1. Se
+   * no alle 01.30 ricomparirebbero tutte le ore del pomeriggio appena
+   * passato. */
+  let adessoAbs = null;
+  if (data === oggi) adessoAbs = ora.getHours();
+  else if (data === giorno(new Date(ora.getTime() - 24 * 3600 * 1000)))
+    adessoAbs = 24 + ora.getHours();
+  if (adessoAbs == null) return { ore, finita: false };
+
+  const restano = ore.filter(o => (o.g || 0) * 24 + o.h >= adessoAbs);
   return restano.length ? { ore: restano, finita: false } : { ore, finita: true };
 }
 
@@ -9100,10 +9118,18 @@ function meteoApri(adesso) {
   const barra = (v, max, colore) =>
     `<span class="mt-v"><div style="width:${Math.min(100, Math.round(v / max * 100))}%;background:${colore}"></div></span>`;
 
+  // Le 02 di domani e le 02 di oggi hanno lo stesso numero: dove il
+  // giorno cambia ci va una riga, se no si legge l'ora sbagliata.
+  let giornoSegnato = ore.length ? (ore[0].g || 0) : 0;
   const righe = ore.map(o => {
     const [, segno] = odgCielo(o.c);
     const tira = o.vt != null && o.vt >= METEO_VENTO;
-    return `<div class="mt-o${tira ? ' ventoso' : ''}">
+    let stacco = '';
+    if ((o.g || 0) !== giornoSegnato) {
+      giornoSegnato = o.g || 0;
+      stacco = `<div class="mt-giorno">${esc(odgDataEstesa(odgDomani(d.data)) || 'il giorno dopo')}</div>`;
+    }
+    return `${stacco}<div class="mt-o${tira ? ' ventoso' : ''}">
       <span class="mt-h">${String(o.h).padStart(2, '0')}:00</span>
       <span class="mt-s">${segno}</span>
       <span class="mt-t">${o.t != null ? o.t + '°' : '—'}</span>
@@ -9130,10 +9156,8 @@ function meteoApri(adesso) {
       </div></div>` : ''}
       <div class="card"><div class="mt-ore">${righe}</div></div>
       <div class="mt-nota">${finita
-        ? `La giornata è finita: questa è com’è andata.`
-        : `Dalle ${ore[0].h} a${ore[ore.length-1].h >= 23 ? ' mezzanotte' : 'lle ' + ore[ore.length-1].h}.` +
-          (p.a && ore[ore.length-1].h > p.a ? ` Il wrap è previsto alle ${p.a}, ma le ore dopo restano qui.` : '')}${
-        tirato.length ? ` Il vento supera i ${METEO_VENTO} km/h ${tirato.length === 1
+        ? `La giornata è finita: questa è com’è andata.` : ''}${
+        tirato.length ? `${finita ? ' ' : ''}Il vento supera i ${METEO_VENTO} km/h ${tirato.length === 1
           ? 'alle ' + String(tirato[0].h).padStart(2,'0') + ':00'
           : 'per ' + tirato.length + ' ore'}: in presa diretta si sente.` : ''}</div>
     </div>`;
@@ -11689,6 +11713,13 @@ function odgCercabile(a) {
 function odgMapsVicino(cosa, dove) { return odgMaps(cosa + ' vicino a ' + dove); }
 function odgCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
 
+/* Il giorno dopo, in forma di data. Serve al meteo delle notturne. */
+function odgDomani(iso) {
+  const t = Date.parse(String(iso || '') + 'T12:00:00');
+  if (!t) return iso;
+  return new Date(t + 24 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 function odgDataEstesa(iso) {
   if (!iso) return '';
   const d = new Date(iso + 'T00:00:00'); if (isNaN(d)) return iso;
@@ -12171,7 +12202,9 @@ async function odgPrevisione(d){
     + '?latitude=' + c.lat + '&longitude=' + c.lon
     + '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m'
     + '&daily=sunrise,sunset'
-    + '&timezone=Europe%2FRome&start_date=' + d.data + '&end_date=' + d.data;
+    // Anche il giorno dopo: le notturne sfondano la mezzanotte, e le ore
+    // dopo le 24 stanno nel giorno successivo. Costa niente chiederle.
+    + '&timezone=Europe%2FRome&start_date=' + d.data + '&end_date=' + odgDomani(d.data);
   const r = await fetch(u);
   if (!r.ok) throw new Error('meteo ' + r.status);
   const j = await r.json();
@@ -12182,21 +12215,38 @@ async function odgPrevisione(d){
   const da = ora(d.convocazione) ?? 7;
   const a  = ora(d.fineLavorazione) ?? ora(d.fineRiprese) ?? 20;
 
-  /* Due intervalli, e servono tutti e due.
+  /* Le ore si contano di fila, non dentro il giorno.
+   *
+   * Una notturna convocata alle 18 e che chiude alle 02 ha la fine
+   * "prima" dell'inizio, e un confronto fra numeri di ora la leggeva al
+   * contrario: il riassunto finiva per descrivere due ore invece di
+   * otto. Contando dall'inizio in avanti — le 02 del giorno dopo sono
+   * l'ora 26 — la giornata torna una sola, lunga quanto e'.
+   *
+   * Due intervalli, e servono tutti e due.
    *
    * Il riassunto in cima — la parola, i gradi, la pioggia, il vento — si
-   * fa sulle ore di lavoro: e' il meteo della giornata, e allungarlo alla
-   * sera abbasserebbe il minimo con temperature che nessuno lavora.
+   * fa sulle ore di lavoro: e' il meteo della giornata, e allungarlo
+   * abbasserebbe il minimo con temperature che nessuno lavora.
    *
-   * L'elenco ora per ora invece arriva a mezzanotte. Il wrap sull'ordine
-   * del giorno e' quello previsto, e di previsto sui set ci sono poche
-   * cose: fermandosi li', la sera che si tira oltre il meteo sparisce
-   * proprio quando si vuole sapere se mettersi la cerata per il wrap.
+   * L'elenco ora per ora arriva piu' in la'. Il wrap sull'ordine del
+   * giorno e' quello previsto, e di previsto sui set ci sono poche cose:
+   * fermandosi li', la sera che si tira oltre il meteo sparisce proprio
+   * quando si vuole sapere se mettersi la cerata per il wrap. Su una
+   * giornata normale si arriva a mezzanotte; su una notturna, quattro
+   * ore oltre il wrap previsto.
    */
-  const dentro = (i, fino) => { const o = +h.time[i].slice(11,13); return o >= da && o <= fino; };
-  const tutti = h.time.map((_,i)=>i);
-  const idx    = tutti.filter(i => dentro(i, Math.max(da+1, a)));
-  const idxOre = tutti.filter(i => dentro(i, 23));
+  const notte = a <= da;                         // la giornata sfonda la mezzanotte
+  const fineLav = notte ? a + 24 : Math.max(da + 1, a);
+  const fineOre = notte ? Math.min(fineLav + 4, 30) : 23;
+
+  const assoluta = (i) => {
+    const t = h.time[i];
+    return (t.slice(0, 10) === d.data ? 0 : 24) + (+t.slice(11, 13));
+  };
+  const tutti = h.time.map((_, i) => i).filter(i => assoluta(i) >= da);
+  const idx    = tutti.filter(i => assoluta(i) <= fineLav);
+  const idxOre = tutti.filter(i => assoluta(i) <= fineOre);
   if (!idx.length) return null;
 
   const val = (arr) => idx.map(i => arr && arr[i]).filter(v => v != null);
@@ -12240,6 +12290,9 @@ async function odgPrevisione(d){
      * arriva la pioggia, a che ora rinforza il vento. */
     ore: idxOre.map(i => ({
       h:  +String(h.time[i]).slice(11, 13),
+      // 1 = e' gia' il giorno dopo. Serve alla finestra per separarli:
+      // le 02 di domani e le 02 di oggi hanno lo stesso numero.
+      g:  String(h.time[i]).slice(0, 10) === d.data ? 0 : 1,
       t:  h.temperature_2m          && h.temperature_2m[i]          != null ? Math.round(h.temperature_2m[i]) : null,
       p:  h.precipitation_probability && h.precipitation_probability[i] != null ? h.precipitation_probability[i] : null,
       vt: h.wind_speed_10m          && h.wind_speed_10m[i]          != null ? Math.round(h.wind_speed_10m[i]) : null,
@@ -12269,7 +12322,7 @@ async function odgPrevisione(d){
 /* La versione sale quando cambia cosa si chiede o come si cerca il posto:
    le previsioni gia' salvate si rifanno da sole, se no chi ha l'OdG di
    ieri resta con una scheda che non si puo' aprire. */
-const ODG_METEO_V = 6;
+const ODG_METEO_V = 7;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
