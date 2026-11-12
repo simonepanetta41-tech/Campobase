@@ -61,7 +61,9 @@ ok('senza ore no',            await riassunto({...PREV, ore:[]}), {apribile:fals
 console.log('\n── la finestra ──');
 const fin = await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', previsione:a, scene:[]};
-  meteoApri();
+  // Orologio fisso: se no questi controlli passerebbero solo di mattina
+  // presto, e dal pomeriggio in poi diventerebbero rossi da soli.
+  meteoApri(new Date('2026-11-12T06:00:00'));
   const el = document.getElementById('odgMeteo');
   const ore = [...el.querySelectorAll('.mt-o')];
   return {
@@ -88,16 +90,46 @@ ok('8, 10 e 19 km/h sono spenti', fin.ventose.slice(0,3), [false,false,false]);
 ok('20 e 27 sono accesi',         fin.ventose.slice(3,5), [true,true]);
 ok('e 14 torna spento',           fin.ventose[5], false);
 ok('la nota conta le ore vere',   /supera i 20 km\/h per 2 ore/.test(fin.nota), true);
+ok('e parte dalla prima ora',     /Dalle 7 alle 12/.test(fin.nota), true);
 
 const calmo = await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', previsione:{...a, ore:a.ore.map(o=>({...o, vt:6}))}, scene:[]};
-  meteoApri();
+  meteoApri(new Date('2026-11-12T06:00:00'));
   const el = document.getElementById('odgMeteo');
   return {ventose: [...el.querySelectorAll('.mt-o.ventoso')].length,
           nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
 }, PREV);
 ok('con poco vento nessuna riga accesa', calmo.ventose, 0);
 ok('e la nota non lo nomina',            /vento/.test(calmo.nota), false);
+
+console.log('\n── le ore passate non si mostrano più ──');
+/* A meta' pomeriggio le ore della mattina non servono a nessuno: quello
+   che si vuole sapere e' se la pioggia arriva prima del wrap. L'ora in
+   corso resta — alle 9 e un quarto le 9:00 sono ancora adesso. */
+const alle = (ora, data) => p.evaluate(a=>{
+  odgCorrente = {data:a.data, previsione:a.prev, scene:[]};
+  meteoApri(new Date(a.data + 'T' + String(a.ora).padStart(2,'0') + ':15:00'));
+  const el = document.getElementById('odgMeteo');
+  return {orari: [...el.querySelectorAll('.mt-h')].map(x=>x.textContent),
+          nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
+}, {ora, data, prev:PREV});
+
+const OGGI = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+const m = await alle(9, OGGI);
+ok('alle 9:15 si parte dalle 9',  m.orari[0], '09:00');
+ok('e la mattina è sparita',      m.orari.length, 4);
+ok('la nota parte da lì',         /Dalle 9 alle 12/.test(m.nota), true);
+/* Il vento si conta su quello che si vede: dire "per 2 ore" mostrandone
+   una sola sarebbe una riga che contraddice la schermata sotto. */
+ok('e conta il vento che resta',  /per 2 ore/.test(m.nota), true);
+
+const tardi = await alle(20, OGGI);
+ok('a giornata finita si vede tutto', tardi.orari.length, 6);
+ok('e la riga lo dice',               /ore di lavoro di oggi sono passate/.test(tardi.nota), true);
+
+/* Su un ordine del giorno che non e' di oggi non e' passato niente. */
+const domani = await alle(20, '2099-01-01');
+ok('su un altro giorno niente si toglie', domani.orari.length, 6);
 
 console.log('\n── si chiude ──');
 ok('chiusa', await p.evaluate(()=>{meteoChiudi();
@@ -107,7 +139,7 @@ console.log('\n── un\'ora senza dati non inventa niente ──');
 ok('trattino al posto dei gradi', await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', scene:[],
     previsione:{...a, ore:[{h:7, t:null, p:null, vt:null, c:null}]}};
-  meteoApri();
+  meteoApri(new Date('2026-11-12T06:00:00'));
   const o = document.querySelector('#odgMeteo .mt-o');
   return {gradi:o.querySelector('.mt-t').textContent, righe:o.querySelectorAll('.mt-r').length};
 }, PREV), {gradi:'—', righe:0});

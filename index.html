@@ -425,25 +425,25 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 #odgMeteo.on{display:flex}
 .mt-corpo{flex:1;overflow-y:auto;padding:14px 16px 40px}
 .mt-ore{display:flex;flex-direction:column}
-.mt-o{display:flex;align-items:center;gap:12px;padding:11px 14px;
+.mt-o{display:flex;align-items:center;gap:13px;padding:14px 15px;
   border-bottom:1px solid var(--border)}
 .mt-o:last-child{border-bottom:none}
-.mt-h{flex:0 0 42px;font-family:'DM Mono',monospace;font-size:12px;color:var(--white)}
-.mt-s{flex:0 0 26px;font-size:17px;text-align:center;line-height:1}
-.mt-t{flex:0 0 46px;font-family:'DM Mono',monospace;font-size:13px;color:var(--white-dim)}
-.mt-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
-.mt-r{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--muted)}
-.mt-r .q{flex:0 0 34px;font-family:'DM Mono',monospace;text-align:right}
-.mt-v{flex:1;height:3px;border-radius:2px;background:var(--surface2);overflow:hidden}
+.mt-h{flex:0 0 52px;font-family:'DM Mono',monospace;font-size:15px;color:var(--white)}
+.mt-s{flex:0 0 30px;font-size:21px;text-align:center;line-height:1}
+.mt-t{flex:0 0 50px;font-family:'DM Mono',monospace;font-size:17px;color:var(--white)}
+.mt-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.mt-r{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.mt-r .q{flex:0 0 42px;font-family:'DM Mono',monospace;text-align:right}
+.mt-v{flex:1;height:4px;border-radius:2px;background:var(--surface2);overflow:hidden}
 .mt-v>div{height:100%;border-radius:2px}
 /* Il vento si tinge quando comincia a dare fastidio alla presa diretta. */
 .mt-o.ventoso{background:rgba(245,197,66,.05)}
 .mt-o.ventoso .mt-r.vento{color:var(--yellow)}
-.mt-luce{display:flex;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.mt-luce{display:flex;gap:10px;padding:14px 15px;border-bottom:1px solid var(--border)}
 .mt-luce div{flex:1}
-.mt-luce .k{display:block;font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
-.mt-luce .v{display:block;margin-top:3px;font-family:'DM Mono',monospace;font-size:15px;color:var(--white)}
-.mt-nota{margin-top:16px;padding:0 2px;font-size:11px;line-height:1.55;color:var(--muted)}
+.mt-luce .k{display:block;font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+.mt-luce .v{display:block;margin-top:4px;font-family:'DM Mono',monospace;font-size:20px;color:var(--white)}
+.mt-nota{margin-top:18px;padding:0 2px;font-size:12.5px;line-height:1.6;color:var(--muted)}
 
 /* Le categorie dello spoglio sotto una scena del giorno. Il proprio
    reparto in giallo, il resto grigio: si legge di sfuggita scorrendo. */
@@ -4964,7 +4964,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.106';
+const CB_VERSIONE = '1.107';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9068,15 +9068,39 @@ function fabOrdina(fabbisogni, mioReparto) {
  */
 const METEO_VENTO = 20;   // km/h: da qui in su il vento si fa sentire
 
-function meteoApri() {
+/* Le ore che restano da fare.
+ *
+ * A meta' pomeriggio le ore della mattina non servono piu' a nessuno:
+ * quello che si vuole sapere e' se la pioggia arriva prima del wrap. Si
+ * tolgono solo se l'ordine del giorno e' di oggi — su quello di domani
+ * non e' passato niente, e su uno di ieri toglierle vorrebbe dire aprire
+ * una finestra vuota.
+ *
+ * L'ora in corso resta: alle 9 e un quarto le 9:00 sono ancora adesso.
+ *
+ * E se sono passate tutte si mostrano lo stesso, con una riga che lo
+ * dice: una schermata bianca non spiega niente a nessuno.
+ */
+function meteoDaFare(prev, data, adesso) {
+  const ore = (prev && prev.ore) || [];
+  const ora = adesso || new Date();
+  const oggi = new Date(ora.getTime() - ora.getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+  if (!data || data !== oggi) return { ore, finita: false };
+  const restano = ore.filter(o => o.h >= ora.getHours());
+  return restano.length ? { ore: restano, finita: false } : { ore, finita: true };
+}
+
+function meteoApri(adesso) {
   const d = odgCorrente;
   const p = d && d.previsione;
   if (!p || !(p.ore || []).length) return;
+  const { ore, finita } = meteoDaFare(p, d.data, adesso);
 
   const barra = (v, max, colore) =>
     `<span class="mt-v"><div style="width:${Math.min(100, Math.round(v / max * 100))}%;background:${colore}"></div></span>`;
 
-  const righe = p.ore.map(o => {
+  const righe = ore.map(o => {
     const [, segno] = odgCielo(o.c);
     const tira = o.vt != null && o.vt >= METEO_VENTO;
     return `<div class="mt-o${tira ? ' ventoso' : ''}">
@@ -9089,7 +9113,9 @@ function meteoApri() {
       </span></div>`;
   }).join('');
 
-  const tirato = p.ore.filter(o => o.vt != null && o.vt >= METEO_VENTO);
+  // Il vento si conta su quello che si vede: dire "per 4 ore" mostrandone
+  // due sarebbe una riga che contraddice la schermata sotto.
+  const tirato = ore.filter(o => o.vt != null && o.vt >= METEO_VENTO);
   const el = document.getElementById('odgMeteo');
   el.innerHTML = `
     <div class="sc-top">
@@ -9103,7 +9129,9 @@ function meteoApri() {
         ${p.tramonto ? `<div><span class="k">Tramonto</span><span class="v">${esc(p.tramonto)}</span></div>` : ''}
       </div></div>` : ''}
       <div class="card"><div class="mt-ore">${righe}</div></div>
-      <div class="mt-nota">Dalle ${p.da} alle ${p.a}, le ore della giornata di lavoro.${
+      <div class="mt-nota">${finita
+        ? `Le ore di lavoro di oggi sono passate: questa è la giornata com’è andata.`
+        : `Dalle ${ore[0].h} alle ${p.a}, le ore che restano della giornata.`}${
         tirato.length ? ` Il vento supera i ${METEO_VENTO} km/h ${tirato.length === 1
           ? 'alle ' + String(tirato[0].h).padStart(2,'0') + ':00'
           : 'per ' + tirato.length + ' ore'}: in presa diretta si sente.` : ''}</div>
