@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Campobase</title>
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#040507">
@@ -202,7 +202,7 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
   .result-tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tabs-2 { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tab { padding: 10px 8px 8px; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: 96px; }
+  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 }
 .result-tab { flex: 1; background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; padding: 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .wrap-chip { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;border:1.5px solid var(--border);color:var(--muted);background:none;transition:all 0.15s;user-select:none; }
@@ -726,13 +726,17 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .acc-minuto{font-size:12px;color:var(--muted);text-align:center;margin:18px 0 0;line-height:1.5}
 #authPage .auth-msg{margin-top:12px;font-size:13px;text-align:center;min-height:18px}
 .cb-testa{position:sticky;top:0;z-index:120;display:flex;align-items:center;gap:8px;
-  padding:9px 0;background:var(--bg);border-bottom:1px solid var(--border)}
-/* Sul telefono la testata si ferma sotto la barra di stato (ora, campo,
-   batteria), e in quella striscia sopra la pagina continuava a scorrere:
-   si leggevano pezzi di testo dietro l'orologio. Un telo dello stesso
-   colore del fondo, appeso sopra la testata, largo quanto lo schermo. */
-.cb-testa::before{content:'';position:absolute;left:-28px;right:-28px;bottom:100%;
-  height:120px;background:var(--bg);pointer-events:none}
+  padding:calc(env(safe-area-inset-top) + 9px) 0 9px;background:var(--bg);
+  border-bottom:1px solid var(--border)}
+/* La testata arriva fino in cima allo schermo, dietro la barra di stato
+   (ora, campo, batteria). Prima si fermava sotto, e in quella striscia la
+   pagina continuava a scorrere: si leggevano pezzi di testo dietro
+   l'orologio. Il primo rimedio, un telo appeso sopra la testata, sul
+   telefono non si vedeva: iOS non disegna niente di fisso fuori dall'area
+   sicura. Quindi si prende tutto lo schermo (viewport-fit=cover nel meta
+   in cima al file) e ogni cosa che tocca un bordo si scosta da sola con
+   env(safe-area-inset-*). Chi aggiunge un pannello a tutto schermo deve
+   fare lo stesso, o finisce sotto l'orologio. */
 .cb-ident{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;
   border:none;padding:4px 0;cursor:pointer;color:inherit;text-align:left;font-family:inherit}
 .cb-mark{width:26px;height:26px;flex:0 0 26px}
@@ -1058,7 +1062,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .bg-heavy { background:linear-gradient(180deg,rgba(255,107,90,.17),transparent); }
 
 /* Day modal for PDL */
-.pdl-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:1000;align-items:flex-start;justify-content:center;padding:24px;overflow-y:auto; }
+.pdl-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:1000;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top) + 24px) 24px 24px;overflow-y:auto; }
 .pdl-overlay.open { display:flex; }
 .pdl-modal { background:var(--surface);border:1px solid var(--border-l);border-radius:16px;max-width:620px;width:100%;padding:22px;margin:auto; }
 /* Sul telefono sale dal basso e arriva al bordo: una scheda centrata con
@@ -1952,7 +1956,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         </div>
 
         <!-- SCORPORO MODAL -->
-        <div id="tt-scorporoOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:300;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto">
+        <div id="tt-scorporoOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:300;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top) + 40px) 16px 40px;overflow-y:auto">
           <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:12px;padding:22px;width:460px;max-width:100%">
             <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px">Scorporo lavoratori</div>
             <div style="font-size:10px;color:var(--muted);margin-bottom:16px">Seleziona chi ha orari diversi — verrà creata una nuova tabella con gli orari già copiati. I selezionati vengono rimossi dalla tabella di origine.</div>
@@ -2176,7 +2180,8 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
              background:var(--surface);border-top:1px solid var(--border-l);
              border-radius:16px 16px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);
              transition:transform 0.25s cubic-bezier(0.32,0.72,0,1);
-             transform:translateY(100%);height:82dvh;max-height:82dvh;display:flex;flex-direction:column">
+             transform:translateY(100%);height:82dvh;max-height:82dvh;display:flex;flex-direction:column;
+             box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom)">
       <!-- handle + header -->
       <div style="padding:10px 16px 0;flex-shrink:0">
         <div style="width:36px;height:4px;background:var(--border-l);border-radius:2px;margin:0 auto 10px"></div>
@@ -5002,7 +5007,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.118';
+const CB_VERSIONE = '1.119';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -5052,7 +5057,7 @@ function showToast(msg, type = 'default', duration = 3000) {
     if (!el) {
       el = document.createElement('div');
       el.id = 'toastContainer';
-      el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none';
+      el.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top) + 20px);left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none';
       document.body.appendChild(el);
     }
     return el;
@@ -6974,7 +6979,7 @@ function wrapOpenWebsite(url, name) {
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column';
   modal.innerHTML = `
-    <div style="padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+    <div style="padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:var(--white)">${name}</div>
       <div style="display:flex;gap:8px">
         <a href="${url}" target="_blank" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border);color:var(--muted);font-size:11px;text-decoration:none">Apri ↗</a>
