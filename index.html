@@ -579,6 +579,9 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   background:var(--surface2);border:1px solid var(--border-l);color:var(--white);
   font-family:'DM Mono',monospace;font-size:13px}
 .sp-sc:active{background:rgba(245,197,66,.14);border-color:var(--yellow)}
+/* Una scena gia' girata resta al suo posto e si apre come le altre, ma
+   va sullo sfondo: quello che salta all'occhio e' quello che manca. */
+.sp-sc.fatta{background:none;border-color:var(--border);color:var(--muted);opacity:.55}
 .sp-nota{display:none;margin-top:9px}
 .sp-nota.on{display:block}
 .sp-nota textarea{width:100%;min-height:62px;padding:10px 12px;border-radius:9px;resize:vertical;
@@ -1037,6 +1040,8 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .cal-cell.status-complete { border-color:rgba(110,231,183,.5); }
 .cal-cell.status-partial { border-color:rgba(245,166,35,.55); }
 .cal-cell.is-today { outline:2px solid var(--yellow);outline-offset:-2px; }
+/* I giorni passati si abbassano: oggi resta acceso col suo bordo. */
+.cal-cell.passata { opacity:.38; }
 .cal-cell.empty, .cal-cell.vuota { background:none;border-color:transparent; }
 .cal-cell.vuota .cal-cell-day { color:var(--muted);font-weight:400; }
 .bg-light { background:var(--surface); }
@@ -4570,8 +4575,9 @@ function spoglioRender(d){
 /* Una categoria: il nome, quante scene, le scene da toccare, la nota. */
 function spoglioRigaCat(c, scene, accesa){
   const nota = (catNotesData[c.key] || '').trim();
+  const fatte = sceneFatte();
   const chip = scene.map(x =>
-    `<button class="sp-sc" onclick="spoglioApriScena('${esc(spoglioNum(x.scena))}')">${esc(spoglioNum(x.scena))}</button>`
+    `<button class="sp-sc${fatte.has(catNumero(spoglioNum(x.scena))) ? ' fatta' : ''}" onclick="spoglioApriScena('${esc(spoglioNum(x.scena))}')">${esc(spoglioNum(x.scena))}</button>`
   ).join('');
   return `<div class="sp-cat${accesa ? '' : ' spenta'}" id="sp-cat-${c.key}">
     <div class="sp-cat-n">
@@ -4987,7 +4993,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.114';
+const CB_VERSIONE = '1.115';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -10717,6 +10723,101 @@ async function odgSalva(d, opzioni) {
   }
 }
 
+/* ══ LE SCENE GIA' GIRATE ════════════════════════════════════════════
+ *
+ * Nello spoglio le scene fatte si spengono. Chi lo dice che una scena e'
+ * fatta? Nessuno lo segna a mano sul set, quindi si crede ai documenti,
+ * giorno per giorno:
+ *
+ *   - per un giorno passato di cui c'e' l'ordine del giorno, le scene
+ *     sono quelle dell'ordine del giorno: e' cio' che si e' girato
+ *     davvero, o almeno cio' che la produzione ha messo in mano quella
+ *     mattina;
+ *   - per un giorno passato senza ordine del giorno, quelle del piano di
+ *     lavorazione. Serve ai film presi in corsa: di Missione San Gennaro
+ *     mancano i primi venti, e senza il piano meta' film resterebbe
+ *     acceso.
+ *
+ * Poi si toglie tutto quello che deve ancora succedere, con la stessa
+ * regola: le scene di oggi e dei giorni a venire, dall'ordine del giorno
+ * dove c'e' e dal piano dove no. Una scena non chiusa torna in un foglio
+ * successivo — la 36 girata a meta' ricompare come 36PT — e allora si
+ * riaccende da sola.
+ *
+ * I numeri si confrontano con catNumero, che di "36PT" fa "36".
+ */
+let odgPassati = [];            // [{data, scene:[numeri]}], dal cloud
+const ODG_PASSATI = 'cb_odg_passati';
+
+function oggiLocale(adesso){
+  const d = adesso || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+       + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function sceneFatte(adesso){
+  const oggi = oggiLocale(adesso);
+  const num = x => catNumero(x);
+
+  // Un ordine del giorno per data: quelli del cloud, piu' quello in mano.
+  const perData = {};
+  for (const o of odgPassati || []) if (o && o.data) perData[o.data] = o.scene || [];
+  if (odgCorrente && odgCorrente.data)
+    perData[odgCorrente.data] = (odgCorrente.scene || []).map(s => s && s.n);
+
+  const fatte = new Set(), daFare = new Set();
+  const metti = (data, numeri) => {
+    const dove = data < oggi ? fatte : daFare;
+    for (const n of numeri || []) { const k = num(n); if (k) dove.add(k); }
+  };
+
+  for (const data in perData) metti(data, perData[data]);
+  for (const g of (typeof getPdlAllGiorni === 'function' ? getPdlAllGiorni() : [])) {
+    /* L'OdG vince sul piano, ma solo se dice qualcosa: un ordine del
+       giorno salvato senza scene non cancella quelle del piano. */
+    if (!g || !g.data || (perData[g.data] || []).length) continue;
+    metti(g.data, (g.scene || []).map(s => s && s.numero));
+  }
+  for (const k of daFare) fatte.delete(k);
+  return fatte;
+}
+
+/* Dal cloud si prendono solo data e numeri di scena di ogni ordine del
+   giorno, non il documento intero. Si tengono anche sul telefono: sul
+   set il campo va e viene, e lo spoglio non deve riaccendersi tutto
+   perche' manca la rete. */
+async function odgPassatiCarica(){
+  const f = filmCorrente();
+  const chiave = ODG_PASSATI + ':' + (f ? f.id : 'io');
+  try { odgPassati = JSON.parse(localStorage.getItem(chiave) || '[]') || []; } catch (_) { odgPassati = []; }
+  if (currentUser) {
+    try {
+      const q = sb.from('odg').select('data,scene:dati->scene');
+      const { data, error } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
+        .order('data', { ascending: false }).limit(200);
+      if (error) throw new Error(error.message);
+      odgPassati = (data || []).filter(r => r && r.data).map(r => ({
+        data: r.data,
+        scene: (Array.isArray(r.scene) ? r.scene : []).map(s => s && s.n).filter(Boolean)
+      }));
+      try { localStorage.setItem(chiave, JSON.stringify(odgPassati)); } catch (_) {}
+    } catch (e) { console.log('[scene fatte] ordini del giorno passati non letti:', e.message); }
+  }
+  sceneFatteAggiorna();
+}
+
+/* Lo spoglio potrebbe essere gia' a schermo, disegnato prima che
+   arrivassero gli ordini del giorno o il piano. Non si ridisegna: si
+   accendono e si spengono i bottoni che ci sono, cosi' una nota aperta a
+   meta' resta dov'e'. */
+function sceneFatteAggiorna(){
+  try {
+    const fatte = sceneFatte();
+    document.querySelectorAll('#spoglioSection .sp-sc').forEach(b =>
+      b.classList.toggle('fatta', fatte.has(catNumero(b.textContent))));
+  } catch (e) { console.log('[scene fatte]', e.message); }
+}
+
 async function odgRipristina() {
   try {
     const l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
@@ -10737,6 +10838,7 @@ async function odgRipristina() {
   }
   odgRicalcola();
   odgRender();
+  odgPassatiCarica();     // non si aspetta: lo spoglio si ridisegna quando arriva
 }
 
 /* Un film si chiude quando si esce dall'account: il prossimo che entra
@@ -13017,6 +13119,7 @@ function renderPdlDashboard() {
              return t.giorni ? t.giorni + ' giorni · ' + t.scene + ' scene' : ''; })()
   ].filter(Boolean).join(' · ');
   renderPdlStats(); renderPdlCalendar(); renderPdlStandby();
+  if (typeof sceneFatteAggiorna === 'function') sceneFatteAggiorna();   // il piano dice i giorni senza OdG
   const avg=getPdlAvgPages();
   document.getElementById('pdlAvgLabel').textContent='media ' + avg.toFixed(1) + ' pag/giorno';
 }
@@ -13137,7 +13240,7 @@ function renderPdlCalendar() {
       const sd=pdlShootingData[g.numero_giorno]||{};
       const status=sd.status||'pending';
       const bgClass=getPdlCellBgClass(g.pagine_giorno);
-      el.className=`cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}`;
+      el.className=`cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}${dateStr<todayStr?' passata':''}`;
       el.addEventListener('click', ()=>openPdlDayModal(g.numero_giorno));
       el.addEventListener('touchstart', (e)=>{ el._touchMoved=false; }, {passive:true});
       el.addEventListener('touchmove', ()=>{ el._touchMoved=true; }, {passive:true});
@@ -13161,7 +13264,7 @@ function renderPdlCalendar() {
       /* Il nome della destinazione in una casella da 55 pixel si taglia a
          meta' e non si legge. Resta la macchinina, che si vede da lontano,
          e il posto si legge toccando. */
-      el.className=`cal-cell is-viaggio tocca ${isToday?'is-today':''}`;
+      el.className=`cal-cell is-viaggio tocca ${isToday?'is-today':''}${dateStr<todayStr?' passata':''}`;
       el.title = viaggiMap[dateStr];
       el.addEventListener('click', ()=>apriViaggio(dateStr, viaggiMap[dateStr]));
       el.innerHTML=`<div class="cal-cell-day">${day}</div><div class="cal-cell-bus">${ODG_SEGNI.viaggio}</div>`;
@@ -13224,7 +13327,7 @@ function renderPdlCalendarWeekly() {
       const sd = pdlShootingData[g.numero_giorno] || {};
       const status = sd.status || 'pending';
       const bgClass = getPdlCellBgClass(g.pagine_giorno);
-      el.className = `cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}`;
+      el.className = `cal-cell has-shooting ${bgClass} status-${status} ${isToday?'is-today':''} ${g.giorno_viaggio?'is-viaggio':''}${dateStr<todayStr?' passata':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
       el.addEventListener('click', ()=>openPdlDayModal(g.numero_giorno));
       el.addEventListener('touchstart', ()=>{ el._touchMoved=false; }, {passive:true});
@@ -13250,7 +13353,7 @@ function renderPdlCalendarWeekly() {
         ${g.trasferimento?`<div class="cal-cell-bus">${ODG_SEGNI.viaggio}</div>`:''}
         ${sd.notes ? `<div class="cal-cell-note">${sd.notes}</div>` : ''}`;
     } else if (viaggiMap[dateStr]) {
-      el.className = `cal-cell is-viaggio tocca ${isToday?'is-today':''}`;
+      el.className = `cal-cell is-viaggio tocca ${isToday?'is-today':''}${dateStr<todayStr?' passata':''}`;
       el.style.minHeight = window.innerWidth <= 600 ? '100px' : '140px';
       el.title = viaggiMap[dateStr];
       el.addEventListener('click', ()=>apriViaggio(dateStr, viaggiMap[dateStr]));
