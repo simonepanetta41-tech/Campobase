@@ -160,6 +160,23 @@ ok('gli stacchi restano',
    (await ricuci([{n:'16',sinossi:'a',ids:'1'},{n:'',nota:'TRASFERIMENTO'},{n:'17',sinossi:'b',ids:'2'}],
                  [{scene:'16, 17'}], TESTO2)).length, 3);
 
+console.log('\n── gli stralci di una giornata con una scena sola ──');
+/* Con una scena sola c'e' un'intestazione sola, e contando fino a due il
+   documento non era niente: la scena dell'OdG 24 non si apriva. La
+   parola "stralci" sta nel nome del file, non nel testo. */
+const UNO = 'INT./EST. OSTERIA - NOTTE 16 16\nColonna e Navarra sono seduti a un tavolo. NAVARRA Scusate, per Roma?\n';
+ok('dal nome del file', await p.evaluate(x=>odgTipoDoc(x, 'MSG - Stralci DAY _24.pdf'), 'testo qualunque senza intestazioni'), 'stralci');
+ok('anche col file rinominato, da un\'intestazione', await p.evaluate(x=>odgTipoDoc(x, 'documento.pdf'), UNO), 'stralci');
+ok('un ordine del giorno resta tale, anche col nome sbagliato',
+   await p.evaluate(()=>odgTipoDoc('CONVOCAZIONE: 13.00\nFINE RIPRESE: 20.30\nCESTINI: 110', 'Stralci.pdf')), 'odg');
+const rip = await p.evaluate(x=>{
+  odgCorrente = {data:'2026-11-13', numero:'24', scene:[{n:'16'}], cast:[{scene:'16'}],
+    allegati:[{nome:'MSG - Stralci DAY _24.pdf', tipo:null, testo:x}]};
+  odgRicalcola();
+  return {tipo:odgCorrente.allegati[0].tipo, apre:odgHaStralcio(odgCorrente, '16')};
+}, UNO);
+ok('un OdG già salvato si ripara all\'apertura', rip, {tipo:'stralci', apre:true});
+
 ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();

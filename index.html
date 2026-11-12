@@ -5012,7 +5012,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.121';
+const CB_VERSIONE = '1.122';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -10290,8 +10290,8 @@ let odgInCorso = false;
  * Si riconoscono dal contenuto, non dal nome del file, che cambia da
  * produzione a produzione.
  */
-function odgTipoDoc(t){
-  const u = t.toUpperCase().replace(/\s+/g,' ');
+function odgTipoDoc(t, nome){
+  const u = String(t || '').toUpperCase().replace(/\s+/g,' ');
 
   // Gli stralci sono sceneggiatura: hanno le intestazioni di scena, che
   // nessun altro documento ha. Nel formato italiano il numero viene dopo
@@ -10337,12 +10337,21 @@ function odgTipoDoc(t){
 
   if (slug >= 2) return 'stralci';
   if (/STRALC/.test(u)) return 'stralci';
+  /* Una giornata con una scena sola ha stralci con un'intestazione sola,
+     e la parola "stralci" dentro al testo non c'e': sta nel nome del
+     file ("MSG - Stralci DAY _24.pdf"). Contando fino a due quel
+     documento non era niente, e la scena del giorno non si apriva. Il
+     nome lo ha scritto la produzione: quando il testo non decide, vale. */
+  if (nome && /STRALC/i.test(nome)) return 'stralci';
 
   // I giri auto non si chiamano sempre cosi': a distinguerli sono le
   // colonne, che l'OdG non ha.
   if (/GIRI\s?AUTO|TRANSPORT\s?LIST|LISTA\s?TRASPORT|RUNNER|ORARIO ?PARTENZA|ORARIO ?ARRIVO/.test(u)) return 'giri';
 
   if (/CONVOCAZIONE TROUPE|ORDINE DEL GIORNO|\bODG\b/.test(u)) return 'odg';
+  // Niente di tutto il resto, ma un'intestazione di scena c'e': stralci
+  // di una giornata con una scena sola, col file rinominato.
+  if (slug >= 1) return 'stralci';
   return null;   // non riconosciuto: decide la lunghezza, piu' avanti
 }
 
@@ -10424,7 +10433,7 @@ async function odgLavora(files, opzioni) {
       const r = await odgTestoDaPdf(f, true);
       letti.push({ nome: f.name, vero: f, testo: r.testo, piatto: r.piatto,
                    colonne: r.colonne, righe: r.righe,
-                   tipo: odgTipoDoc(r.testo), file: salvato ? chiave : null,
+                   tipo: odgTipoDoc(r.testo, f.name), file: salvato ? chiave : null,
                    percorso: percorsi[f.name] || null });
     }
     // Se nessuno si e' dichiarato ordine del giorno, e' il piu' lungo:
@@ -11409,6 +11418,16 @@ function odgRicalcola() {
      qui, su ogni telefono che lo apre: testo e cast sono salvati con lui,
      non serve richiamare il modello. */
   try { if (d.testo) odgRicuciScene(d, d.testo); } catch (_) {}
+  /* E gli stralci che non erano stati riconosciuti come tali: il testo
+     dell'allegato e' salvato, basta rileggerlo col nome accanto. Manca la
+     forma con i rientri (quella vuole il PDF), ma lo stralcio si apre. */
+  try {
+    if (!d.stralci || !Object.keys(d.stralci).length) {
+      const a = (d.allegati || []).find(x => x && !x.tipo && x.testo
+                                          && odgTipoDoc(x.testo, x.nome) === 'stralci');
+      if (a) { a.tipo = 'stralci'; d.stralci = odgStralci(a.testo); }
+    }
+  } catch (_) {}
   if (d.giriTesto) {
     const p = odgPickUp(d.giriTesto, profilo());
     if (p) d.pickup = p;
