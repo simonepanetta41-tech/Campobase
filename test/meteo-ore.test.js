@@ -95,10 +95,10 @@ ok('8, 10 e 19 km/h sono spenti', fin.ventose.slice(0,3), [false,false,false]);
 ok('20 e 27 sono accesi',         fin.ventose.slice(3,5), [true,true]);
 ok('e 14 torna spento',           fin.ventose[5], false);
 ok('e la sera è calma',           fin.ventose.slice(6), [false,false,false]);
-ok('la nota conta le ore vere',   /supera i 20 km\/h per 2 ore/.test(fin.nota), true);
-/* La nota dice una cosa sola: il vento. Gli orari si leggono
-   dall'elenco, che e' li' sopra, e ripeterli sotto era rumore. */
-ok('la nota parla solo del vento', fin.nota, 'Il vento supera i 20 km/h per 2 ore: in presa diretta si sente.');
+/* Il riassunto del vento a parole non c'e' piu': le ore che tirano sono
+   gia' gialle nell'elenco, e dirlo una seconda volta ripeteva una cosa
+   che si vede. Sotto l'elenco non c'e' niente, a giornata in corso. */
+ok('niente scritte sotto l\'elenco', fin.nota, '');
 
 const calmo = await p.evaluate(a=>{
   odgCorrente = {data:'2026-11-12', previsione:{...a, ore:a.ore.map(o=>({...o, vt:6}))}, scene:[]};
@@ -108,7 +108,7 @@ const calmo = await p.evaluate(a=>{
           nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
 }, PREV);
 ok('con poco vento nessuna riga accesa', calmo.ventose, 0);
-ok('e la nota non lo nomina',            /vento/.test(calmo.nota), false);
+ok('e sotto resta vuoto',                calmo.nota, '');
 
 console.log('\n── le ore passate non si mostrano più ──');
 /* A meta' pomeriggio le ore della mattina non servono a nessuno: quello
@@ -119,6 +119,7 @@ const alle = (ora, data) => p.evaluate(a=>{
   meteoApri(new Date(a.data + 'T' + String(a.ora).padStart(2,'0') + ':15:00'));
   const el = document.getElementById('odgMeteo');
   return {orari: [...el.querySelectorAll('.mt-h')].map(x=>x.textContent),
+          ventose: [...el.querySelectorAll('.mt-o')].map(o=>o.classList.contains('ventoso')),
           nota: el.querySelector('.mt-nota').textContent.replace(/\s+/g,' ').trim()};
 }, {ora, data, prev:PREV});
 
@@ -126,14 +127,14 @@ const OGGI = new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOSt
 const m = await alle(9, OGGI);
 ok('alle 9:15 si parte dalle 9',  m.orari[0], '09:00');
 ok('e la mattina è sparita',      m.orari.length, 7);
-ok('la nota resta sul vento',     /supera i 20/.test(m.nota), true);
-/* Il vento si conta su quello che si vede: dire "per 2 ore" mostrandone
-   una sola sarebbe una riga che contraddice la schermata sotto. */
-ok('e conta il vento che resta',  /per 2 ore/.test(m.nota), true);
+ok('e sotto non si scrive niente', m.nota, '');
+/* Le righe gialle pero' restano, e seguono quello che si vede: delle
+   due ore ventose, dalle 9 in poi ne restano due. */
+ok('e le righe gialle sono quelle che restano', m.ventose.filter(Boolean).length, 2);
 
 const tardi = await alle(20, OGGI);
 ok('alle 20 restano la 22 e la 23',   tardi.orari, ['22:00','23:00']);
-ok('e senza vento la nota sparisce',  tardi.nota, '');
+ok('e sotto non c\'è niente',         tardi.nota, '');
 
 /* Su un ordine del giorno che non e' di oggi non e' passato niente.
    L'orologio deve stare su un ALTRO giorno: mettendolo sulla stessa data

@@ -4987,7 +4987,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.112';
+const CB_VERSIONE = '1.113';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9156,9 +9156,10 @@ function meteoApri(adesso) {
       </span></div>`;
   }).join('');
 
-  // Il vento si conta su quello che si vede: dire "per 4 ore" mostrandone
-  // due sarebbe una riga che contraddice la schermata sotto.
-  const tirato = ore.filter(o => o.vt != null && o.vt >= METEO_VENTO);
+  /* Il riassunto del vento in fondo non c'e' piu': le ore che tirano
+     sono gia' gialle nell'elenco, e dirlo una seconda volta a parole
+     ripeteva una cosa che si vede. La soglia resta, e resta a tingere
+     le righe. */
   const el = document.getElementById('odgMeteo');
   el.innerHTML = `
     <div class="sc-top">
@@ -9172,11 +9173,7 @@ function meteoApri(adesso) {
         ${p.tramonto ? `<div><span class="k">Tramonto</span><span class="v">${esc(p.tramonto)}</span></div>` : ''}
       </div></div>` : ''}
       <div class="card"><div class="mt-ore">${righe}</div></div>
-      <div class="mt-nota">${finita
-        ? `La giornata è finita: questa è com’è andata.` : ''}${
-        tirato.length ? `${finita ? ' ' : ''}Il vento supera i ${METEO_VENTO} km/h ${tirato.length === 1
-          ? 'alle ' + String(tirato[0].h).padStart(2,'0') + ':00'
-          : 'per ' + tirato.length + ' ore'}: in presa diretta si sente.` : ''}</div>
+      <div class="mt-nota">${finita ? `La giornata è finita: questa è com’è andata.` : ''}</div>
     </div>`;
   el.classList.add('on');
 }
