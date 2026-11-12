@@ -434,7 +434,7 @@ export async function avvisaPosta(env, projectId, fatti, oggetto) {
  * Solo a lui, non alla troupe: la troupe non puo' farci niente, e una
  * notifica che non si puo' agire e' rumore.
  */
-export async function avvisaMittenteStrano(env, film, chi, oggetto) {
+export async function avvisaMailDaParte(env, film, oggetto) {
   let capi = await db(env,
     `film_membri?select=user_id&project_id=eq.${film.id}&ruolo=eq.capo`);
 
@@ -445,8 +445,14 @@ export async function avvisaMittenteStrano(env, film, chi, oggetto) {
   if (!capi?.length && film.user_id) capi = [{ user_id: film.user_id }];
   if (!capi?.length) return 0;
 
-  const da = String(chi || '').replace(/\s+/g, ' ').trim().slice(0, 70);
-  const testo = 'Mail messa da parte\n' + (da ? 'Arrivata da ' + da : 'Mittente non riconosciuto');
+  /* Sotto il titolo l'oggetto della mail, non il mittente: il mittente,
+     dopo un reinvio di Outlook, e' sempre lo stesso indirizzo e non dice
+     niente. L'oggetto invece si riconosce a occhio — se c'e' scritto il
+     film giusto, il controllo ha sbagliato e c'e' da rimediare adesso. */
+  const sotto = String(oggetto || '')
+    .replace(/^(\s*(?:fwd?|re|i|inoltro)\s*:\s*)+/i, '')
+    .replace(/\s+/g, ' ').trim().slice(0, 80);
+  const testo = 'Mail messa da parte\n' + (sotto || 'Senza oggetto');
 
   const adesso = new Date();
   const righe = capi.map(c => ({

@@ -25,7 +25,7 @@ import { leggiMessaggio } from './mime.js';
    catch e' giusto, una notifica mancata non deve far rimbalzare una mail
    arrivata; ma messo attorno a un nome che non esiste rende invisibile un
    errore di programmazione. */
-import { avvisaPosta, avvisaMittenteStrano } from './push.js';
+import { avvisaPosta, avvisaMailDaParte } from './push.js';
 
 // Quello che vale la pena tenere. Le immagini no: nei pacchetti sono firme
 // e loghi della mail, non documenti.
@@ -57,7 +57,7 @@ function nomePulito(nome) {
     .slice(-120) || 'allegato';
 }
 
-/* ── Chi ha scritto ────────────────────────────────────────────────────
+/* ── Di quale film e' questa mail ──────────────────────────────────────
  *
  * La posta viene smistata solo per indirizzo di arrivo: la casella dice
  * il film, e basta. Finche' si gira un film solo va bene. Ma l'inoltro
@@ -66,13 +66,39 @@ function nomePulito(nome) {
  * l'ordine del giorno del film nuovo finisce dentro il film vecchio e
  * sessanta persone che non c'entrano niente ricevono la notifica.
  *
- * Da qui si guarda anche chi scrive. `projects.mittente` dice da chi ci
- * si aspetta la posta di quel film; vuoto, passa tutto, come prima.
+ * Qui si guarda dentro la mail. Dove, lo decidono i dati veri.
  *
- * Si accettano un indirizzo intero (odg@produzione.it), un dominio
- * (@produzione.it, o produzione.it) e piu' voci separate da virgole o da
- * spazi: la produzione manda da tre caselle diverse e cambia la persona a
- * meta' film, quindi un solo indirizzo esatto non regge una lavorazione.
+ * Il primo tentativo era di guardare chi l'ha mandata, e sui dati veri
+ * non funziona: Outlook non redirige, REINVIA. Busta e intestazione
+ * From: portano sempre l'indirizzo di chi inoltra — lo stesso per tutti
+ * i film, quindi non distingue niente, e un controllo appoggiato li'
+ * sarebbe stato inerte o sbagliato sempre.
+ *
+ * Il mittente vero sta nel corpo, nel blocco che il reinvio mette in
+ * testa al messaggio ("Da: Produzione <...>", oppure "Inizio messaggio
+ * inoltrato:" quando l'inoltro passa dal telefono). Da quel blocco si
+ * leggono gli indirizzi. Non e' un campo dichiarato, e' testo: quindi
+ * non e' l'unica cosa che si guarda.
+ *
+ * La seconda cosa e' l'oggetto. Le produzioni mettono davanti le
+ * iniziali del film — "MSG - ODG #23", "MSG_ACCOMMODATION NAPOLI" — e
+ * quel prefisso lo scrive la produzione, non noi.
+ *
+ * Due colonne su `projects`:
+ *   mittente   gli indirizzi attesi: uno intero, un dominio (@x.it), o
+ *              piu' voci separate da virgola. La produzione manda da tre
+ *              caselle e cambia la persona a meta' film.
+ *   marcatore  cosa deve comparire nell'oggetto. Piu' voci: virgola.
+ *
+ * Vuote entrambe, passa tutto, come prima di questo controllo.
+ *
+ * E una mail si trattiene solo se TUTTI E DUE i segnali dicono no. Il
+ * rischio di questo controllo e' al contrario di tutto il resto:
+ * trattenere per sbaglio vuol dire un ordine del giorno che alle sei del
+ * mattino non c'e', e sono sessanta persone sul set senza il foglio.
+ * Lasciar passare una mail di troppo vuol dire una notifica da ignorare.
+ * Non e' lo stesso prezzo, e due segnali indipendenti che sbagliano
+ * insieme sono molto piu' rari di uno.
  */
 const INDIRIZZO = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
 
@@ -80,18 +106,24 @@ function indirizzi(s) {
   return String(s || '').toLowerCase().match(INDIRIZZO) || [];
 }
 
-export function mittenteCombacia(atteso, ...candidati) {
-  const regole = String(atteso || '').toLowerCase().split(/[,;\s]+/).filter(Boolean);
-  if (!regole.length) return true;      // niente dichiarato, niente da controllare
+/* Gli indirizzi non hanno spazi dentro, quindi si separano anche per
+   spazio. I marcatori si separano solo per virgola: "MSG - ODG" e' un
+   marcatore solo, e spezzarlo lo farebbe combaciare con qualunque
+   oggetto che contiene un trattino. */
+function indirizziAttesi(campo) {
+  return String(campo || '').toLowerCase().split(/[,;\s]+/).filter(Boolean);
+}
 
-  const visti = candidati.flatMap(indirizzi);
-  /* Se nella mail non si legge nessun indirizzo non si mette da parte
-     niente. Una mail si trattiene solo quando si e' riconosciuto un
-     mittente ed e' un altro: su un dubbio passa, perche' trattenere per
-     sbaglio l'ordine del giorno costa piu' che lasciar passare una mail
-     di troppo. */
-  if (!visti.length) return true;
+function marcatoriAttesi(campo) {
+  return String(campo || '').toLowerCase().split(/\s*[,;]\s*/)
+    .map(s => s.trim()).filter(Boolean);
+}
 
+/* Un indirizzo atteso contro quelli trovati. Un dominio nudo o con la
+   chiocciola prende tutta la casa; un indirizzo intero prende se stesso
+   e basta — e qui serve: le produzioni stanno su gmail, e "gmail.com"
+   accetterebbe qualunque film. */
+function indirizzoAtteso(regole, visti) {
   return regole.some(r => {
     const dominio = r.replace(/^@/, '');
     const esatta = r.includes('@') && !r.startsWith('@');
@@ -99,6 +131,48 @@ export function mittenteCombacia(atteso, ...candidati) {
       ? v === r
       : v === dominio || v.endsWith('@' + dominio) || v.endsWith('.' + dominio));
   });
+}
+
+/* L'oggetto, senza i prefissi di inoltro: tre "Fwd:" in fila non dicono
+   niente, e "I:" e' l'inoltro di Outlook in italiano. */
+function oggettoNudo(oggetto) {
+  return String(oggetto || '').toLowerCase()
+    .replace(/^(\s*(?:fwd?|re|i|inoltro)\s*:\s*)+/i, '').trim();
+}
+
+export function postaDelFilm(film, mail) {
+  const attesi = indirizziAttesi(film && film.mittente);
+  const marcatori = marcatoriAttesi(film && film.marcatore);
+  if (!attesi.length && !marcatori.length) return { suo: true };
+
+  /* Gli indirizzi di chi ha consegnato restano nel mazzo: un giorno una
+     produzione potrebbe scrivere alla casella direttamente, senza
+     passare dall'inoltro, e allora il mittente vero e' li'. */
+  const nelCorpo = indirizzi(mail.testo);
+  const visti = [...indirizzi(mail.envelope), ...indirizzi(mail.da), ...nelCorpo];
+
+  const perIndirizzo = attesi.length && indirizzoAtteso(attesi, visti);
+  const oggetto = oggettoNudo(mail.oggetto);
+  const perOggetto = marcatori.length && !!oggetto
+    && marcatori.some(m => oggetto.includes(m));
+
+  if (perIndirizzo || perOggetto) return { suo: true };
+
+  /* Nessuno dei due ha riconosciuto il film. Prima di trattenere, si
+     controlla che ci fosse qualcosa da riconoscere: un corpo senza
+     nemmeno un indirizzo e un oggetto vuoto non sono una mail di un
+     altro film, sono una mail che non abbiamo saputo leggere. */
+  const leggibile = (attesi.length && nelCorpo.length) || (marcatori.length && oggetto);
+  if (!leggibile) return { suo: true };
+
+  return {
+    suo: false,
+    perche: [
+      attesi.length ? 'mittente atteso ' + attesi.join('/') + ', trovati '
+        + (nelCorpo.length ? nelCorpo.slice(0, 3).join(' ') : 'nessuno nel corpo') : '',
+      marcatori.length ? 'oggetto senza ' + marcatori.join('/') : ''
+    ].filter(Boolean).join('; ').slice(0, 400)
+  };
 }
 
 function capi(env) {
@@ -110,7 +184,8 @@ function capi(env) {
 
 async function filmDallaCasella(env, casella) {
   const u = `${env.SUPABASE_URL.replace(/\/+$/, '')}/rest/v1/projects`
-          + `?casella=eq.${encodeURIComponent(casella)}&select=id,titolo,mittente,user_id&limit=1`;
+          + `?casella=eq.${encodeURIComponent(casella)}`
+          + `&select=id,titolo,mittente,marcatore,user_id&limit=1`;
   const r = await fetch(u, { headers: capi(env) });
   if (!r.ok) throw new Error('lettura film: ' + r.status + ' ' + await r.text());
   const righe = await r.json();
@@ -243,20 +318,26 @@ export async function riceviPosta(message, env, ctx) {
     riga.nota = String(e && e.message || e).slice(0, 500);
   }
 
-  /* Il controllo sta qui e non prima perche' l'intestazione From: si
-     legge solo dopo aver aperto il messaggio: l'envelope da solo, quando
-     la mail arriva da un inoltro automatico, dice chi l'ha inoltrata e
-     non chi l'ha scritta. */
-  if (riga.stato === 'nuova' &&
-      !mittenteCombacia(film.mittente, riga.mittente, riga.mittente_vero)) {
-    /* Non 'errore': non si e' rotto niente. E non 'nuova', perche'
-       prendi_posta prende solo nuova, errore e in analisi — con questo
-       stato il pacchetto resta nel database e l'app non lo tocca. Per
-       farlo analizzare basta rimetterlo a 'nuova' a mano. */
-    riga.stato = 'da verificare';
-    riga.nota = 'mittente non atteso (' + film.mittente + '): '
-      + [riga.mittente, riga.mittente_vero].filter(Boolean).join(' / ').slice(0, 400);
-    console.log('posta: messa da parte, ' + riga.nota);
+  /* Il controllo sta qui, e non appena si conosce la casella, perche'
+     guarda il corpo e l'oggetto: roba che esiste solo dopo aver aperto
+     il messaggio. Se l'apertura e' fallita lo stato e' 'errore' e non si
+     trattiene niente — una mail che non si e' saputa leggere non e' una
+     mail di un altro film. */
+  if (riga.stato === 'nuova') {
+    const giudizio = postaDelFilm(film, {
+      envelope: riga.mittente, da: riga.mittente_vero,
+      testo: riga.testo, oggetto: riga.oggetto
+    });
+    if (!giudizio.suo) {
+      /* Non 'errore': non si e' rotto niente. E non 'nuova', perche'
+         prendi_posta prende solo nuova, errore e in analisi — con questo
+         stato il pacchetto resta nel database con tutti i suoi allegati e
+         l'app non lo tocca. Per farlo analizzare basta rimetterlo a
+         'nuova' a mano. */
+      riga.stato = 'da verificare';
+      riga.nota = 'non sembra di questo film: ' + giudizio.perche;
+      console.log('posta: messa da parte, ' + riga.nota);
+    }
   }
 
   if (!riga.data_invio) delete riga.data_invio;
@@ -279,8 +360,7 @@ export async function riceviPosta(message, env, ctx) {
    */
   if (riga.stato === 'da verificare') {
     try {
-      const quanti = await avvisaMittenteStrano(
-        env, film, riga.mittente_vero || riga.mittente, riga.oggetto);
+      const quanti = await avvisaMailDaParte(env, film, riga.oggetto);
       console.log('posta: avvisato il capo,', quanti, 'righe');
     } catch (e) {
       console.error('posta: avviso al capo non partito', e.message);

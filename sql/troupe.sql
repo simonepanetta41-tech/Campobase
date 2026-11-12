@@ -20,6 +20,25 @@ alter table public.projects add column if not exists casella    text;
 alter table public.projects add column if not exists produzione text;
 alter table public.projects add column if not exists mittente   text;
 
+-- Come si riconosce la posta di questo film. Servono perche' la casella
+-- da sola non basta: la regola di inoltro di Outlook resta dov'e' quando
+-- comincia il film dopo, e l'ordine del giorno della produzione nuova
+-- arriverebbe nella casella di quella vecchia, avvisandone la troupe.
+--
+--   mittente   gli indirizzi attesi. Outlook REINVIA invece di
+--              redirigere, quindi busta e From: portano sempre
+--              l'indirizzo di chi inoltra: l'indirizzo della produzione
+--              si legge nel corpo, nel blocco "Da:" del reinvio. Una o
+--              piu' voci separate da virgola; un dominio nudo prende
+--              tutta la casa, ma le produzioni stanno su gmail, quindi
+--              di solito va messo l'indirizzo intero.
+--   marcatore  cosa deve comparire nell'oggetto: le produzioni mettono
+--              davanti le iniziali del film ("MSG - ODG #23").
+--
+-- Vuote, il Worker passa tutto come prima. Una mail si trattiene solo se
+-- tutti e due i segnali dicono no.
+alter table public.projects add column if not exists marcatore  text;
+
 -- Il codice sta in un QR e qualcuno lo digitera' a mano: otto cifre
 -- esadecimali si leggono ad alta voce senza sbagliare. La casella invece
 -- nessuno la digita e chi la indovina ci infila dentro un falso ordine
