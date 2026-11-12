@@ -727,6 +727,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 #authPage .auth-msg{margin-top:12px;font-size:13px;text-align:center;min-height:18px}
 .cb-testa{position:sticky;top:0;z-index:120;display:flex;align-items:center;gap:8px;
   padding:9px 0;background:var(--bg);border-bottom:1px solid var(--border)}
+/* Sul telefono la testata si ferma sotto la barra di stato (ora, campo,
+   batteria), e in quella striscia sopra la pagina continuava a scorrere:
+   si leggevano pezzi di testo dietro l'orologio. Un telo dello stesso
+   colore del fondo, appeso sopra la testata, largo quanto lo schermo. */
+.cb-testa::before{content:'';position:absolute;left:-28px;right:-28px;bottom:100%;
+  height:120px;background:var(--bg);pointer-events:none}
 .cb-ident{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;
   border:none;padding:4px 0;cursor:pointer;color:inherit;text-align:left;font-family:inherit}
 .cb-mark{width:26px;height:26px;flex:0 0 26px}
@@ -4996,7 +5002,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.117';
+const CB_VERSIONE = '1.118';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
