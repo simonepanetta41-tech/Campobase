@@ -4987,7 +4987,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.113';
+const CB_VERSIONE = '1.114';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9173,7 +9173,6 @@ function meteoApri(adesso) {
         ${p.tramonto ? `<div><span class="k">Tramonto</span><span class="v">${esc(p.tramonto)}</span></div>` : ''}
       </div></div>` : ''}
       <div class="card"><div class="mt-ore">${righe}</div></div>
-      <div class="mt-nota">${finita ? `La giornata è finita: questa è com’è andata.` : ''}</div>
     </div>`;
   el.classList.add('on');
 }
