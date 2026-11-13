@@ -131,7 +131,15 @@ await p.waitForTimeout(250);
 await p.screenshot({path:__dirname+'/g2-odg.png',fullPage:true});
 
 console.log('\n── rimuovo ──');
-await p.evaluate(()=>odgRimuovi());
+/* Il tasto chiede prima: sta in fondo alla pagina, sotto il pollice che
+   scorre, e toccato per sbaglio toglieva tutto senza una parola. */
+const vero = await p.evaluate(()=>{ window.__conferma=askConfirm; return true; });
+ok('chi annulla tiene l\'ordine del giorno', await p.evaluate(async()=>{
+  let chiesto=''; askConfirm=async t=>{ chiesto=t; return false; };
+  await odgRimuovi();
+  return [/da questo telefono/.test(chiesto), !!odgCorrente];
+}), [true, true]);
+await p.evaluate(async()=>{ askConfirm=async()=>true; await odgRimuovi(); askConfirm=window.__conferma; });
 ok('torna vuoto', await p.evaluate(()=>/Nessun ordine del giorno/.test(document.getElementById('odgCorpo').innerText)), true);
 
 console.log('\n── aprendo un film si arriva all\'OdG ──');
