@@ -14,6 +14,7 @@ import { handleWrap } from './wrap.js';
 import { riceviPosta } from './posta.js';
 import { handleIscrivi, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
 import { handleAttore } from './attore.js';
+import { leggiInOmbra } from './ombra.js';
 
 const FREE_LIMIT = 3;
 
@@ -324,6 +325,19 @@ export default {
       const m = String(e && e.message || e);
       if (/does not exist|42P01|PGRST205|\b404\b/.test(m)) console.log('cron: tabelle delle notifiche non ancora create');
       else console.error('cron', e);
+    }
+
+    /* La lettura in ombra (ombra.js). DOPO le notifiche e in un try suo:
+       qualunque cosa le succeda — colonna non ancora creata, modello che
+       non risponde, tempo che finisce — le notifiche di questo minuto
+       sono gia' partite. */
+    try {
+      const esito = await leggiInOmbra(env);
+      if (!/^(niente da leggere|spenta|non configurata)$/.test(esito)) console.log('ombra:', esito);
+    } catch (e) {
+      const m = String(e && e.message || e);
+      if (/ombra_stato|ombra_il|42703|PGRST204/.test(m)) console.log('ombra: colonne non ancora create (sql/ombra.sql)');
+      else console.error('ombra', m);
     }
   },
 
