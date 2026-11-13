@@ -1860,7 +1860,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Ore</div>
           <div style="display:flex;gap:8px">
-            <button onclick="ttClear()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">✕ Svuota</button>
+            <button onclick="ttNuovaSettimana()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer">Nuova settimana</button>
             <!-- Il tasto Salva non c'e' piu': salvava la stessa cosa che l'app
                  salva gia' da sola a ogni orario scritto, ed era il tasto piu'
                  in vista della schermata. In giallo adesso c'e' l'unica azione
@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.125';
+const CB_VERSIONE = '1.126';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -14647,18 +14647,81 @@ function ttRenderTab(tab){
 }
 
 function ttAddFirst(){ttTabelle.push(ttMkTab([]));ttRenderAll();}
-// Svuota solo gli orari. Produzione, film, settimana, date e note restano:
-// cambiano a inizio lavorazione, non da un giorno all'altro, e riscriverle
-// ogni volta era il motivo per cui questo tasto non si poteva usare.
-// Restano anche i lavoratori, che sono la squadra della settimana.
-async function ttClear(){
-  if(!await askConfirm('Svuotare gli orari di tutte le tabelle? Intestazione, date e lavoratori restano.', { conferma: 'Svuota orari' }))return;
+/* Nuova settimana: quello che si fa a mano ogni lunedi'.
+ *
+ * Al posto di "Svuota", che cancellava gli orari e basta. Il guaio era
+ * il dopo: l'app salva da sola, e una settimana si riconosce per film,
+ * reparto e numero. Svuotando senza cambiare il numero, il salvataggio
+ * automatico riscriveva sul cloud la settimana appena finita — con gli
+ * orari vuoti. Il lavoro di sei giorni perso premendo un tasto che
+ * prometteva solo di fare pulizia.
+ *
+ * Qui l'ordine e' obbligato:
+ *   1. la settimana in corso si mette al sicuro sul cloud, e se non ci
+ *      si riesce (niente rete, niente numero) ci si ferma: non si butta
+ *      via niente che non sia stato salvato;
+ *   2. solo dopo si va avanti: numero +1, date +7 giorni, orari e note
+ *      vuoti. Squadra, film, reparto e regole restano;
+ *   3. se la settimana di arrivo esiste gia' nello storico ci si ferma
+ *      lo stesso, perche' azzerandola la si perderebbe allo stesso modo.
+ */
+function ttSettimanaDopo(s){
+  // "3" -> "4", "Sett. 3" -> "Sett. 4", "3ª" -> "4ª". Senza numero, niente.
+  const m=/\d+/.exec(String(s||''));
+  if(!m)return '';
+  return s.slice(0,m.index)+(parseInt(m[0],10)+1)+s.slice(m.index+m[0].length);
+}
+function ttDataPiu7(iso){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||''));
+  if(!m)return iso||'';
+  const d=new Date(+m[1],+m[2]-1,+m[3]+7);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+async function ttNuovaSettimana(){
+  const campo=id=>document.getElementById(id);
+  const sett=(campo('tt-settimana').value||'').trim();
+  const film=(campo('tt-film').value||'').trim();
+  const reparto=(campo('tt-reparto').value||'').trim();
+  const piena=ttTabelle.some(t=>Object.values(t.orari||{}).some(a=>(a||[]).some(x=>x&&String(x).trim())));
+  const dopo=ttSettimanaDopo(sett);
+
+  if(piena){
+    if(!sett){
+      showToast('Scrivi prima il numero di questa settimana nell\'intestazione: senza, non posso conservarla nello storico.','red',7000);
+      return;
+    }
+    clearTimeout(ttSyncT);
+    const ok=await ttSync();
+    if(!ok){
+      showToast('Questa settimana non è ancora al sicuro sul cloud. Riprova appena c\'è rete: così non si perde niente.','red',7000);
+      return;
+    }
+    try{ await ttRenderStorico(); }catch(_){}
+  }
+  if(sett && !dopo){
+    showToast('Non trovo un numero in "'+sett+'": scrivi il numero della settimana e riprova.','red',6000);
+    return;
+  }
+  const uguale=x=>String(x||'').trim().toLowerCase();
+  if(dopo && (ttStoricoCache||[]).some(w=>w.meta&&uguale(w.meta.settimana)===uguale(dopo)
+       &&uguale(w.meta.film)===uguale(film)&&uguale(w.meta.reparto)===uguale(reparto))){
+    showToast('La settimana '+dopo+' c\'è già nello storico: aprila da lì.','red',6000);
+    return;
+  }
+  const testo=piena
+    ? `Passare alla settimana ${dopo}? La settimana ${sett} resta nello storico con i suoi orari. Squadra e intestazione restano.`
+    : `Passare alla settimana ${dopo||'successiva'}? Squadra e intestazione restano.`;
+  if(!await askConfirm(testo,{conferma:'Nuova settimana',pericolo:false}))return;
+
+  if(dopo)campo('tt-settimana').value=dopo;
+  campo('tt-dal').value=ttDataPiu7(campo('tt-dal').value);
+  campo('tt-al').value=ttDataPiu7(campo('tt-al').value);
   const CAMPI=['partenza','inizio','pausa','stop','fine','rientro'];
-  ttTabelle.forEach(t=>{
-    CAMPI.forEach(f=>{t.orari[f]=Array(6).fill('');});
-  });
-  ttRenderAll();
-  showToast('Orari svuotati.');
+  ttTabelle.forEach(t=>{ CAMPI.forEach(f=>{t.orari[f]=Array(6).fill('');}); });
+  ttMeta.note='';
+  const note=campo('tt-note'); if(note)note.value='';
+  ttRenderAll();                       // salva: e' gia' la settimana nuova
+  showToast(dopo?('Settimana '+dopo+' pronta.'):'Settimana nuova pronta.');
 }
 async function ttDelTab(id){if(ttTabelle.length<=1)return;if(!await askConfirm('Eliminare questa tabella?'))return;ttTabelle=ttTabelle.filter(t=>t.id!=id);ttRenderAll();}
 /*
