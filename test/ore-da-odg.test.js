@@ -79,6 +79,27 @@ r = await giro([{azzera:true, odg:ODG}]);
 ok('"Vedi GA" non è un orario: vale la generale', r[0].inizio[4], '13.00');
 await p.evaluate(()=>{ odgMiaRiga=()=>null; });
 
+console.log('\n── la stessa regola sulla scheda della convocazione ──');
+/* Dall'OdG 25: convocazione generale 12.30, ma il data manager e'
+   convocato alle 13.30 e il van lo prende alle 13.00. Si vedeva scritto
+   "12.30 · pick-up 13.00", cioe' il pick-up dopo la convocazione. */
+const scheda = (io, d) => p.evaluate(a=>{
+  const h = odgBadgeHtml(a.d, a.io);
+  return [(/class="o num">([^<]*)</.exec(h)||[])[1], (/class="p num">([^<]*)</.exec(h)||[,''])[1]];
+}, {io, d});
+const D25 = {data:'2026-11-14', convocazione:'12.30', pickup:{ora:'13.00'}};
+ok('il data manager, col suo orario sotto "partenza"',
+   await scheda({ruolo:'Data Manager', reparto:'Fotografia', nome:'V. Leone', set:'', partenza:'13.30'}, D25),
+   ['13.30', 'pick-up 13.00']);
+ok('e col suo orario sotto SET',
+   await scheda({ruolo:'Data Manager', nome:'V. Leone', set:'13.30', partenza:''}, D25), ['13.30', 'pick-up 13.00']);
+ok('chi ha "O.C." vede la generale',
+   await scheda({ruolo:'Costumista', nome:'R. Aprea', set:'', partenza:'O.C.'}, {...D25, pickup:null}), ['12.30', '']);
+ok('un orario solo non diventa anche "partenza"',
+   await scheda({ruolo:'Fonico', nome:'D. De Angelis', set:'', partenza:'12.30'}, {...D25, pickup:null}), ['12.30', '']);
+ok('due orari: SET è la convocazione, l\'altro la partenza',
+   await scheda({ruolo:'Runner', nome:'X', set:'12.30', partenza:'11.45'}, {...D25, pickup:null}), ['12.30', 'partenza 11.45']);
+
 console.log('\n── ⚠ quello che scrive la persona vince sempre ──');
 r = await giro([{azzera:true, odg:ODG, scrivo:['partenza',4,'12.00']}]);
 ok('una casella già compilata non si tocca', [r[0].partenza[4], r[0].inizio[4]], ['12.00','13.00']);

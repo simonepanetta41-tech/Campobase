@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.132';
+const CB_VERSIONE = '1.133';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12996,7 +12996,12 @@ function odgBadgeHtml(d, io) {
         <span class="r">${[q.ruolo, q.reparto].filter(Boolean).map(esc).join(' · ')}</span></button>`).join('')}</div>
     </div>`;
   }
-  const ora = io.set || d.convocazione || '';
+  /* La convocazione e' quella della propria riga, non quella generale: il
+     data manager convocato un'ora dopo gli altri si vedeva scritto 12.30
+     con il pick-up alle 13.00. L'orario ce l'aveva, 13.30, ma nella
+     colonna sbagliata (odgOreDi). */
+  const mie = odgOreDi(io, d);
+  const ora = mie.convocazione;
   /* L'ora di partenza la dicono i giri auto, non la convocazione troupe.
    *
    * Nella tabella della troupe le colonne Partenza e SET sono due, ma su
@@ -13008,13 +13013,29 @@ function odgBadgeHtml(d, io) {
    * in una tabella, non un'interpretazione. */
   const part = d.pickup && d.pickup.ora && d.pickup.ora !== ora
     ? { ora: d.pickup.ora, voce: 'pick-up' }
-    : (!d.pickup && io.partenza && io.partenza !== ora && /\d/.test(io.partenza)
-        ? { ora: io.partenza, voce: 'partenza' } : null);
+    : (!d.pickup && mie.partenza && mie.partenza !== ora
+        ? { ora: mie.partenza, voce: 'partenza' } : null);
   return `<div class="odg-badge" onclick="odgCambiaIo()" title="Tocca per cambiare persona">
     <span class="r">${[io.ruolo, io.reparto].filter(Boolean).map(esc).join(' · ')}</span>
     <span class="o num">${esc(ora)}</span>
     ${part ? `<span class="p num">${part.voce} ${esc(part.ora)}</span>` : ''}
   </div>`;
+}
+
+/* Gli orari di una persona, dalla sua riga nella convocazione troupe.
+ *
+ * Le colonne sono due, Partenza e SET, ma di solito e' stampato un orario
+ * solo ed e' quello di SET: la partenza la dicono i giri auto. Chi legge
+ * il foglio quell'unico orario lo mette a volte in una colonna e a volte
+ * nell'altra — sull'OdG 24 tutti e 93 sotto "partenza", mentre sul foglio
+ * stanno sotto SET. Quindi un orario solo, dovunque sia finito, e' la
+ * convocazione; e' una partenza solo se ci sono tutti e due. "O.C.",
+ * "Vedi GA" e "--" non sono orari: li' vale la convocazione generale.
+ */
+function odgOreDi(io, d) {
+  const vera = x => { const v = String(x || '').trim(); return /^\d{1,2}[.:]\d{2}$/.test(v) ? v : ''; };
+  const s = vera(io && io.set), p = vera(io && io.partenza);
+  return { convocazione: s || p || (d && d.convocazione) || '', partenza: s && p ? p : '' };
 }
 
 // "4 1/8" -> 4.125, per sommare le pagine della giornata
@@ -14045,11 +14066,10 @@ function ttDaOdg(){
      e 93 sotto "partenza", mentre sul foglio stanno sotto SET). Quindi un
      orario solo, dovunque sia finito, e' la convocazione; vale come
      partenza solo se ci sono tutti e due. */
-  const oraVera=x=>/^\d{1,2}[.:]\d{2}$/.test(String(x||'').trim())?String(x).trim():'';
-  const tSet=oraVera(io&&io.set), tPar=oraVera(io&&io.partenza);
+  const mie=odgOreDi(io,d);
   const valori={
-    partenza:ttNormalizzaOra((d.pickup&&d.pickup.ora)||(tSet&&tPar?tPar:'')),
-    inizio:  ttNormalizzaOra(tSet||tPar||d.convocazione||'')
+    partenza:ttNormalizzaOra((d.pickup&&d.pickup.ora)||mie.partenza),
+    inizio:  ttNormalizzaOra(mie.convocazione)
   };
   let nota={}; try{ nota=JSON.parse(localStorage.getItem(TT_PRE)||'{}')||{}; }catch(_){}
   let scritte=0;
