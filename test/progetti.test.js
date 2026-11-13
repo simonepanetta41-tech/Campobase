@@ -25,7 +25,16 @@ await p.evaluate(()=>{
 console.log('\n── la pagina dei progetti ──');
 ok('si chiama così',     await p.evaluate(()=>document.querySelector('.prog-tit').textContent.trim()), 'I tuoi progetti');
 ok('in testa il film o Campobase', await p.evaluate(()=>document.getElementById('cbNome').textContent.trim()), 'Campobase');
-ok('c\'è il tasto nuovo',  await p.evaluate(()=>/Nuovo progetto/.test(document.getElementById('progNuovo').textContent)), true);
+ok('c\'è il tasto nuovo',  await p.evaluate(()=>/Nuovo da sceneggiatura/.test(document.getElementById('progNuovo').textContent)), true);
+/* I due modi di aggiungere un film sono due tasti uguali, e il codice
+   viene prima: e' quello che usa quasi tutta la troupe. */
+ok('prima il codice, poi la sceneggiatura', await p.evaluate(()=>
+  [...document.querySelectorAll('#homePage > .prog-nuovo')].map(b=>b.textContent.trim())),
+  ['＋ Entra con un codice','＋ Nuovo da sceneggiatura']);
+ok('con lo stesso aspetto', await p.evaluate(()=>{
+  const s=id=>{const c=getComputedStyle(document.getElementById(id));
+    return [c.minHeight,c.borderTopStyle,c.color,c.fontSize].join('|');};
+  return s('progCodice')===s('progNuovo');}), true);
 ok('caricamento chiuso', await p.evaluate(()=>getComputedStyle(document.getElementById('uploadPanel')).display), 'none');
 
 console.log('\n── senza progetti ──');

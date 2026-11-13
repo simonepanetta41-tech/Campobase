@@ -676,10 +676,7 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   min-height:52px;margin-top:4px;background:none;border:1px dashed var(--border-l);
   border-radius:12px;color:var(--yellow);font-family:'Space Grotesk',sans-serif;
   font-size:14.5px;font-weight:500;cursor:pointer}
-/* Entrare in un film di qualcun altro: tasto piu' sobrio di quello per
-   aprire un film nuovo, perche' si usa una volta per produzione. */
-.prog-codice{min-height:44px;margin-top:8px;border-style:solid;
-  color:var(--white-dim);font-size:13.5px}
+.prog-nuovo + .prog-nuovo, .cod-box + .prog-nuovo{margin-top:8px}
 .cod-box{display:none;gap:8px;margin-top:8px}
 /* Quando il browser porta il campo in vista, che lo faccia lasciando un
    po' d'aria sopra e sotto invece di incollarlo al bordo. */
@@ -1469,16 +1466,19 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div>
       <!-- Il caricamento di una sceneggiatura sta dietro un tasto: si fa una
            volta per film, mentre la lista si guarda tutti i giorni. -->
-      <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
-        ＋ Nuovo progetto da sceneggiatura</button>
-      <button class="prog-nuovo prog-codice" id="progCodice" onclick="codiceMostra()">
-        Entra in un film con il codice</button>
+      <!-- Due modi di aggiungere un film, due tasti uguali. Prima il
+           codice: e' quello che usa quasi tutta la troupe, mentre la
+           sceneggiatura la carica una persona sola per film. -->
+      <button class="prog-nuovo" id="progCodice" onclick="codiceMostra()">
+        ＋ Entra con un codice</button>
       <div class="cod-box" id="codBox">
         <input id="codInput" maxlength="9" autocapitalize="characters" autocomplete="off"
                spellcheck="false" placeholder="C59C90CE"
                onkeydown="if(event.key==='Enter')codiceEntra()">
         <button onclick="codiceEntra()">Entra</button>
       </div>
+      <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
+        ＋ Nuovo da sceneggiatura</button>
       <div class="panel" id="uploadPanel" style="display:none;margin-top:12px">
         <div class="panel-label">Nuova Analisi</div>
 
@@ -3406,7 +3406,7 @@ function homeNuovo(){
   const aperto=p.style.display!=='none';
   p.style.display=aperto?'none':'block';
   const b=document.getElementById('progNuovo');
-  if(b)b.textContent=aperto?'＋ Nuovo progetto da sceneggiatura':'✕ Annulla';
+  if(b)b.textContent=aperto?'＋ Nuovo da sceneggiatura':'✕ Annulla';
   if(!aperto)setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),60);
 }
 
@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.130';
+const CB_VERSIONE = '1.131';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
