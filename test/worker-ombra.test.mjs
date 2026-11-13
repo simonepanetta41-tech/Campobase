@@ -65,7 +65,8 @@ globalThis.fetch = async (url, opz = {}) => {
   const params = [...u.searchParams.entries()];
   const trovate = posta.filter(r => passa(r, params));
   if ((opz.method || 'GET') === 'GET') {
-    trovate.sort((x, y) => String(y.ricevuta).localeCompare(String(x.ricevuta)));
+    if (u.searchParams.get('order') === 'oggetto.asc') trovate.sort((x, y) => String(x.oggetto).localeCompare(String(y.oggetto)));
+    else trovate.sort((x, y) => String(y.ricevuta).localeCompare(String(x.ricevuta)));
     return new Response(JSON.stringify(trovate.slice(0, +(u.searchParams.get('limit') || 100))), { status: 200 });
   }
   if (opz.method === 'PATCH') {
@@ -132,6 +133,19 @@ corretto.allegati = corretto.allegati.map(a => /ODG/.test(a.nome) ? { ...a, byte
 posta.push(corretto);
 await leggiInOmbra(ENV);
 ok('la versione corretta si legge', [posta.find(r => r.id === 'p4').ombra_stato, chiamate.length], ['fatta', 2]);
+
+console.log('\n── le prove a mano: vecchie quanto si vuole, e per prime ──');
+/* Dieci ordini del giorno gia' passati, caricati apposta per provare la
+   lettura in un quarto d'ora invece che in dieci sere. */
+azzera([riga({ id: 'vera', ricevuta: fa(5) }),
+        riga({ id: 'pr2', stato: 'prova', oggetto: 'prova 22', ricevuta: '2026-01-01T00:00:00Z' }),
+        riga({ id: 'pr1', stato: 'prova', oggetto: 'prova 20', ricevuta: '2026-01-01T00:00:00Z' })]);
+await leggiInOmbra(ENV);
+ok('prima la prova, in ordine di oggetto', posta.filter(r => r.ombra_stato === 'fatta').map(r => r.id), ['pr1']);
+await leggiInOmbra(ENV); await leggiInOmbra(ENV);
+/* Fra prove non si scartano doppioni: una prova si mette apposta. */
+ok('tutte e due le prove lette', posta.filter(r => r.stato === 'prova').map(r => r.ombra_stato), ['fatta', 'fatta']);
+ok('e poi tocca alla mail vera', posta.find(r => r.id === 'vera').ombra_stato, 'fatta');
 
 console.log('\n── cosa non si legge ──');
 azzera([riga({ allegati: [{ nome: 'MSG_ACCOMMODATION.pdf', tenuto: true, percorso: 'f1/p1/a.pdf' }] })]);

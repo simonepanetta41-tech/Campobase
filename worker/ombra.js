@@ -128,8 +128,19 @@ export async function leggiInOmbra(env) {
   const da = new Date(Date.now() - FINESTRA_ORE * 3600000).toISOString();
   const recenti = `&stato=in.(nuova,%22in%20analisi%22,fatta)&ricevuta=gte.${encodeURIComponent(da)}`
                 + '&order=ricevuta.desc&limit=1';
-  let righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra&ombra_stato=is.null' + recenti);
+  /* Le prove a mano vengono prima, e non hanno scadenza: sono righe con
+     stato 'prova' messe li' apposta (sql/ombra.sql) per far leggere al
+     Worker dieci ordini del giorno gia' passati in un quarto d'ora,
+     invece di aspettare dieci sere. L'app non le vede: prende solo
+     'nuova' e 'in analisi'. */
+  let righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra'
+    + '&ombra_stato=is.null&stato=eq.prova&order=oggetto.asc&limit=1');
   let riga = righe && righe[0];
+  const prova = !!riga;
+  if (!riga) {
+    righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra&ombra_stato=is.null' + recenti);
+    riga = righe && righe[0];
+  }
 
   /* Una lettura rimasta a meta'. Se il cron viene chiuso mentre il modello
      sta ancora rispondendo, la riga resta 'in corso' e nessuno la
@@ -156,7 +167,7 @@ export async function leggiInOmbra(env) {
      automatico, poi quello a mano dal telefono. Leggerlo una volta basta,
      e ogni lettura e' una chiamata al modello che si paga. */
   let doppione = false;
-  if (odg && !ripresa) {
+  if (odg && !ripresa && !prova) {
     const altre = await db(env, `posta?select=id,allegati&project_id=eq.${riga.project_id}`
       + `&id=neq.${riga.id}&ombra_stato=in.(fatta,tronca,%22in%20corso%22)&ricevuta=gte.${encodeURIComponent(da)}&limit=20`);
     /* Stesso nome E stessa grandezza: un ordine del giorno corretto e
