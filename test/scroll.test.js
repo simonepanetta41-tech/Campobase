@@ -1,33 +1,22 @@
-/* ⚠ UN'ATTESA DI QUESTO CONTROLLO E' ANCORA ROSSA, e non e' spiegata.
+/* La tabella delle ore non salta e non perde il fuoco mentre si scrive.
  *
- * Nato per un guasto vero: sulla tabella delle ore, su un telefono, si
- * scorreva fino al sabato, si scriveva un orario, e lo scorrimento tornava
- * al lunedi' facendo perdere il segno.
+ * Nato per un guasto vero: su un telefono si scorreva fino al sabato, si
+ * scriveva un orario, e lo scorrimento tornava al lunedi' facendo perdere
+ * il segno.
  *
- * QUI SOPRA C'ERA SCRITTA UNA SPIEGAZIONE SBAGLIATA, e vale la pena
- * lasciarne memoria. Diceva che la tabella era cambiata, che a 390 pixel
- * la vista a settimana non sbordava piu' e che quindi le due attese rosse
- * parlavano di una schermata inesistente. Misurato poi davvero: a 390
- * pixel ci sono 352 pixel da scorrere, e il KO "le ore calcolate si
- * aggiornano" era un guasto in piena regola — ttSetO infilava l'id della
- * tabella, che e' un numero con la virgola, dentro un selettore CSS, e
- * sollevava un errore prima di salvare l'orario. Quell'attesa adesso e'
- * verde, e il guasto e' coperto da ore-scrittura.test.js.
+ * STORIA DI UN ROSSO, da tenere a mente. Per settimane l'attesa "il campo
+ * resta attivo" e' rimasta rossa e non spiegata. Il motivo era in questo
+ * file e non nell'app: apriva la sezione con switchResultTab('timetable'),
+ * un nome che non esiste piu' (adesso e' 'ore'). La sezione restava
+ * nascosta, la tabella era larga zero, e su un campo nascosto il fuoco non
+ * si puo' mettere. Peggio: l'altra attesa, quella sullo scorrimento,
+ * passava — zero pixel prima e zero dopo — senza controllare niente.
  *
- * Morale: un rosso che non si capisce non si archivia con un racconto.
- * Questo controllo stava dicendo la verita' e gli e' stata scritta sopra
- * una spiegazione che lo faceva sembrare obsoleto. E' una forma piu'
- * educata di ritarare le attese finche' passano, e fa lo stesso danno.
- *
- * COSA RESTA: l'attesa "il campo resta attivo" e' ancora rossa e NON si
- * sa perche'. Provato a parte, il comportamento dell'app e' giusto:
- * scrivendo in una casella della vista a settimana e aspettando 600ms, il
- * fuoco resta sulla casella. Quindi il sospetto e' che a perderlo sia
- * questa sequenza di prova — lo scorrimento e le misure fra una scrittura
- * e l'altra — e non l'app. Ma "il sospetto e'" non basta: va trovato il
- * motivo e poi o si rifa' l'attesa su cio' che conta davvero (la tastiera
- * che non si chiude su iOS), oppure si toglie. Quello che non si deve
- * fare e' aggiustarla finche' diventa verde.
+ * Due morali. Un rosso che non si capisce non si archivia con un racconto
+ * (qui sopra ce n'era stato scritto uno sbagliato, prima ancora). E un
+ * verde vale solo se la cosa che misura esiste: per questo adesso il
+ * controllo fallisce subito se la sezione non e' a schermo o se non c'e'
+ * niente da scorrere.
  */
 const RADICE = require('path').join(__dirname, '..');
 const {chromium}=require('playwright');
@@ -54,7 +43,7 @@ const {chromium}=require('playwright');
     document.getElementById('authPage').style.display='none';
     document.getElementById('app').style.display='block';
     document.getElementById('resultsPage').style.display='flex';
-    try{switchResultTab('timetable');}catch(e){}
+    try{switchResultTab('ore');}catch(e){}
   });
   await p.waitForTimeout(300);
 
@@ -97,6 +86,10 @@ const {chromium}=require('playwright');
   await p.evaluate(()=>{document.querySelector('.tt-scroll').scrollLeft=9999;});
   await p.waitForTimeout(150);
   const prima=await misura();
+  if(!(await p.evaluate(()=>getComputedStyle(document.getElementById('timetableSection')).display!=='none')) || prima.max<=0){
+    console.log('KO — la sezione delle ore non è a schermo o non c\'è niente da scorrere: questo controllo non starebbe misurando niente');
+    await b.close(); process.exit(1);
+  }
   console.log('\nscorrimento massimo:',prima.max,'— posizione dopo lo scroll:',prima.scrollLeft);
   console.log(await p.evaluate(()=>{
     // Chi sta nascondendo la tabella: si risale la catena.

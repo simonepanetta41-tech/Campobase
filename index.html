@@ -5012,7 +5012,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.123';
+const CB_VERSIONE = '1.124';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11386,14 +11386,14 @@ async function pushAppuntamenti(d){
        "Stefano" dice anche chi cercare. */
     const chi = d.pickup.autista ? d.pickup.autista.split(/\s+/)[0] : null;
     const dove = d.pickup.luogo || d.pickup.indirizzo || '';
-    if (q) lista.push({ quando: q.toISOString(), genere: 'pickup',
+    if (q) lista.push({ quando: q.toISOString(), giorno: d.data, genere: 'pickup',
       testo: (chi ? `${chi} è lì fra 10 minuti per il pick up!`
                   : 'Il tuo driver è lì fra 10 minuti per il pick up!')
              + '\n' + ['Pick up alle ' + pick, odgCap(dove)].filter(Boolean).join(' · ') });
   }
   if (d.catering) {
     const q = pushIstante(d.data, d.catering, PUSH_PRIMA.catering);
-    if (q) lista.push({ quando: q.toISOString(), genere: 'catering',
+    if (q) lista.push({ quando: q.toISOString(), giorno: d.data, genere: 'catering',
       testo: 'Catering pronto fra 15 minuti!\nPronto alle ' + d.catering
              + (d.cestini ? ` · ${d.cestini} cestini` : '') });
   }

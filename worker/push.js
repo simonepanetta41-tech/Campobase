@@ -323,13 +323,25 @@ export async function handleAppuntamenti(request, env) {
     if (!a.genere || !a.testo || isNaN(quando)) continue;
     // Un appuntamento nel passato non si registra: nascerebbe gia' scaduto.
     if (quando.getTime() < Date.now()) continue;
+    /* La chiave dice "il pick-up di QUEL giorno di lavoro", e il giorno e'
+       quello dell'ordine del giorno, che l'app manda in `giorno`. Prima si
+       ricavava dalla data UTC dell'ora di avviso, e non e' la stessa cosa:
+       un pick-up alle 02.00 spostato alle 01.15 porta l'avviso da dopo a
+       prima della mezzanotte UTC, la chiave cambiava, e invece di spostare
+       l'avviso se ne aggiungeva un secondo — con quello vecchio, all'ora
+       sbagliata, ancora in attesa di partire. Succede solo di notte, cioe'
+       quando un avviso sbagliato costa di piu'.
+       Un'app non ancora aggiornata non manda `giorno`: vale la regola di
+       prima, che di giorno da' la stessa chiave. */
+    const giorno = /^\d{4}-\d{2}-\d{2}$/.test(String(a.giorno || ''))
+      ? a.giorno : quando.toISOString().slice(0, 10);
     righe.push({
       user_id: user.id,
       project_id: b.project_id || null,
       quando: quando.toISOString(),
       genere: String(a.genere).slice(0, 20),
       testo: String(a.testo).slice(0, 200),
-      chiave: `${user.id}:${a.genere}:${quando.toISOString().slice(0, 10)}`
+      chiave: `${user.id}:${a.genere}:${giorno}`
     });
   }
   if (!righe.length) return json({ ok: true, scritti: 0 });

@@ -227,15 +227,45 @@ ok('solo il suo telefono', bussate.map(b => b.endpoint), ['https://web.push.appl
 
 console.log('\n── l\'app riscrive gli appuntamenti e non si duplicano ──');
 azzera();
-corpoFinto = { lista: [{ quando: fra(60), genere: 'pickup', testo: 'alle 7.30' }] };
+/* `giorno` e' la data dell'ordine del giorno, e la chiave si fa su quella.
+   Senza, questo controllo dipendeva dall'orologio: passava di pomeriggio e
+   falliva verso mezzanotte, quando i 60 e i 90 minuti cadevano a cavallo
+   del cambio di data UTC. Stava segnalando un guasto vero — vedi sotto. */
+const DOMANI = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+corpoFinto = { lista: [{ quando: fra(60), giorno: DOMANI, genere: 'pickup', testo: 'alle 7.30' }] };
 await push.handleAppuntamenti({}, ENV);
 await push.handleAppuntamenti({}, ENV);
 ok('una riga sola', tavoli.push_appuntamenti.length, 1);
-corpoFinto = { lista: [{ quando: fra(90), genere: 'pickup', testo: 'spostato alle 8.00' }] };
+corpoFinto = { lista: [{ quando: fra(90), giorno: DOMANI, genere: 'pickup', testo: 'spostato alle 8.00' }] };
 await push.handleAppuntamenti({}, ENV);
 ok('e l\'ora si aggiorna', tavoli.push_appuntamenti.length, 1);
 ok('col testo nuovo', tavoli.push_appuntamenti[0].testo, 'spostato alle 8.00');
 ok('e torna da mandare', tavoli.push_appuntamenti[0].mandato, null);
+
+console.log('\n── ⚠ un pick-up di notte spostato a cavallo della mezzanotte ──');
+/* Pick-up alle 02.00 spostato alle 01.15: l'avviso passa da dopo a prima
+   della mezzanotte UTC. E' lo stesso pick-up dello stesso giorno di
+   lavoro, quindi deve restare un avviso solo, all'ora nuova. Con la
+   chiave fatta sulla data UTC diventavano due, e quello vecchio partiva
+   all'ora sbagliata. */
+azzera();
+const mezzanotte = new Date(Date.now() + 2 * 86400000); mezzanotte.setUTCHours(0, 0, 0, 0);
+const attorno = m => new Date(mezzanotte.getTime() + m * 60000).toISOString();
+const GIORNO = new Date(mezzanotte.getTime() - 86400000).toISOString().slice(0, 10);
+corpoFinto = { lista: [{ quando: attorno(30), giorno: GIORNO, genere: 'pickup', testo: 'alle 02.00' }] };
+await push.handleAppuntamenti({}, ENV);
+corpoFinto = { lista: [{ quando: attorno(-15), giorno: GIORNO, genere: 'pickup', testo: 'alle 01.15' }] };
+await push.handleAppuntamenti({}, ENV);
+ok('un avviso solo', tavoli.push_appuntamenti.length, 1);
+ok('all\'ora nuova', tavoli.push_appuntamenti[0].testo, 'alle 01.15');
+/* Un'app non ancora aggiornata non manda il giorno: resta la regola di
+   prima, che di giorno da' la stessa chiave. */
+azzera();
+corpoFinto = { lista: [{ quando: attorno(600), genere: 'pickup', testo: 'senza giorno' }] };
+await push.handleAppuntamenti({}, ENV);
+corpoFinto = { lista: [{ quando: attorno(630), giorno: attorno(600).slice(0, 10), genere: 'pickup', testo: 'col giorno' }] };
+await push.handleAppuntamenti({}, ENV);
+ok('app vecchia e app nuova non si doppiano', tavoli.push_appuntamenti.length, 1);
 
 console.log('\n── un\'ora già passata non si registra ──');
 azzera();
