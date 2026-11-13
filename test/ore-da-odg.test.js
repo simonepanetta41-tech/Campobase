@@ -69,6 +69,14 @@ await p.evaluate(()=>{ odgMiaRiga=()=>({nome:'S. Panetta', set:'13.30', partenza
 r = await giro([{azzera:true, odg:{...ODG, pickup:null}}]);
 ok('Inizio dalla mia riga', r[0].inizio[4], '13.30');
 ok('senza pick-up, la partenza della mia riga', r[0].partenza[4], '12.45');
+/* Sull'OdG 24 il telefono ha messo l'unico orario della troupe sotto
+   "partenza", ma sul foglio sta sotto SET: e' la convocazione. */
+await p.evaluate(()=>{ odgMiaRiga=()=>({nome:'S. Peroni', set:'', partenza:'11.40'}); });
+r = await giro([{azzera:true, odg:{...ODG, pickup:null}}]);
+ok('un orario solo è la convocazione, non la partenza', [r[0].partenza[4], r[0].inizio[4]], ['', '11.40']);
+await p.evaluate(()=>{ odgMiaRiga=()=>({nome:'A. Zazzaro', set:'', partenza:'Vedi GA'}); });
+r = await giro([{azzera:true, odg:ODG}]);
+ok('"Vedi GA" non è un orario: vale la generale', r[0].inizio[4], '13.00');
 await p.evaluate(()=>{ odgMiaRiga=()=>null; });
 
 console.log('\n── ⚠ quello che scrive la persona vince sempre ──');

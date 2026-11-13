@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.127';
+const CB_VERSIONE = '1.128';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9495,7 +9495,7 @@ Fra una scena e l'altra la tabella puo' avere una riga senza numero, con una scr
 domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO". etichetta: giorno, data e fascia oraria come scritti ("Martedi' 10 novembre - 08.00/16.00"). Se non c'e', domani vale null. Se sotto quella tabella c'e' una sua griglia di fabbisogni, va in domani.fabbisogni con le stesse regole di sotto.
 fabbisogni: cosa serve quel giorno, reparto per reparto. Ogni produzione la scrive a modo suo: una griglia di caselle senza titolo, oppure sotto "FABBISOGNI", "NOTE PER I REPARTI", "ARREDAMENTO/FABBISOGNO SCENA", "NOTE". Le intestazioni sono i nomi dei reparti come li scrive quel foglio — "Scenografia / Props", "Veicoli", "Stunt", "Animali", "Costumi / Trucco", "SFX", "VFX", "Suono", "Mezzi di Scena", "Attr. speciali" — e non vanno tradotte ne' raggruppate: riportale alla lettera. Sotto ogni intestazione le voci sono righe tipo "SC. 21: Accampamento Volpe, lanterne" oppure "Sc. 25, 25A, 27: Auto carabinieri": scene e' la parte prima dei due punti, senza "SC."; cosa e' quella dopo, senza il punto e virgola finale.
 ATTENZIONE, e vale piu' di ogni altra regola: questa griglia e' fatta di colonne affiancate, e nel testo che ricevi le intestazioni e i contenuti arrivano mescolati. Metti una voce sotto un reparto SOLO se sei sicuro che sia sua; se una voce potrebbe appartenere a due intestazioni vicine, lasciala fuori. L'app accende un avviso quando trova qualcosa del reparto di chi legge: una voce messa sotto il reparto sbagliato gli fa portare sul set la roba di un altro, ed e' molto peggio di una voce che manca. Se la griglia non si capisce, fabbisogni vale [].
-cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP. set: l'ultima colonna, SET.
+cast: una riga per interprete convocato, anche dalle tabelle delle figurazioni speciali (ID come "1FS"). scene: i numeri di scena di quella riga separati da virgola, saltando i trattini. pickup: la colonna P/UP, cioe' il PRIMO orario dopo i numeri di scena; quello subito dopo e' CB, l'arrivo al campo base, e non e' il pick-up. set: l'ultima colonna, SET.
 troupe: tutte le persone sotto "CONVOCAZIONE TROUPE". La tabella ha tre gruppi di colonne affiancati e le righe arrivano intrecciate: ricostruisci ogni persona con il reparto della sua intestazione (REGIA, FOTOGRAFIA, COSTUMI, ELETTRICISTI, MACCHINISTI, SCENOGRAFIA, SUONO, LOCATION, TRUCCO, AUTISTI, MONTAGGIO, VFX, SFX, AGGIUNTI, PRODUZIONE...). partenza e set sono le due colonne di orario; "O.C.", "Vedi GA" e "--" riportali come stanno.
 contatti: solo le persone con un numero di telefono, in testa al documento. tel: sole cifre.
 
@@ -14027,9 +14027,18 @@ function ttDaOdg(){
   if(idx<0||idx>5)return 0;                                  // altra settimana, o domenica
 
   const io=(typeof odgMiaRiga==='function')?odgMiaRiga():null;
+  /* Nella tabella della troupe le colonne sono due, Partenza e SET, ma di
+     solito e' stampato un orario solo ed e' quello di SET: la partenza la
+     dicono i giri auto. Chi legge il foglio quell'unico orario lo mette a
+     volte in una colonna e a volte nell'altra (visto sull'OdG 24: tutti
+     e 93 sotto "partenza", mentre sul foglio stanno sotto SET). Quindi un
+     orario solo, dovunque sia finito, e' la convocazione; vale come
+     partenza solo se ci sono tutti e due. */
+  const oraVera=x=>/^\d{1,2}[.:]\d{2}$/.test(String(x||'').trim())?String(x).trim():'';
+  const tSet=oraVera(io&&io.set), tPar=oraVera(io&&io.partenza);
   const valori={
-    partenza:ttNormalizzaOra((d.pickup&&d.pickup.ora)||(io&&io.partenza)||''),
-    inizio:  ttNormalizzaOra((io&&io.set)||d.convocazione||'')
+    partenza:ttNormalizzaOra((d.pickup&&d.pickup.ora)||(tSet&&tPar?tPar:'')),
+    inizio:  ttNormalizzaOra(tSet||tPar||d.convocazione||'')
   };
   let nota={}; try{ nota=JSON.parse(localStorage.getItem(TT_PRE)||'{}')||{}; }catch(_){}
   let scritte=0;
