@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.131';
+const CB_VERSIONE = '1.132';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9737,7 +9737,12 @@ function eTel(s){ return TEL_RE.test(s) && (String(s).match(/\d/g)||[]).length >
    numero italiano — tre cifre che cominciano per 3 o per 0 — se no una
    fila di numeri di scena si sommava fino a sembrare un telefono. */
 const PREFISSO_TEL = /^\+?(?:39)?[03]\d{2}$/;
-const GRUPPO_TEL = /^\d{2,5}$/;
+/* Fino a otto cifre nel gruppo: "339 8408475" e' un prefisso e sette cifre
+   in un pezzo solo, e fermandosi a cinque il numero di Luca Cammarosano
+   restava vuoto (giri auto di sabato 14). Il prefisso davanti resta
+   obbligatorio, quindi una fila di numeri di scena continua a non
+   passare. */
+const GRUPPO_TEL = /^\d{2,8}$/;
 
 function telVicino(P, da){
   let cifre = '';

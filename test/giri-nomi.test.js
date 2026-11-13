@@ -105,5 +105,22 @@ ok('senza cognome niente', await cerca(DUE,'Franco',''),        null);
 console.log('\n── i compagni di furgone, senza me stesso ──');
 ok('solo gli altri', franco.conMe, ['P.Mazzara']);
 
+console.log('\n── il telefono dell\'autista stampato in due pezzi ──');
+/* Dai giri auto di sabato 14, come li legge l'app: "339" e "8408475"
+   arrivano separati, e il secondo pezzo ha sette cifre. Il numero di
+   Luca Cammarosano restava vuoto, e nella scheda del pick-up mancava il
+   tasto per chiamarlo. */
+const SABATO = ['SET','Luca Cammarosano Van','339','8408475','11.55','A.Viscardi','D .Cinque',
+  'VILLA DELLA MEDA','Viale Del Tramonto 23','12.00','TURSPORT HOTEL RESIDENCE',
+  'Via del Faro, 58, 74122 Taranto TA','12.00','F.Lombardi','D.De Angelis','S.Panetta','A.Rizzo','A.Liddi',
+  'TURSPORT HOTEL RESIDENCE','Via del Faro, 58, 74122 Taranto TA','12.30','SET'].join('\n');
+const pk = await p.evaluate(t=>odgPickUp(t,{nome:'Simone',cognome:'Panetta'}), SABATO);
+ok('il numero si rimette insieme', pk && pk.tel, '3398408475');
+ok('e il pick-up resta il suo', pk && [pk.ora, pk.autista], ['12.00','Luca Cammarosano']);
+/* Ma senza un prefisso davanti una fila di numeri non diventa un
+   telefono: orari e numeri di scena restano quello che sono. */
+ok('due numeri qualunque non fanno un telefono',
+   await p.evaluate(()=>telVicino(['Mario Rossi Van','16','8408475','12.00'],0)), null);
+
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();
