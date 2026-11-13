@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.129';
+const CB_VERSIONE = '1.130';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11464,8 +11464,8 @@ function odgRicalcola() {
    parola. Si toglie solo da questo telefono — sul cloud resta, e riaprendo
    l'app torna — ma chi lo vede sparire non lo sa. */
 async function odgRimuovi() {
-  if (!await askConfirm('Togliere l\'ordine del giorno da questo telefono? Per la troupe resta, e riaprendo l\'app torna anche qui.',
-                        { conferma: 'Togli', annulla: 'Annulla' })) return;
+  if (!await askConfirm('Confermi di voler eliminare questo OdG?',
+                        { conferma: 'Elimina', annulla: 'Annulla' })) return;
   odgCorrente = null; odgErrore = null;
   try { localStorage.removeItem(ODG_LOCALE); } catch (_) {}
   cbFileCancella('odg/');

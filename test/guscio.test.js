@@ -137,7 +137,7 @@ const vero = await p.evaluate(()=>{ window.__conferma=askConfirm; return true; }
 ok('chi annulla tiene l\'ordine del giorno', await p.evaluate(async()=>{
   let chiesto=''; askConfirm=async t=>{ chiesto=t; return false; };
   await odgRimuovi();
-  return [/da questo telefono/.test(chiesto), !!odgCorrente];
+  return [/Confermi/.test(chiesto), !!odgCorrente];
 }), [true, true]);
 await p.evaluate(async()=>{ askConfirm=async()=>true; await odgRimuovi(); askConfirm=window.__conferma; });
 ok('torna vuoto', await p.evaluate(()=>/Nessun ordine del giorno/.test(document.getElementById('odgCorpo').innerText)), true);
