@@ -1860,9 +1860,12 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Ore</div>
           <div style="display:flex;gap:8px">
-            <button onclick="ttExportModal()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--orange)';this.style.color='var(--orange)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">↓ PDF</button>
             <button onclick="ttClear()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border-l)';this.style.color='var(--muted)'">✕ Svuota</button>
-            <button onclick="ttSave()" style="padding:7px 14px;background:var(--yellow);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer">Salva</button>
+            <!-- Il tasto Salva non c'e' piu': salvava la stessa cosa che l'app
+                 salva gia' da sola a ogni orario scritto, ed era il tasto piu'
+                 in vista della schermata. In giallo adesso c'e' l'unica azione
+                 che produce qualcosa: il PDF da mandare alla produzione. -->
+            <button onclick="ttExportModal()" style="padding:7px 14px;background:var(--yellow);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer">Esporta PDF</button>
           </div>
         </div>
 
@@ -1942,7 +1945,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
-        <div id="tt-stato" style="font-size:10px;color:var(--muted);text-align:center;min-height:14px;margin-top:-4px"></div>
+        <div id="tt-stato" style="font-size:12px;color:var(--white-dim);text-align:center;min-height:16px;margin-top:-4px"></div>
 
         <!-- Note -->
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
@@ -5012,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.124';
+const CB_VERSIONE = '1.125';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -14947,7 +14950,9 @@ function ttTocca(){
   }catch(e){ console.log('[tt] locale non scritto:',e.message); }
   ttStato(navigator.onLine?'salvataggio…':'salvato sul telefono · in attesa di rete');
   clearTimeout(ttSyncT);
-  ttSyncT=setTimeout(ttSync,2500);
+  // Lo storico si aggiorna da solo quando il cloud conferma: prima lo
+  // faceva solo il tasto Salva, che non c'e' piu'.
+  ttSyncT=setTimeout(()=>ttSync().then(ok=>{ if(ok){ try{ ttRenderStorico(); }catch(_){} } }),2500);
 }
 
 async function ttSync(){
