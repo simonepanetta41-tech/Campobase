@@ -37,7 +37,7 @@ await p.addInitScript(()=>{
     auth:{getSession:async()=>({data:{session:null}}),signOut:async()=>({}),
           onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},
     from:tavola,
-    rpc:async(n,a)=>{ window.FINTO.rpc.push(n); return {data:null}; },
+    rpc:async(n,a)=>{ if(n==='prendi_posta') window.FINTO.rpc.push(n); return {data:null}; },
     storage:{from:()=>({download:async()=>({data:null,error:{message:'finto'}}),
                         createSignedUrl:async()=>({data:null,error:{message:'finto'}})})}
   })};

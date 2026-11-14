@@ -15,6 +15,7 @@ import { riceviPosta } from './posta.js';
 import { handleIscrivi, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
 import { handleAttore } from './attore.js';
 import { leggiInOmbra } from './ombra.js';
+import { leggiPiano } from './piano.js';
 
 const FREE_LIMIT = 3;
 
@@ -331,13 +332,30 @@ export default {
        qualunque cosa le succeda — colonna non ancora creata, modello che
        non risponde, tempo che finisce — le notifiche di questo minuto
        sono gia' partite. */
+    let libero = false;
     try {
       const esito = await leggiInOmbra(env);
+      // Libero anche quando ha solo scartato una mail: non ha chiamato il modello.
+      libero = /^(niente da leggere|spenta|saltata|già presa)/.test(esito);
       if (!/^(niente da leggere|spenta|non configurata)$/.test(esito)) console.log('ombra:', esito);
     } catch (e) {
       const m = String(e && e.message || e);
       if (/ombra_stato|ombra_il|42703|PGRST204/.test(m)) console.log('ombra: colonne non ancora create (sql/ombra.sql)');
       else console.error('ombra', m);
+    }
+
+    /* Il piano di lavorazione (piano.js). Solo nei minuti in cui l'ombra
+       non ha letto niente: due letture nello stesso passaggio sommano il
+       loro calcolo, e il conto e' stretto. */
+    if (libero) {
+      try {
+        const esito = await leggiPiano(env);
+        if (!/^(niente da leggere|spento|non configurato)$/.test(esito)) console.log('piano:', esito);
+      } catch (e) {
+        const m = String(e && e.message || e);
+        if (/piano_stato|piano_il|42703|PGRST204/.test(m)) console.log('piano: colonne non ancora create (sql/piano.sql)');
+        else console.error('piano', m);
+      }
     }
   },
 

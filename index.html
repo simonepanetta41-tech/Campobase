@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.134';
+const CB_VERSIONE = '1.135';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8429,8 +8429,61 @@ function savePdlShootingData() {
   if(pdlData && currentAnalysisId) savePdlToSupabase();
 }
 
+/* Il piano che scrive il server (worker/piano.js) prende il posto di
+ * quello sul telefono quando e' piu' recente. Uno caricato a mano da qui
+ * dopo, invece, resta: ha il suo timbro piu' nuovo.
+ */
+function pianoCloudVince(remoto, locale){
+  if (!remoto || !remoto.daServer || !remoto.caricatoIl || !remoto.settimane) return false;
+  if (!locale) return true;
+  return String(remoto.caricatoIl) > String(locale.caricatoIl || '');
+}
+
+function pianoAdotta(p, segnate){
+  pdlData = p; window.pdlData = pdlData;
+  if (segnate) pdlShootingData = segnate;
+  try { localStorage.setItem('pdl_full_bk_' + pdlData.titolo, JSON.stringify(pdlData)); } catch (_) {}
+  const su = document.getElementById('pdlUploadArea'), giu = document.getElementById('pdlDashboard');
+  if (su) su.style.display = 'none';
+  if (giu) giu.style.display = 'block';
+  try { renderPdlDashboard(); } catch (e) { console.log('[piano] non ridisegnato:', e.message); }
+}
+
+/* Si guarda se sul cloud c'e' un piano piu' nuovo, come per l'ordine del
+   giorno (odgCloudNuovo): a ogni ritorno sull'app. Torna true se l'ha
+   cambiato. */
+let pianoCloudInCorso = false;
+async function pianoCloudNuovo(){
+  const f = filmCorrente();
+  if (pianoCloudInCorso || !currentUser || !f || !f.id) return false;
+  pianoCloudInCorso = true;
+  try {
+    const { data } = await sb.rpc('pdl_del_film', { p_film: f.id });
+    const p = (data || [])[0];
+    if (!p || !pianoCloudVince(p.data, pdlData)) return false;
+    pianoAdotta(p.data, p.shooting_data || null);
+    showToast('Piano di lavorazione aggiornato — ' + (pdlData.versione || 'nuova versione'), 'yellow', 4000);
+    return true;
+  } catch (e) {
+    console.log('[piano] cloud non raggiungibile:', e.message);
+    return false;
+  } finally { pianoCloudInCorso = false; }
+}
+
 async function savePdlToSupabase() {
   if (!pdlData || !currentAnalysisId) return;
+  /* Prima di salvare si guarda se il server ha scritto un piano piu' nuovo
+     mentre qui c'era in mano il vecchio: salvando alla cieca, una scena
+     segnata come girata riporterebbe indietro il piano a tutta la troupe.
+     Si chiede solo il timbro, che pesa niente. */
+  try {
+    const { data: t } = await sb.from('pdl_versions')
+      .select('caricatoIl:data->>caricatoIl,daServer:data->>daServer').eq('analysis_id', currentAnalysisId).maybeSingle();
+    if (t && String(t.daServer) === 'true' && String(t.caricatoIl || '') > String(pdlData.caricatoIl || '')) {
+      const { data: c } = await sb.from('pdl_versions').select('data').eq('analysis_id', currentAnalysisId).maybeSingle();
+      if (c && pianoCloudVince(c.data, pdlData)) pianoAdotta(c.data, null);
+    }
+  } catch (_) {}
   try {
     const { error } = await sb.from('pdl_versions').upsert(
       { analysis_id: currentAnalysisId, user_id: currentUser.id, data: pdlData, shooting_data: pdlShootingData },
@@ -11114,8 +11167,10 @@ async function postaControlla(){
     for (const p of data) if (p.stato !== 'al server') await postaApri(p);
     if (attesa.length) postaAspetta();
     else postaAttese = 0;
-    // E in ogni caso si guarda se il cloud ha un ordine del giorno piu' nuovo.
+    // E in ogni caso si guarda se il cloud ha un ordine del giorno piu' nuovo,
+    // o un piano di lavorazione.
     await odgCloudNuovo();
+    await pianoCloudNuovo();
   } catch (e) {
     console.log('[posta] non raggiungibile:', e.message);
   } finally {
@@ -11129,7 +11184,7 @@ async function postaControlla(){
 let postaAttese = 0, postaAttesaT = null;
 function postaAspetta(){
   if (postaAttese === 0)
-    avvisoGrande('Nuovo ordine del giorno', 'Sta arrivando: ancora un momento.', 5000);
+    avvisoGrande('Nuova mail dalla produzione', 'Sta arrivando: ancora un momento.', 5000);
   if (postaAttese >= 15) { postaAttese = 0; return; }
   postaAttese++;
   clearTimeout(postaAttesaT);
@@ -13369,6 +13424,7 @@ async function loadPdlFile(input) {
     document.getElementById('pdlDashboard').style.display='block';
     renderPdlDashboard();
     // Save to Supabase
+    if (pdlData) pdlData.caricatoIl = new Date().toISOString();
     if (currentAnalysisId) savePdlToSupabase();
     // Parse transfers locally (async, non-blocking)
     extractAndApplyTrasferimenti(b64);
@@ -13450,6 +13506,8 @@ async function pdlAggiorna(f) {
     // si ricontano, se no restano salvati sbagliati.
     const tot=pdlTotali(pdlData);
     pdlData.totale_giorni=tot.giorni; pdlData.totale_scene=tot.scene;
+    // Caricato adesso, da qui: vince su un piano scritto prima dal server.
+    pdlData.caricatoIl=new Date().toISOString(); delete pdlData.daServer;
     const tutte=getPdlAllGiorni();
     pdlData.data_inizio=tutte.find(g=>g.data)?.data||pdlData.data_inizio;
     pdlData.data_fine=[...tutte].reverse().find(g=>g.data)?.data||pdlData.data_fine;

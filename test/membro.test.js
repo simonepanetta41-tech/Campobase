@@ -66,7 +66,8 @@ await p.evaluate(async()=>{
 await p.waitForTimeout(900);
 
 console.log('\n── le tre domande al database ──');
-ok('chieste tutte e tre', await p.evaluate(()=>window.__rpc.filter(n=>n.endsWith('_del_film')).sort()),
+// Il piano si richiede anche a ogni ritorno sull'app (pianoCloudNuovo): conta che ci siano tutte.
+ok('chieste tutte e tre', await p.evaluate(()=>[...new Set(window.__rpc.filter(n=>n.endsWith('_del_film')))].sort()),
    ['analisi_del_film','cast_del_film','pdl_del_film']);
 
 console.log('\n── e cosa si vede ──');

@@ -341,21 +341,29 @@ export async function riceviPosta(message, env, ctx) {
     }
   }
 
-  /* Con OMBRA_SCRIVE = "si" l'ordine del giorno lo legge il server
-     (scrive.js). La mail si salva 'al server' invece che 'nuova': i
-     telefoni prendono solo le 'nuove' e quindi aspettano, e la notifica
-     non parte adesso — partira' fra un minuto o due, con dentro gli
-     orari, quando c'e' davvero qualcosa da aprire. Se il server non ce
-     la fa la mail torna 'nuova' e tutto va come prima.
-
-     Solo se fra gli allegati c'e' un ordine del giorno e NON c'e' il
-     piano di lavorazione: il piano lo sa leggere solo il telefono, e una
-     mail che lo porta fa tutta la strada vecchia. */
-  if (riga.stato === 'nuova' && String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si') {
-    const tenuti = (riga.allegati || []).filter(v => v && v.tenuto && v.percorso);
-    const haOdg = tenuti.some(v => genereDalNome(v.nome) === 'odg');
-    const haPiano = tenuti.some(v => /\bpdl\b|piano\s*di\s*lavoraz/.test(String(v.nome || '').toLowerCase().replace(/[_-]/g, ' ')));
-    if (haOdg && !haPiano) riga.stato = 'al server';
+  /* Chi legge questa mail: il server o il telefono.
+   *
+   * Con OMBRA_SCRIVE = "si" l'ordine del giorno lo legge il server
+   * (scrive.js); con PIANO_SCRIVE = "si" anche il piano di lavorazione
+   * (piano.js). Una mail che il server sa leggere per intero si salva
+   * 'al server' invece che 'nuova': i telefoni prendono solo le 'nuove' e
+   * quindi aspettano, e la notifica non parte adesso — parte fra un minuto
+   * o due, quando c'e' davvero qualcosa da aprire. Se il server non ce la
+   * fa la mail torna 'nuova' e tutto va come prima.
+   *
+   * Per intero: se dentro c'e' anche solo un documento che tocca ancora
+   * al telefono (il piano, finche' PIANO_SCRIVE e' spento), la mail fa
+   * tutta la strada vecchia. Meta' e meta' vorrebbe dire due notifiche e
+   * due posti dove guardare se qualcosa va storto.
+   *
+   * Tutto il resto — DOOD, memo, alloggi — il server non lo apre: si
+   * riconosce dal nome solo quello che serve (genereDalNome). */
+  if (riga.stato === 'nuova') {
+    const si = (v) => String(v || '').toLowerCase() === 'si';
+    const generi = (riga.allegati || []).filter(v => v && v.tenuto && v.percorso).map(v => genereDalNome(v.nome));
+    const haOdg = generi.includes('odg'), haPiano = generi.includes('pdl');
+    const alTelefono = (haOdg && !si(env.OMBRA_SCRIVE)) || (haPiano && !si(env.PIANO_SCRIVE));
+    if ((haOdg || haPiano) && !alTelefono) riga.stato = 'al server';
   }
 
   if (!riga.data_invio) delete riga.data_invio;
@@ -388,10 +396,11 @@ export async function riceviPosta(message, env, ctx) {
 
   if (riga.stato === 'nuova' && (riga.allegati || []).some(v => v.tenuto)) {
     try {
-      const nomi = riga.allegati.filter(v => v.tenuto).map(v => v.nome).join(' ').toLowerCase();
-      const fatti = [];
-      if (/\bodg\b|ordine[ _-]?del[ _-]?giorno|call[ _-]?sheet/.test(nomi)) fatti.push('odg');
-      if (/\bpdl\b|piano[ _-]?di[ _-]?lavoraz/.test(nomi)) fatti.push('pdl');
+      /* Dal nome, con la stessa regola del server: "MSG_PDL7_03.11.pdf"
+         con \bpdl\b non si riconosceva, e la notifica diceva "nuova
+         posta" invece di "nuovo piano". */
+      const generi = riga.allegati.filter(v => v.tenuto).map(v => genereDalNome(v.nome));
+      const fatti = ['odg', 'pdl'].filter(g => generi.includes(g));
       const quanti = await avvisaPosta(env, film.id, fatti, riga.oggetto);
       console.log('posta: avvisati', quanti, 'membri', fatti.length ? '(' + fatti.join('+') + ')' : '(generico)');
     } catch (e) {

@@ -58,6 +58,12 @@
   // definizione, e tenerla in un posto solo evita che le due parti
   // finiscano per usarne due diverse.
 
+  // Le variabili aggiunte dal pannello (OMBRA_SCRIVE, PIANO_SCRIVE...)
+  // restano dove sono a ogni deploy, anche se messe come testo e non come
+  // secret. Senza questa riga un push le toglierebbe, e il server
+  // tornerebbe spento senza dirlo a nessuno.
+  "keep_vars": true,
+
   "observability": {
     "enabled": true
   }

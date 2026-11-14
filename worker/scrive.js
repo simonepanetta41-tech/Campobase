@@ -32,6 +32,7 @@
  */
 import { avvisaPosta } from './push.js';
 import { nomeCorrisponde, avvisiPer } from './avvisi.js';
+import { genereDalNome } from './ombra.js';
 
 export const ATTESA_MINUTI = 4;       // oltre, si rilascia e ci pensa il telefono
 
@@ -227,9 +228,12 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
       updated_at: new Date(adesso).toISOString() })
   });
 
-  // 2. La mail e' a posto: i telefoni non devono piu' analizzarla.
-  await db(env, `posta?id=eq.${riga.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({ stato: 'fatta', nota: 'letta dal server' }) });
+  // 2. La mail e' a posto: i telefoni non devono piu' analizzarla. A meno
+  //    che porti anche un piano che il server deve ancora leggere
+  //    (piano.js): allora resta 'al server', e la chiude lui.
+  if (!(await pianoInSospeso(env, riga)))
+    await db(env, `posta?id=eq.${riga.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ stato: 'fatta', nota: 'letta dal server' }) });
 
   // 3. Le notifiche. Da qui in poi niente deve far tornare indietro: l'ordine
   //    del giorno e' scritto, e un avviso mancato non lo rende meno vero.
@@ -264,6 +268,20 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
   return { scritto: true, data: d.data, notifiche, avvisi, errore };
 }
 
+/* La mail porta un piano di lavorazione che tocca al server e che non e'
+   ancora stato letto? Si chiede a parte, e se la domanda fallisce (le
+   colonne di sql/piano.sql non ci sono) la risposta e' no: l'ordine del
+   giorno non deve restare appeso a una cosa che non parte. */
+const ATTESA_PIANO_MINUTI = 8;
+const haPiano = (riga) => (riga.allegati || []).some(a => a && a.tenuto && genereDalNome(a.nome) === 'pdl');
+export async function pianoInSospeso(env, riga) {
+  if (String(env.PIANO_SCRIVE || '').toLowerCase() !== 'si' || !haPiano(riga)) return false;
+  try {
+    const r = (await db(env, `posta?select=piano_stato&id=eq.${riga.id}&limit=1`) || [])[0];
+    return !!r && !['fatta', 'tronca', 'saltata', 'errore'].includes(r.piano_stato);
+  } catch (_) { return false; }
+}
+
 /* La strada vecchia: la mail torna 'nuova', parte la notifica di sempre,
    e il primo telefono che apre analizza. Si scrive solo se la mail e'
    ancora 'al server', cosi' due passaggi del cron non la rilasciano due
@@ -275,8 +293,8 @@ export async function rilascia(env, riga, motivo) {
   });
   if (!prese || !prese.length) return false;
   try {
-    const nomi = (riga.allegati || []).filter(a => a && a.tenuto).map(a => a.nome).join(' ').toLowerCase();
-    await avvisaPosta(env, riga.project_id, /\bodg\b|ordine|call.?sheet/.test(nomi.replace(/[_-]/g, ' ')) ? ['odg'] : [], riga.oggetto);
+    const generi = (riga.allegati || []).filter(a => a && a.tenuto).map(a => genereDalNome(a.nome));
+    await avvisaPosta(env, riga.project_id, ['odg', 'pdl'].filter(g => generi.includes(g)), riga.oggetto);
   } catch (e) { console.error('scrive: avviso di riserva non partito', e.message); }
   console.log('scrive: rilasciata al telefono —', motivo);
   return true;
@@ -286,10 +304,18 @@ export async function rilascia(env, riga, motivo) {
    si rilasciano. Copre il caso in cui la lettura non parte proprio, o si
    ferma a meta'. */
 export async function rilasciaInRitardo(env, adesso) {
-  const limite = new Date((adesso || Date.now()) - ATTESA_MINUTI * 60000).toISOString();
-  const righe = await db(env, 'posta?select=id,project_id,oggetto,allegati&stato=eq.al%20server'
+  const ora = adesso || Date.now();
+  const limite = new Date(ora - ATTESA_MINUTI * 60000).toISOString();
+  const righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ricevuta&stato=eq.al%20server'
     + `&ricevuta=lt.${encodeURIComponent(limite)}&limit=5`);
+  const pianoAcceso = String(env.PIANO_SCRIVE || '').toLowerCase() === 'si';
   let n = 0;
-  for (const r of righe || []) if (await rilascia(env, r, `passati ${ATTESA_MINUTI} minuti`)) n++;
+  for (const r of righe || []) {
+    /* Una mail col piano fa due letture, una al minuto: le si da' il
+       doppio del tempo prima di arrendersi. */
+    const minuti = pianoAcceso && haPiano(r) ? ATTESA_PIANO_MINUTI : ATTESA_MINUTI;
+    if (Date.parse(r.ricevuta) > ora - minuti * 60000) continue;
+    if (await rilascia(env, r, `passati ${minuti} minuti`)) n++;
+  }
   return n;
 }

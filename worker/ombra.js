@@ -35,7 +35,7 @@
  */
 
 import { avvisiDalServer } from './avvisi.js';
-import { scriviTutto, rilascia, rilasciaInRitardo } from './scrive.js';
+import { scriviTutto, rilascia, rilasciaInRitardo, pianoInSospeso } from './scrive.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -89,7 +89,7 @@ function capi(env) {
 
 function base(env) { return env.SUPABASE_URL.replace(/\/+$/, ''); }
 
-async function db(env, percorso, opzioni = {}) {
+export async function db(env, percorso, opzioni = {}) {
   const r = await fetch(`${base(env)}/rest/v1/${percorso}`,
     { ...opzioni, headers: { ...capi(env), ...(opzioni.headers || {}) } });
   if (!r.ok) throw new Error(`${percorso.split('?')[0]} -> ${r.status} ${await r.text().catch(() => '')}`);
@@ -103,13 +103,21 @@ async function db(env, percorso, opzioni = {}) {
 export function genereDalNome(nome) {
   const n = String(nome || '').toLowerCase();
   if (!/\.pdf$/.test(n)) return null;
-  if (/stralc|mappa|memo|sceneggiatura|script/.test(n)) return null;
-  if (/giri|transport|trasport|movement/.test(n)) return 'giri';
-  if (/\bodg\b|ordine[ _-]*del[ _-]*giorno|call[ _-]*sheet/.test(n.replace(/[_-]/g, ' '))) return 'odg';
+  const p = n.replace(/\.pdf$/, '').replace(/[_\-.]+/g, ' ');
+  if (/stralc|mappa|memo|sceneggiatura|script/.test(p)) return null;
+  /* Insieme al piano la produzione manda spesso il DOOD (day out of
+     days), a volte con "PDL" nel nome: non e' il piano e non si legge. */
+  if (/\bdood\b|day out of days/.test(p)) return null;
+  if (/giri|transport|trasport|movement/.test(p)) return 'giri';
+  if (/\bodg\b|ordine del giorno|call sheet/.test(p)) return 'odg';
+  /* Il piano di lavorazione: "MSG_PDL7_03.11", "MSG - PDL6", "PDL8",
+     "IS_PDL_23.02.26". Il numero della versione sta attaccato alla sigla,
+     quindi qui \bpdl\b non basta. */
+  if (/(^|[^a-z])pdl(?![a-z])|piano (di )?lavorazione/.test(p)) return 'pdl';
   return null;
 }
 
-async function firma(env, percorso) {
+export async function firma(env, percorso) {
   const via = percorso.split('/').map(encodeURIComponent).join('/');
   const r = await fetch(`${base(env)}/storage/v1/object/sign/${SECCHIO}/${via}`, {
     method: 'POST', headers: capi(env), body: JSON.stringify({ expiresIn: SCADENZA_FIRMA })
@@ -121,7 +129,7 @@ async function firma(env, percorso) {
   return /^https?:/.test(u) ? u : `${base(env)}/storage/v1${u.startsWith('/') ? '' : '/'}${u}`;
 }
 
-function ragionamento(modello) {
+export function ragionamento(modello) {
   return String(modello).startsWith('claude-sonnet-5-5') ? { type: 'between_tools' } : { type: 'disabled' };
 }
 
@@ -143,7 +151,7 @@ export async function leggiInOmbra(env) {
      una che aspetta da troppo: quella si rilascia subito, qualunque cosa
      succeda al resto di questo passaggio. */
   const scrive = String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si';
-  if (scrive) {
+  if (scrive || String(env.PIANO_SCRIVE || '').toLowerCase() === 'si') {
     try { await rilasciaInRitardo(env); } catch (e) { console.error('ombra: rilascio in ritardo', e.message); }
   }
   const mia = (r) => scrive && r && r.stato === 'al server';     // la troupe sta aspettando questa
@@ -221,7 +229,10 @@ export async function leggiInOmbra(env) {
        chiude senza un'altra notifica. Se la prima poi non ce la fa viene
        rilasciata lei, e basta quella. */
     if (mia(riga)) {
-      try { await scrivi(env, riga.id, JSON.stringify({ stato: 'fatta', nota: 'doppione: già letta dal server' })); } catch (_) {}
+      try {
+        if (!(await pianoInSospeso(env, riga)))
+          await scrivi(env, riga.id, JSON.stringify({ stato: 'fatta', nota: 'doppione: già letta dal server' }));
+      } catch (_) {}
     }
     return 'saltata: doppione';
   }
