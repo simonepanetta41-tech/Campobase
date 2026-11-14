@@ -24,7 +24,7 @@ const LETTO = { numero: '24', data: '2026-11-13', convocazione: '13.00', fineRip
   scene: [{ n: '16' }], cast: [], troupe: [],
   tratte: [{ partenza: '12.30', luogo: 'TURSPORT HOTEL RESIDENCE', passeggeri: ['S.Panetta', 'D.De Angelis'] }] };
 
-let posta, chiamate, modello, firme;
+let posta, chiamate, modello, firme, avvisiScritti = [];
 function azzera(righe) {
   posta = righe; chiamate = []; firme = [];
   modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: { input_tokens: 9000, output_tokens: 4000 },
@@ -62,6 +62,9 @@ globalThis.fetch = async (url, opz = {}) => {
     firme.push(via);
     return new Response(JSON.stringify({ signedURL: '/object/sign/' + via + '?token=abc' }), { status: 200 });
   }
+  if (u.pathname.endsWith('/film_membri')) return new Response(JSON.stringify([{ user_id: 'u1' }, { user_id: 'u2' }]), { status: 200 });
+  if (u.pathname.endsWith('/profiles')) return new Response(JSON.stringify([{ id: 'u1', nome: 'Simone', cognome: 'Panetta' }]), { status: 200 });
+  if (u.pathname.endsWith('/push_appuntamenti')) { avvisiScritti.push(...JSON.parse(opz.body)); return new Response(null, { status: 201 }); }
   const params = [...u.searchParams.entries()];
   const trovate = posta.filter(r => passa(r, params));
   if ((opz.method || 'GET') === 'GET') {
@@ -191,6 +194,36 @@ azzera([riga({ ombra_stato: 'in corso', ombra_il: fa(15), ombra: { tentativi: 2 
 esito = await leggiInOmbra(ENV);
 ok('alla terza si dice che il tempo non basta', [posta[0].ombra_stato, chiamate.length], ['errore', 0]);
 ok('e lo si scrive', /tempo scaduto/.test(posta[0].ombra.errore), true);
+
+console.log('\n── ⚠ gli avvisi di pick-up e catering: spenti finché non si dice "si" ──');
+/* Una lettura di un giorno che deve ancora venire, con Panetta nei giri. */
+const FUTURO = { ...LETTO, data: '2099-01-10', catering: '13.30' };
+const colFuturo = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: {},
+  content: [{ type: 'text', text: JSON.stringify(FUTURO) }] }), { status: 200 });
+azzera([riga()]); modello = colFuturo; avvisiScritti = [];
+await leggiInOmbra(ENV);
+ok('senza la variabile non crea niente', avvisiScritti.length, 0);
+ok('ma scrive cosa avrebbe fatto', [posta[0].ombra.avvisi.acceso, posta[0].ombra.avvisi.calcolati], [false, 3]);
+ok('membro per membro', posta[0].ombra.avvisi.chi.map(c => [c.nome, c.pickup]), [['Simone Panetta', '12.30'], [null, null]]);
+ok('e la lettura è salva lo stesso', posta[0].ombra.letto.numero, '24');
+
+azzera([riga()]); modello = colFuturo; avvisiScritti = [];
+await leggiInOmbra({ ...ENV, OMBRA_AVVISI: 'si' });
+ok('con "si": un pick-up e due catering', avvisiScritti.map(x => x.genere).sort(), ['catering', 'catering', 'pickup']);
+ok('alla chiave del telefono', avvisiScritti.find(x => x.genere === 'pickup').chiave, 'u1:pickup:2099-01-10');
+ok('e risulta acceso', posta[0].ombra.avvisi.creati, 3);
+
+/* Una prova a mano non deve mai svegliare nessuno, nemmeno con "si". */
+azzera([riga({ stato: 'prova', oggetto: 'prova 024', ricevuta: '2026-01-01T00:00:00Z' })]); modello = colFuturo; avvisiScritti = [];
+await leggiInOmbra({ ...ENV, OMBRA_AVVISI: 'si' });
+ok('una prova non crea avvisi', [avvisiScritti.length, posta[0].ombra.avvisi.acceso], [0, false]);
+
+/* E una lettura troncata non e' abbastanza per avvisare qualcuno. */
+azzera([riga()]); avvisiScritti = [];
+modello = () => new Response(JSON.stringify({ stop_reason: 'max_tokens', usage: {},
+  content: [{ type: 'text', text: JSON.stringify(FUTURO) }] }), { status: 200 });
+await leggiInOmbra({ ...ENV, OMBRA_AVVISI: 'si' });
+ok('una lettura troncata non crea avvisi', avvisiScritti.length, 0);
 
 console.log('\n── il cron: prima le notifiche, poi l\'ombra ──');
 const indice = (await import('node:fs')).readFileSync(RADICE + '/worker/index.js', 'utf8');

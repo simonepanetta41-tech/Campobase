@@ -34,6 +34,8 @@
  * del Worker. Per cambiare modello: OMBRA_MODELLO.
  */
 
+import { avvisiDalServer } from './avvisi.js';
+
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
 const FINESTRA_ORE = 36;          // non si rincorrono le mail vecchie
@@ -237,8 +239,22 @@ export async function leggiInOmbra(env) {
     const fatta = d.stop_reason === 'max_tokens' ? 'tronca' : 'fatta';
     try {
       if (!j) throw new Error('nella risposta non c\'e\' un oggetto JSON (' + (d.stop_reason || '?') + ')');
+
+      /* Gli avvisi di pick-up e catering per tutti i membri (avvisi.js).
+         Si calcolano sempre e si scrivono accanto alla lettura, cosi' si
+         vede cosa farebbe; si CREANO solo con OMBRA_AVVISI = "si", solo
+         per una mail vera e solo da una lettura intera. Qui il JSON si
+         apre davvero — sono trentamila caratteri, una volta sola. */
+      let avvisi = null;
+      try {
+        const letto = JSON.parse(j);
+        const acceso = !prova && fatta === 'fatta' && String(env.OMBRA_AVVISI || '').toLowerCase() === 'si';
+        avvisi = await avvisiDalServer(env, riga.project_id, letto, { scrivi: acceso });
+      } catch (e) { avvisi = { creati: 0, errore: String(e.message).slice(0, 200) }; }
+
       await scrivi(env, riga.id,
-        '{"ombra_stato":"' + fatta + '","ombra":{"info":' + JSON.stringify(coda) + ',"letto":' + j + '}}');
+        '{"ombra_stato":"' + fatta + '","ombra":{"info":' + JSON.stringify(coda)
+        + ',"avvisi":' + JSON.stringify(avvisi) + ',"letto":' + j + '}}');
     } catch (e) {
       await scrivi(env, riga.id, JSON.stringify({ ombra_stato: 'errore',
         ombra: { info: coda, errore: 'JSON non valido: ' + e.message.slice(0, 200), testo: testo.slice(0, 60000) } }));
