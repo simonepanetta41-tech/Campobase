@@ -204,6 +204,31 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
   .result-tab { padding: 10px 8px 8px; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 }
+/* Il telefono sdraiato.
+ *
+ * La regola qui sopra guarda solo la larghezza: un telefono girato in
+ * orizzontale supera i 600 punti e l'app si credeva su un computer — la
+ * barra saltava in alto, dentro un riquadro grigio. Un telefono sdraiato
+ * si riconosce dal dito e dallo schermo basso: la barra resta in basso
+ * come in verticale, ma con icona e scritta sulla stessa riga, perche'
+ * qui l'altezza e' la cosa che manca. Tablet e computer non cambiano.
+ */
+@media (min-width:601px) and (max-height:500px) and (pointer:coarse) {
+  .result-tabs, .result-tabs-2 { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0;
+    border-top: 1px solid var(--border); z-index: 100; background: var(--bg);
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .result-tab { padding: 11px 8px; font-size: 11px; flex-direction: row; gap: 8px; }
+  .result-tab svg { width: 20px; height: 20px; }
+  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+}
+/* Una riga sottile fra una sezione e l'altra, dove la barra e' quella del
+   telefono: dice dove finisce un tasto e comincia il prossimo. */
+@media (max-width:600px), (min-width:601px) and (max-height:500px) and (pointer:coarse) {
+  .result-tab { position: relative; border-radius: 0; }
+  .result-tab + .result-tab::before { content: ''; position: absolute; left: 0; top: 24%; bottom: 24%;
+    width: 1px; background: rgba(255,255,255,.11); }
+  body.light .result-tab + .result-tab::before { background: rgba(0,0,0,.12); }
+}
 .result-tab { flex: 1; background: none; border: none; color: var(--muted); font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; padding: 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-transform: uppercase; letter-spacing: 0.05em; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
 .wrap-chip { display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;border:1.5px solid var(--border);color:var(--muted);background:none;transition:all 0.15s;user-select:none; }
 .wrap-chip.active { border-color:var(--yellow);color:var(--yellow);background:rgba(245,197,66,0.08); }
@@ -5022,7 +5047,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.140';
+const CB_VERSIONE = '1.141';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
