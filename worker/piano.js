@@ -402,7 +402,9 @@ export async function aggiornaCast(env, analysisId, proprietario, attori) {
     await db(env, `cast_list?analysis_id=eq.${analysisId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
     try {
       await db(env, 'cast_list', { method: 'POST', headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify(nuovo.map(c => ({ analysis_id: analysisId, user_id: proprietario, ...c, fonte: 'ufficiale' }))) });
+        /* Le colonne sono quelle che ha davvero la tabella (viste sul
+           database): cast_list non ha user_id, la lista e' dell'analisi. */
+        body: JSON.stringify(nuovo.map(c => ({ analysis_id: analysisId, ...c, fonte: 'ufficiale' }))) });
     } catch (e) {
       // Si rimette quella di prima, cosi' com'era.
       if (prima.length) { try { await db(env, 'cast_list', { method: 'POST', headers: { Prefer: 'return=minimal' },

@@ -146,7 +146,7 @@ function mondo() {
         profiles: [{ id: 'u1', nome: 'Simone', cognome: 'Panetta' }, { id: 'u2', nome: 'Valerio', cognome: 'Leone' }],
         analyses: [{ id: 'a1', project_id: 'f1', created_at: '2099-01-01' }],
         pdl_versions: [{ analysis_id: 'a1', user_id: 'u1', data: JSON.parse(JSON.stringify(VECCHIO)), shooting_data: { 24: { scenes: { 16: 'done' } } } }],
-        cast_list: [{ id: 'c1', analysis_id: 'a1', user_id: 'u1', character_id: 1, nome: 'COLONNA', minore: false, fonte: 'provvisoria', pose_stimate: 12 }],
+        cast_list: [{ id: 'c1', analysis_id: 'a1', character_id: 1, nome: 'COLONNA', minore: false, fonte: 'provvisoria', pose_stimate: 12 }],
         posta: [], odg: [], push_appuntamenti: [], push_iscrizioni: [] };
   rotto = null; chiamate = [];
   risposte = { pdl: () => LETTO(), odg: () => ODG_LETTO, stop: 'end_turn', stato: 200 };
@@ -251,7 +251,10 @@ console.log('\n── la lista del cast dalla legenda del piano ──');
 const elenco = () => T.cast_list.map(c => [c.character_id, c.nome, c.minore, c.fonte]);
 ok('la lista ufficiale prende il posto della provvisoria', elenco(), [[1, 'PRINCIPE COLONNA', false, 'ufficiale'], [2, 'GIUSEPPE NAVARRA', false, 'ufficiale'],
    [3, 'PAOLINO', true, 'ufficiale'], [4, 'TERESA NAVARRA', false, 'ufficiale']]);
-ok('attaccata allo spoglio del film', T.cast_list.every(c => c.analysis_id === 'a1' && c.user_id === 'u1'), true);
+ok('attaccata allo spoglio del film', T.cast_list.every(c => c.analysis_id === 'a1'), true);
+/* La tabella vera non ha altre colonne: una in piu' e l'inserimento viene rifiutato. */
+ok('⚠ solo colonne che la tabella ha davvero', [...new Set(T.cast_list.flatMap(c => Object.keys(c)))].filter(k =>
+   !['id', 'analysis_id', 'character_id', 'nome', 'pose_stimate', 'id_ufficiale', 'fonte', 'created_at', 'minore'].includes(k)), []);
 ok('resta scritto', T.posta[0].piano.scritto.cast, { fatto: true, personaggi: 4, prima: 1 });
 { const { aggiornaCast } = await import(RADICE + '/worker/piano.js');
   const ids = T.cast_list.map(c => c.id).join();
