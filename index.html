@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.137';
+const CB_VERSIONE = '1.138';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -6464,6 +6464,81 @@ function switchResultTab(tab) {
   if (el) el.classList.add('active');
 
   try { cbTestata(); } catch(_) {}
+  usoSegna();            // il tempo passato fin qui va alla sezione di prima
+  usoSezioneOra = tab;
+}
+
+/* ══ IL TEMPO D'USO ═══════════════════════════════════════════════════
+ *
+ * In questa fase di prova serve sapere chi usa l'app, quanto, e quali
+ * sezioni: e' quello che dice cosa vale la pena sviluppare. Si conta solo
+ * il tempo in cui l'app e' davanti agli occhi, diviso per sezione, e si
+ * manda a Supabase un totale al minuto (sql/uso.sql): nessun dettaglio di
+ * cosa si guarda dentro la sezione.
+ *
+ * Quando l'app andra' sugli store questa parte va riguardata: e' un dato
+ * personale, e li' servono un'informativa e un consenso. Si spegne
+ * mettendo USO_ACCESO a false: il resto dell'app non se ne accorge.
+ */
+const USO_ACCESO = true;
+const USO_CODA = 'cb_uso_coda';
+let usoSezioneOra = null, usoDa = 0, usoFermo = false, usoUltimoInvio = 0;
+
+function usoDove(){
+  if (typeof currentUser === 'undefined' || !currentUser) return null;
+  const r = document.getElementById('resultsPage');
+  const aperto = r && r.offsetParent !== null;
+  return aperto ? (usoSezioneOra || 'odg') : 'home';
+}
+function usoCoda(){ try { return JSON.parse(localStorage.getItem(USO_CODA) || '{}') || {}; } catch (_) { return {}; } }
+
+/* Mette in coda il tempo passato dall'ultima volta. Un intervallo lungo
+   non e' uso: e' il telefono che ha congelato l'app, e si butta. */
+function usoSegna(){
+  if (!USO_ACCESO || usoFermo) return;
+  const ora = Date.now(), dove = usoDove();
+  const passati = usoDa ? Math.round((ora - usoDa) / 1000) : 0;
+  usoDa = (document.visibilityState === 'visible') ? ora : 0;
+  if (!dove || passati <= 0 || passati > 45) return;
+  const c = usoCoda();
+  c[dove] = Math.min((c[dove] || 0) + passati, 6 * 3600);
+  try { localStorage.setItem(USO_CODA, JSON.stringify(c)); } catch (_) {}
+}
+
+async function usoManda(){
+  if (!USO_ACCESO || usoFermo || !currentUser) return;
+  const c = usoCoda();
+  const righe = Object.entries(c).filter(([, s]) => s > 0).map(([sezione, secondi]) => ({ sezione, secondi }));
+  if (!righe.length) return;
+  usoUltimoInvio = Date.now();
+  // La coda si svuota prima: se l'invio fallisce si rimette, cosi' il tempo
+  // che passa nel frattempo non viene contato due volte.
+  try { localStorage.removeItem(USO_CODA); } catch (_) {}
+  let errore = null;
+  try { const r = await sb.rpc('segna_uso', { p_righe: righe }); errore = r && r.error; }
+  catch (e) { errore = e; }
+  if (!errore) return;
+  /* La funzione non c'e' (sql/uso.sql non lanciato): inutile riprovare a
+     ogni minuto, e quel tempo non serve tenerlo. Per ogni altro guasto —
+     niente campo, di solito — si rimette in coda e si riprova. */
+  if (/PGRST202|42883|does not exist|Could not find/i.test(String(errore.code || '') + ' ' + String(errore.message || ''))) { usoFermo = true; return; }
+  const d = usoCoda();
+  righe.forEach(x => { d[x.sezione] = Math.min((d[x.sezione] || 0) + x.secondi, 6 * 3600); });
+  try { localStorage.setItem(USO_CODA, JSON.stringify(d)); } catch (_) {}
+}
+
+if (USO_ACCESO) {
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    usoSegna();
+    if (Date.now() - usoUltimoInvio > 60000) usoManda();
+  }, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') usoDa = Date.now();
+    else { usoSegna(); usoManda(); }
+  });
+  window.addEventListener('pagehide', () => { usoSegna(); usoManda(); });
+  usoDa = Date.now();
 }
 
 // ══ WRAP ══
