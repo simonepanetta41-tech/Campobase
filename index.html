@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.133';
+const CB_VERSIONE = '1.134';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9869,7 +9869,16 @@ function odgMinuti(h){
  */
 function odgPickUp(testo, prof){
   if (!testo || !prof || !prof.cognome) return null;
-  const tratte = odgTratte(testo);
+  return odgPickUpFra(odgTratte(testo), prof);
+}
+
+/* Lo stesso, partendo dai viaggi gia' letti. Serve agli ordini del
+   giorno che scrive il server: li' i viaggi arrivano pronti (d.tratte) e
+   non c'e' un testo dei giri auto da rileggere. La scelta di quale sia il
+   tuo resta questa, una sola per le due strade. */
+function odgPickUpFra(tratte, prof){
+  if (!prof || !prof.cognome || !Array.isArray(tratte)) return null;
+  tratte = tratte.filter(t => t && Array.isArray(t.nomi));
   if (!tratte.length) return null;
 
   const mie = tratte.filter(t => t.nomi.some(n => nomeCorrisponde(n, prof)));
@@ -10990,6 +10999,53 @@ function sceneFatteAggiorna(){
   } catch (e) { console.log('[scene fatte]', e.message); }
 }
 
+/* Quando l'ordine del giorno del cloud prende il posto di quello sul
+ * telefono.
+ *
+ * Se ha una giornata piu' avanti: l'OdG di domani e' sempre quello che
+ * serve. E, per la stessa giornata, se l'ha scritto il server piu' di
+ * recente di quello che c'e' qui — la produzione che rimanda il foglio
+ * corretto. Per il resto vince il telefono: quello che uno ha in mano non
+ * gli si cambia sotto senza motivo.
+ */
+const ODG_TOLTO = 'cb_odg_tolto';
+function odgImpronta(d){ return d ? (d.data || '') + '|' + (d.caricatoIl || '') : ''; }
+function odgCloudVince(r, locale, tolto){
+  if (!r || !r.dati) return false;
+  if (!locale || !locale.data) return !tolto || tolto !== odgImpronta(r.dati);
+  if (r.data > locale.data) return true;
+  return r.data === locale.data && !!r.dati.daServer
+      && String(r.dati.caricatoIl || '') > String(locale.caricatoIl || '');
+}
+
+/* Si guarda se sul cloud e' arrivato un ordine del giorno nuovo. Da
+   quando lo scrive il server non c'e' piu' un telefono che lo analizza e
+   lo mostra: ogni telefono se lo va a prendere quando torna davanti agli
+   occhi. Torna true se l'ha cambiato. */
+let odgCloudInCorso = false;
+async function odgCloudNuovo(){
+  const f = filmCorrente();
+  if (odgCloudInCorso || odgInCorso || !currentUser || !f || !f.id) return false;
+  odgCloudInCorso = true;
+  try {
+    const { data, error } = await sb.from('odg').select('dati,data').eq('project_id', f.id)
+      .order('data', { ascending: false }).limit(1);
+    const r = !error && data && data[0];
+    let tolto = null; try { tolto = localStorage.getItem(ODG_TOLTO); } catch (_) {}
+    if (!odgCloudVince(r, odgCorrente, tolto)) return false;
+    odgCorrente = r.dati;
+    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(odgCorrente)); } catch (_) {}
+    odgRicalcola();
+    odgRender();
+    odgPassatiCarica();
+    odgStralciRipara();
+    return true;
+  } catch (e) {
+    console.log('[odg] cloud non raggiungibile:', e.message);
+    return false;
+  } finally { odgCloudInCorso = false; }
+}
+
 async function odgRipristina() {
   try {
     const l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
@@ -11003,9 +11059,7 @@ async function odgRipristina() {
       const { data } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
         .order('data', { ascending: false }).limit(1);
       const r = data && data[0];
-      // Il cloud vince solo se ha una giornata piu' avanti di quella locale:
-      // l'OdG di domani e' sempre quello che serve.
-      if (r && (!odgCorrente || !odgCorrente.data || r.data > odgCorrente.data)) odgCorrente = r.dati;
+      if (odgCloudVince(r, odgCorrente)) odgCorrente = r.dati;
     } catch (e) { console.log('[odg] cloud non raggiungibile:', e.message); }
   }
   odgRicalcola();
@@ -11048,16 +11102,38 @@ async function postaControlla(){
      * ogni apertura vuol dire pagare un'analisi ogni volta per lo stesso
      * guasto. */
     const { data, error } = await sb.from('posta')
-      .select('id,oggetto,allegati,ricevuta')
-      .eq('project_id', f.id).in('stato', ['nuova', 'in analisi'])
+      .select('id,oggetto,allegati,ricevuta,stato')
+      .eq('project_id', f.id).in('stato', ['nuova', 'in analisi', 'al server'])
       .order('ricevuta', { ascending: true }).limit(3);
-    if (error || !data || !data.length) return;
-    for (const p of data) await postaApri(p);
+    if (error || !data) return;
+    /* 'al server': l'ordine del giorno lo sta leggendo il server, e fra
+       un minuto o due sara' sul cloud. Qui non si analizza niente: si
+       dice che sta arrivando e si torna a guardare. Se il server non ce
+       la fa la mail torna 'nuova', e al giro dopo la si apre come sempre. */
+    const attesa = data.filter(p => p.stato === 'al server');
+    for (const p of data) if (p.stato !== 'al server') await postaApri(p);
+    if (attesa.length) postaAspetta();
+    else postaAttese = 0;
+    // E in ogni caso si guarda se il cloud ha un ordine del giorno piu' nuovo.
+    await odgCloudNuovo();
   } catch (e) {
     console.log('[posta] non raggiungibile:', e.message);
   } finally {
     postaInCorso = false;
   }
+}
+
+/* L'attesa di un ordine del giorno che il server sta leggendo: si avvisa
+   una volta e si riguarda ogni venti secondi, per non piu' di cinque
+   minuti — oltre, il server ha gia' rilasciato la mail al telefono. */
+let postaAttese = 0, postaAttesaT = null;
+function postaAspetta(){
+  if (postaAttese === 0)
+    avvisoGrande('Nuovo ordine del giorno', 'Sta arrivando: ancora un momento.', 5000);
+  if (postaAttese >= 15) { postaAttese = 0; return; }
+  postaAttese++;
+  clearTimeout(postaAttesaT);
+  postaAttesaT = setTimeout(() => { if (document.visibilityState !== 'hidden') postaControlla(); }, 20000);
 }
 
 async function postaApri(p){
@@ -11444,6 +11520,20 @@ function odgRicalcola() {
   if (d.giriTesto) {
     const p = odgPickUp(d.giriTesto, profilo());
     if (p) d.pickup = p;
+  } else if (d.daServer) {
+    /* Un ordine del giorno scritto dal server (worker/scrive.js) non ha
+       il testo dei giri auto: ha i viaggi gia' letti. Il pick-up e' di
+       chi guarda, quindi qui si assegna SEMPRE, anche a vuoto — sul cloud
+       puo' essere finito quello di un collega che ha salvato dopo, e chi
+       non e' nei giri auto non deve vedersi il van di un altro. */
+    d.pickup = odgPickUpFra(d.tratte, profilo());
+    /* I nomi dei posti come li scrive il foglio ("CB/ MEZZI TECNICI")
+       diventano quelli dell'app ("Mezzi tecnici"): da li' dipendono
+       l'ordine nel Dove e quale posto si usa per il meteo. Una volta. */
+    if (d.luoghiV !== ODG_LUOGHI_V) {
+      (d.luoghi || []).forEach(l => { l.nome = odgNomePosto(l.nome) || odgCap(l.nome); });
+      d.luoghiV = ODG_LUOGHI_V;
+    }
   }
   if (d.testo && d.luoghiV !== ODG_LUOGHI_V) {
     const l = odgLuoghi(d.testo);
@@ -11471,6 +11561,10 @@ function odgRicalcola() {
 async function odgRimuovi() {
   if (!await askConfirm('Confermi di voler eliminare questo OdG?',
                         { conferma: 'Elimina', annulla: 'Annulla' })) return;
+  /* Ci si ricorda quale si e' tolto: da quando l'ordine del giorno si
+     riprende dal cloud a ogni ritorno sull'app, senza questo tornerebbe
+     dopo dieci secondi. Uno piu' nuovo, invece, arriva lo stesso. */
+  try { localStorage.setItem(ODG_TOLTO, odgImpronta(odgCorrente)); } catch (_) {}
   odgCorrente = null; odgErrore = null;
   try { localStorage.removeItem(ODG_LOCALE); } catch (_) {}
   cbFileCancella('odg/');

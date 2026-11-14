@@ -104,7 +104,7 @@ export function avvisiPer(letto, membri, adesso) {
   const catering = ora2(letto.catering);
   for (const m of membri) {
     const voce = { user_id: m.user_id, nome: [m.nome, m.cognome].filter(Boolean).join(' ') || null,
-                   pickup: null, catering: null, nota: null };
+                   pickup: null, luogo: null, catering: null, nota: null };
     if (!m.cognome) voce.nota = 'profilo senza cognome';
     else if (dubbi.has(m.user_id)) voce.nota = 'nome che combacia con due membri';
     else {
@@ -117,6 +117,7 @@ export function avvisiPer(letto, membri, adesso) {
         const autista = String(mia.autista || '').trim().split(/\s+/)[0] || null;
         const dove = mia.luogo || mia.indirizzo || '';
         voce.pickup = pick;
+        voce.luogo = dove;
         if (q && q.getTime() > ora) righe.push({
           user_id: m.user_id, quando: q.toISOString(), giorno: data, genere: 'pickup',
           testo: (autista ? `${autista} è lì fra 10 minuti per il pick up!`

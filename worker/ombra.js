@@ -35,6 +35,7 @@
  */
 
 import { avvisiDalServer } from './avvisi.js';
+import { scriviTutto, rilascia, rilasciaInRitardo } from './scrive.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -136,20 +137,31 @@ export async function leggiInOmbra(env) {
   if (String(env.OMBRA || '').toLowerCase() === 'no') return 'spenta';
   if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return 'non configurata';
 
+  /* Con OMBRA_SCRIVE = "si" la lettura non e' piu' una prova: le mail con
+     un ordine del giorno aspettano qui ('al server', vedi scrive.js) e i
+     telefoni non le toccano. Quindi per prima cosa si guarda se ce n'e'
+     una che aspetta da troppo: quella si rilascia subito, qualunque cosa
+     succeda al resto di questo passaggio. */
+  const scrive = String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si';
+  if (scrive) {
+    try { await rilasciaInRitardo(env); } catch (e) { console.error('ombra: rilascio in ritardo', e.message); }
+  }
+  const mia = (r) => scrive && r && r.stato === 'al server';     // la troupe sta aspettando questa
+
   const da = new Date(Date.now() - FINESTRA_ORE * 3600000).toISOString();
-  const recenti = `&stato=in.(nuova,%22in%20analisi%22,fatta)&ricevuta=gte.${encodeURIComponent(da)}`
+  const recenti = `&stato=in.(nuova,%22in%20analisi%22,fatta,%22al%20server%22)&ricevuta=gte.${encodeURIComponent(da)}`
                 + '&order=ricevuta.desc&limit=1';
   /* Le prove a mano vengono prima, e non hanno scadenza: sono righe con
      stato 'prova' messe li' apposta (sql/ombra.sql) per far leggere al
      Worker dieci ordini del giorno gia' passati in un quarto d'ora,
      invece di aspettare dieci sere. L'app non le vede: prende solo
      'nuova' e 'in analisi'. */
-  let righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra'
+  let righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,stato,ombra_il,ombra'
     + '&ombra_stato=is.null&stato=eq.prova&order=oggetto.asc&limit=1');
   let riga = righe && righe[0];
   const prova = !!riga;
   if (!riga) {
-    righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra&ombra_stato=is.null' + recenti);
+    righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,stato,ombra_il,ombra&ombra_stato=is.null' + recenti);
     riga = righe && righe[0];
   }
 
@@ -161,7 +173,7 @@ export async function leggiInOmbra(env) {
   let ripresa = false;
   if (!riga) {
     const vecchia = new Date(Date.now() - TEMPO_PERSO * 60000).toISOString();
-    righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,ombra_il,ombra&ombra_stato=eq.in%20corso'
+    righe = await db(env, 'posta?select=id,project_id,oggetto,allegati,stato,ombra_il,ombra&ombra_stato=eq.in%20corso'
       + `&ombra_il=lt.${encodeURIComponent(vecchia)}` + recenti);
     riga = righe && righe[0];
     ripresa = !!riga;
@@ -204,8 +216,19 @@ export async function leggiInOmbra(env) {
   });
   if (!presa || !presa.length) return 'già presa';
   if (!odg) return 'saltata: nessun ordine del giorno fra gli allegati';
-  if (doppione) return 'saltata: doppione';
-  if (troppi) return 'errore: tempo scaduto';
+  if (doppione) {
+    /* La stessa mail inoltrata due volte: la prima fa tutto, questa si
+       chiude senza un'altra notifica. Se la prima poi non ce la fa viene
+       rilasciata lei, e basta quella. */
+    if (mia(riga)) {
+      try { await scrivi(env, riga.id, JSON.stringify({ stato: 'fatta', nota: 'doppione: già letta dal server' })); } catch (_) {}
+    }
+    return 'saltata: doppione';
+  }
+  if (troppi) {
+    if (mia(riga)) { try { await rilascia(env, riga, 'tempo scaduto'); } catch (_) {} }
+    return 'errore: tempo scaduto';
+  }
 
   const modello = env.OMBRA_MODELLO || MODELLO;
   const inizio = Date.now();
@@ -254,19 +277,33 @@ export async function leggiInOmbra(env) {
          vede cosa farebbe; si CREANO solo con OMBRA_AVVISI = "si", solo
          per una mail vera e solo da una lettura intera. Qui il JSON si
          apre davvero — sono trentamila caratteri, una volta sola. */
-      let avvisi = null;
-      try {
-        const letto = JSON.parse(j);
-        const acceso = !prova && fatta === 'fatta' && String(env.OMBRA_AVVISI || '').toLowerCase() === 'si';
-        avvisi = await avvisiDalServer(env, riga.project_id, letto, { scrivi: acceso });
-      } catch (e) { avvisi = { creati: 0, errore: String(e.message).slice(0, 200) }; }
+      let avvisi = null, scritto = null;
+      const letto = JSON.parse(j);          // se non e' JSON si finisce nel catch qui sotto
+      if (mia(riga) && !prova) {
+        /* La troupe aspetta questa lettura. Intera: si scrive l'ordine del
+           giorno e partono le notifiche (scrive.js). Troncata, o se la
+           scrittura non riesce: si rilascia e ci pensa il telefono. */
+        try {
+          if (fatta !== 'fatta') throw new Error('lettura troncata');
+          scritto = await scriviTutto(env, riga, letto);
+        } catch (e) {
+          scritto = { scritto: false, errore: String(e.message).slice(0, 200) };
+          await rilascia(env, riga, scritto.errore);
+        }
+      } else {
+        try {
+          const acceso = !prova && fatta === 'fatta' && String(env.OMBRA_AVVISI || '').toLowerCase() === 'si';
+          avvisi = await avvisiDalServer(env, riga.project_id, letto, { scrivi: acceso });
+        } catch (e) { avvisi = { creati: 0, errore: String(e.message).slice(0, 200) }; }
+      }
 
       await scrivi(env, riga.id,
         '{"ombra_stato":"' + fatta + '","ombra":{"info":' + JSON.stringify(coda)
-        + ',"avvisi":' + JSON.stringify(avvisi) + ',"letto":' + j + '}}');
+        + ',"avvisi":' + JSON.stringify(avvisi) + ',"scritto":' + JSON.stringify(scritto) + ',"letto":' + j + '}}');
     } catch (e) {
       await scrivi(env, riga.id, JSON.stringify({ ombra_stato: 'errore',
         ombra: { info: coda, errore: 'JSON non valido: ' + e.message.slice(0, 200), testo: testo.slice(0, 60000) } }));
+      if (mia(riga) && !prova) { try { await rilascia(env, riga, 'risposta non leggibile'); } catch (_) {} }
       return 'errore: JSON non valido';
     }
     console.log('ombra:', fatta, JSON.stringify(coda));
@@ -277,6 +314,7 @@ export async function leggiInOmbra(env) {
       await scrivi(env, riga.id, JSON.stringify({ ombra_stato: 'errore',
         ombra: { info: { modello, ms: Date.now() - inizio }, errore: String(e.message).slice(0, 500) } }));
     } catch (_) {}
+    if (mia(riga) && !prova) { try { await rilascia(env, riga, String(e.message).slice(0, 120)); } catch (_) {} }
     return 'errore: ' + e.message;
   }
 }

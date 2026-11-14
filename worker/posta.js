@@ -26,6 +26,7 @@ import { leggiMessaggio } from './mime.js';
    arrivata; ma messo attorno a un nome che non esiste rende invisibile un
    errore di programmazione. */
 import { avvisaPosta, avvisaMailDaParte } from './push.js';
+import { genereDalNome } from './ombra.js';
 
 // Quello che vale la pena tenere. Le immagini no: nei pacchetti sono firme
 // e loghi della mail, non documenti.
@@ -338,6 +339,23 @@ export async function riceviPosta(message, env, ctx) {
       riga.nota = 'non sembra di questo film: ' + giudizio.perche;
       console.log('posta: messa da parte, ' + riga.nota);
     }
+  }
+
+  /* Con OMBRA_SCRIVE = "si" l'ordine del giorno lo legge il server
+     (scrive.js). La mail si salva 'al server' invece che 'nuova': i
+     telefoni prendono solo le 'nuove' e quindi aspettano, e la notifica
+     non parte adesso — partira' fra un minuto o due, con dentro gli
+     orari, quando c'e' davvero qualcosa da aprire. Se il server non ce
+     la fa la mail torna 'nuova' e tutto va come prima.
+
+     Solo se fra gli allegati c'e' un ordine del giorno e NON c'e' il
+     piano di lavorazione: il piano lo sa leggere solo il telefono, e una
+     mail che lo porta fa tutta la strada vecchia. */
+  if (riga.stato === 'nuova' && String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si') {
+    const tenuti = (riga.allegati || []).filter(v => v && v.tenuto && v.percorso);
+    const haOdg = tenuti.some(v => genereDalNome(v.nome) === 'odg');
+    const haPiano = tenuti.some(v => /\bpdl\b|piano\s*di\s*lavoraz/.test(String(v.nome || '').toLowerCase().replace(/[_-]/g, ' ')));
+    if (haOdg && !haPiano) riga.stato = 'al server';
   }
 
   if (!riga.data_invio) delete riga.data_invio;
