@@ -28,14 +28,20 @@ ok('l\'ordine del giorno resta ordine del giorno', genereDalNome('MSG - ODG _25 
 
 /* Un piano letto: tre giornate a cavallo di una fine settimana, un viaggio. */
 const sc = (n, piu = {}) => ({ n, ie: 'EXT', m: 'Giorno', ambiente: 'STRADE BIANCHE', luogo: 'GINOSA', cast: ['1', '2'], pag: '1 1/8', note: '', ...piu });
+const GS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const MM = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+/* La riga di chiusura come la stampa il piano, col giorno della settimana giusto. */
+const chiusura = (n, data, pag = '1') => { const d = new Date(data + 'T12:00:00Z');
+  return `End of Day ${n} -- ${GS[d.getUTCDay()]} ${d.getUTCDate()} ${MM[d.getUTCMonth()]} ${d.getUTCFullYear()} -- ${pag} Pag --`; };
+const giorno = (n, data, piu = {}) => ({ n, data, chiusura: chiusura(n, data, piu.pagine), gs: '', orario: '', inizio: '', fine: '', pagine: '1', fineSettimana: null, scene: [sc('1')], ...piu });
 const LETTO = (piu = {}) => ({ titolo: 'MISSIONE SAN GENNARO', regista: '', versione: 'PdL 8 del 12 Novembre 2099',
-  attori: [{ id: '1', ruolo: 'PRINCIPE COLONNA' }],
+  attori: [{ id: '1', ruolo: 'PRINCIPE COLONNA' }, { id: '2', ruolo: 'GIUSEPPE NAVARRA' }, { id: '3M', ruolo: 'PAOLINO' }, { id: '4', ruolo: 'TERESA NAVARRA' }],
   giorni: [
-    { n: 25, data: '2099-11-14', inizio: '12.00', fine: '19.00', incerto: false, pagine: '7/8', settimana: 5,
-      scene: [sc('58End', { ie: 'INT', m: 'Notte', luogo: '', ambiente: 'CHIESA PAESE', note: 'STUNT' })] },
-    { n: 26, data: '2099-11-17', inizio: '16', fine: '24', incerto: true, pagine: '3/8', settimana: 6,
-      scene: [sc('2', { m: 'Alba' }), sc('3Apt', { m: 'Tramonto', luogo: 'ASCALESI' }), sc('', {})] },
-    { n: 27, data: '2099-11-18', inizio: '', fine: 'TBD', pagine: '3 6/8', settimana: 6, scene: [sc('3Pt')] }],
+    giorno(25, '2099-11-14', { orario: '12 / 19', inizio: '12.00', fine: '19.00', pagine: '7/8', fineSettimana: 5,
+      scene: [sc('58End', { ie: 'INT', m: 'Notte', luogo: '', ambiente: 'CHIESA PAESE', note: 'STUNT' })] }),
+    giorno(26, '2099-11-17', { orario: '16 / 24 oppure 17 / 01', inizio: '16', fine: '24', pagine: '3/8',
+      scene: [sc('2', { m: 'Alba' }), sc('3Apt', { m: 'Tramonto', luogo: 'ASCALESI' }), sc('', {})] }),
+    giorno(27, '2099-11-18', { orario: 'TBD', inizio: '', fine: 'TBD', pagine: '3 6/8', scene: [sc('3Pt')] })],
   viaggi: [{ data: '2099-11-16', destinazione: 'Napoli', etichetta: 'lunedì 16 novembre -- TRASFERIMENTO TROUPE A NAPOLI --' },
            { data: '2099-11-17', destinazione: 'Roma', etichetta: '' }, { data: 'boh', destinazione: 'X' }], ...piu });
 
@@ -44,7 +50,7 @@ const p = pianoPerApp(LETTO(), Date.parse('2099-11-12T18:00:00Z'));
 const g = p.settimane.flatMap(s => s.giorni);
 ok('le settimane come le segna il piano', p.settimane.map(s => [s.numero, s.label, s.giorni.length]), [[5, 'Settimana 5', 1], [6, 'Settimana 6', 2]]);
 ok('gli orari nella forma dell\'app', [g[0].ora_inizio, g[0].ora_fine], ['12:00', '19:00']);
-ok('"16 / 24" finisce a mezzanotte', [g[1].ora_inizio, g[1].ora_fine, g[1].ora_incerta], ['16:00', '00:00', true]);
+ok('"16 / 24 oppure 17 / 01": il primo, e incerto', [g[1].ora_inizio, g[1].ora_fine, g[1].ora_incerta], ['16:00', '00:00', true]);
 ok('⚠ senza orario è TBD, non un orario inventato', [g[2].ora_inizio, g[2].ora_fine], ['TBD', 'TBD']);
 ok('il giorno della settimana dalla data', [g[0].giorno_settimana, g[1].giorno_settimana], ['Saturday', 'Tuesday']);
 ok('giorno, notte, alba, tramonto', [g[0].scene[0].momento, g[1].scene[0].momento, g[1].scene[1].momento, g[2].scene[0].momento], ['N', 'M', 'E', 'D']);
@@ -57,16 +63,40 @@ ok('i totali', [p.totale_giorni, p.totale_scene, p.data_inizio, p.data_fine], [3
 ok('il viaggio, e solo in un giorno senza riprese', p.giorni_viaggio, [{ data: '2099-11-16', etichetta: 'TRASFERIMENTO NAPOLI' }]);
 ok('scritto dal server, col suo timbro', [p.daServer, p.caricatoIl], [true, '2099-11-12T18:00:00.000Z']);
 ok('senza settimane segnate: a sei giornate', pianoPerApp(LETTO({ giorni: Array.from({ length: 8 }, (_, i) =>
-  ({ n: i + 1, data: '2099-01-' + String(i + 1).padStart(2, '0'), settimana: null, scene: [sc('1')] })) })).settimane.map(s => s.giorni.length), [6, 2]);
+  giorno(i + 1, '2099-01-' + String(i + 1).padStart(2, '0'))) })).settimane.map(s => s.giorni.length), [6, 2]);
+/* Un segno di fine settimana saltato dal modello unisce due settimane: non sposta niente. */
+ok('le settimane dai segni "FINE Na SETTIMANA"', pianoPerApp(LETTO({ giorni: [1, 2, 3, 4, 5, 6, 7].map(i =>
+  giorno(i, '2099-01-0' + i, { fineSettimana: i === 2 ? 3 : i === 5 ? 4 : null })) })).settimane.map(s => [s.numero, s.giorni.length]), [[3, 2], [4, 3], [5, 2]]);
+
+console.log('\n── ⚠ la data si legge dalla riga copiata, non da quello che ha capito il modello ──');
+/* Successo davvero, alla seconda lettura del PdL 5: le righe giuste
+   davanti e quindici date spostate di un giorno. */
+const spostato = pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, data: '2099-11-16' } : x) }));
+ok('la data scritta male dal modello si corregge dalla riga', spostato.settimane.flatMap(s => s.giorni)[1].data, '2099-11-17');
+ok('e il piano resta buono', pianoLeggibile(spostato), null);
+ok('⚠ riga e data d\'accordo ma col giorno della settimana sbagliato: no',
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, chiusura: 'End of Day 26 -- lunedì 17 novembre 2099 -- 3/8 Pag --' } : x) }))),
+   'la giornata 26: il 2099-11-17 non è il giorno della settimana scritto sul piano');
+ok('⚠ la riga di un\'altra giornata: no',
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, chiusura: chiusura(27, '2099-11-18') } : x) }))),
+   'la chiusura della giornata 26 parla della giornata 27');
+ok('⚠ niente con cui controllare la data: no',
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map(x => ({ ...x, chiusura: '', gs: '' })) }))).slice(0, 51),
+   'la giornata 25 non ha il giorno della settimana per');
+ok('senza riga ma col giorno della settimana giusto: sì',
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map(x => ({ ...x, chiusura: '', gs: GS[new Date(x.data + 'T12:00:00Z').getUTCDay()] })) }))), null);
+ok('l\'orario dal testo copiato, anche se il modello lo sbaglia',
+   (({ ora_inizio, ora_fine, ora_incerta }) => [ora_inizio, ora_fine, ora_incerta])(pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) =>
+     i === 0 ? { ...x, orario: '13.30 / 21.30', inizio: '13.00', fine: '21.00' } : x) })).settimane[0].giorni[0]), ['13:30', '21:30', false]);
 
 console.log('\n── ⚠ un piano che non sta in piedi non si scrive ──');
 const cattivo = (piu) => pianoLeggibile(pianoPerApp(LETTO(piu)));
 ok('letto bene', pianoLeggibile(p), null);
 ok('una giornata sola', cattivo({ giorni: LETTO().giorni.slice(0, 1) }), 'meno di due giornate');
 ok('nessuna scena', cattivo({ giorni: LETTO().giorni.map(x => ({ ...x, scene: [] })) }), 'nessuna scena');
-ok('una giornata senza data', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, data: '17/11' } : x) }), 'la giornata 26 non ha la data');
-ok('la stessa giornata due volte', cattivo({ giorni: [...LETTO().giorni, { ...LETTO().giorni[2], data: '2099-11-19' }] }), 'la giornata 27 compare due volte');
-ok('date che tornano indietro', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 2 ? { ...x, data: '2099-11-15' } : x) }), 'le giornate 26 e 27 non sono in ordine');
+ok('una giornata senza data', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, data: '17/11', chiusura: 'End of Day 26', gs: '' } : x) }), 'la giornata 26 non ha la data');
+ok('la stessa giornata due volte', cattivo({ giorni: [...LETTO().giorni, giorno(27, '2099-11-19')] }), 'la giornata 27 compare due volte');
+ok('date che tornano indietro', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 2 ? giorno(27, '2099-11-15') : x) }), 'le giornate 26 e 27 non sono in ordine');
 ok('troppe giornate vuote', cattivo({ giorni: LETTO().giorni.map((x, i) => i ? { ...x, scene: [] } : x) }), '2 giornate su 3 senza scene');
 
 console.log('\n── il piano nuovo sopra quello che c\'è ──');
@@ -108,6 +138,7 @@ function mondo() {
         profiles: [{ id: 'u1', nome: 'Simone', cognome: 'Panetta' }, { id: 'u2', nome: 'Valerio', cognome: 'Leone' }],
         analyses: [{ id: 'a1', project_id: 'f1', created_at: '2099-01-01' }],
         pdl_versions: [{ analysis_id: 'a1', user_id: 'u1', data: JSON.parse(JSON.stringify(VECCHIO)), shooting_data: { 24: { scenes: { 16: 'done' } } } }],
+        cast_list: [{ id: 'c1', analysis_id: 'a1', user_id: 'u1', character_id: 1, nome: 'COLONNA', minore: false, fonte: 'provvisoria', pose_stimate: 12 }],
         posta: [], odg: [], push_appuntamenti: [], push_iscrizioni: [] };
   rotto = null; chiamate = [];
   risposte = { pdl: () => LETTO(), odg: () => ODG_LETTO, stop: 'end_turn', stato: 200 };
@@ -142,6 +173,8 @@ globalThis.fetch = async (url, opz = {}) => {
   if (!(tav in T)) return R({ message: 'tavola ignota ' + tav }, 404);
   const met = opz.method || 'GET';
   if (rotto === tav && met !== 'GET') return R({ message: 'guasto finto' }, 500);
+  if (rotto === 'cast-nuovo' && tav === 'cast_list' && met === 'POST' && JSON.parse(opz.body).some(r => r.nome === 'LA VOLPE')) return R({ message: 'guasto finto' }, 500);
+  if (met === 'DELETE') { const via = T[tav].filter(r => passa(r, [...u.searchParams.entries()])); T[tav] = T[tav].filter(r => !via.includes(r)); return R(null, 204); }
   if (rotto === 'colonne' && tav === 'posta' && /piano_stato/.test(u.search + (opz.body || ''))) return R({ code: '42703', message: 'column posta.piano_stato does not exist' }, 400);
   const params = [...u.searchParams.entries()];
   if (met === 'GET') {
@@ -206,6 +239,21 @@ ok('la mail è chiusa', [T.posta[0].stato, T.posta[0].nota], ['fatta', 'piano sc
 ok('una notifica a testa', T.push_appuntamenti.map(a => a.testo), Array(2).fill('Nuovo piano di lavorazione!\nPdL 8 del 12 Novembre 2099 · fino al 18 novembre'));
 ok('resta scritto com\'è andata', [T.posta[0].piano.scritto.scritto, T.posta[0].piano.scritto.tenute], [true, 2]);
 
+console.log('\n── la lista del cast dalla legenda del piano ──');
+const elenco = () => T.cast_list.map(c => [c.character_id, c.nome, c.minore, c.fonte]);
+ok('la lista ufficiale prende il posto della provvisoria', elenco(), [[1, 'PRINCIPE COLONNA', false, 'ufficiale'], [2, 'GIUSEPPE NAVARRA', false, 'ufficiale'],
+   [3, 'PAOLINO', true, 'ufficiale'], [4, 'TERESA NAVARRA', false, 'ufficiale']]);
+ok('attaccata allo spoglio del film', T.cast_list.every(c => c.analysis_id === 'a1' && c.user_id === 'u1'), true);
+ok('resta scritto', T.posta[0].piano.scritto.cast, { fatto: true, personaggi: 4, prima: 1 });
+{ const { aggiornaCast } = await import(RADICE + '/worker/piano.js');
+  const ids = T.cast_list.map(c => c.id).join();
+  ok('uguale a quella che c\'è: non si tocca', [(await aggiornaCast(PIANO, 'a1', 'u1', LETTO().attori)).motivo, T.cast_list.map(c => c.id).join() === ids], ['già uguale', true]);
+  ok('⚠ legenda mancante o monca: non si tocca', [(await aggiornaCast(PIANO, 'a1', 'u1', [{ id: '1', ruolo: 'X' }])).fatto, T.cast_list.length], [false, 4]);
+  rotto = 'cast-nuovo';
+  const r = await aggiornaCast(PIANO, 'a1', 'u1', [...LETTO().attori, { id: '5', ruolo: 'LA VOLPE' }]);
+  ok('⚠ se l\'inserimento fallisce torna quella di prima', [r.fatto, !!r.errore, T.cast_list.map(c => c.nome).length], [false, true, 4]);
+  rotto = null; }
+
 console.log('\n── ⚠ il server non ce la fa: torna al telefono ──');
 const cade = async (nome, prepara, motivo) => {
   mondo(); await posta.riceviPosta(mail([PDL]), PIANO, {}); prepara(); await cron(PIANO);
@@ -216,7 +264,8 @@ const cade = async (nome, prepara, motivo) => {
 await cade('il modello non risponde', () => { risposte.stato = 529; });
 await cade('lettura troncata', () => { risposte.stop = 'max_tokens'; }, /troncata/);
 await cade('risposta che non è JSON', () => { risposte.pdl = () => '{"titolo":"MSG","giorni":[{"n":1'; });
-await cade('date in disordine', () => { risposte.pdl = () => LETTO({ giorni: LETTO().giorni.map((x, i) => i === 2 ? { ...x, data: '2099-11-15' } : x) }); }, /non sono in ordine/);
+await cade('date in disordine', () => { risposte.pdl = () => LETTO({ giorni: LETTO().giorni.map((x, i) => i === 2 ? giorno(27, '2099-11-15') : x) }); }, /non sono in ordine/);
+await cade('giorno della settimana che non torna', () => { risposte.pdl = () => LETTO({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, chiusura: 'End of Day 26 -- lunedì 17 novembre 2099 --' } : x) }); }, /giorno della settimana/);
 await cade('la scrittura fallisce', () => { rotto = 'pdl_versions'; });
 await cade('il film non ha uno spoglio', () => { T.analyses = []; }, /spoglio/);
 

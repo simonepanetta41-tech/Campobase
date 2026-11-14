@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.136';
+const CB_VERSIONE = '1.137';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8463,6 +8463,16 @@ async function pianoCloudNuovo(){
     if (!p || !pianoCloudVince(p.data, pdlData)) return false;
     pianoAdotta(p.data, p.shooting_data || null);
     showToast('Piano di lavorazione aggiornato — ' + (pdlData.versione || 'nuova versione'), 'yellow', 4000);
+    /* Col piano il server aggiorna anche la lista del cast, dalla legenda
+       dei personaggi: si riprende quella, senza aspettare che l'app venga
+       riaperta. */
+    try {
+      const { data: cast } = await sb.rpc('cast_del_film', { p_film: f.id });
+      if (cast && cast.length) {
+        castData = cast; window.castData = castData;
+        renderCastTab(castData, castData[0] && castData[0].fonte === 'provvisoria');
+      }
+    } catch (e) { console.log('[piano] cast non ripreso:', e.message); }
     return true;
   } catch (e) {
     console.log('[piano] cloud non raggiungibile:', e.message);
