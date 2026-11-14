@@ -9,6 +9,15 @@
   "compatibility_date": "2026-11-05",
   "main": "worker/index.js",
 
+  // Prima di ogni pubblicazione gira questo controllo. Se trova l'app o
+  // il service worker vuoti o troncati, le versioni che non combaciano o
+  // un file del Worker che non si carica, esce con un errore: il deploy
+  // non parte e online resta la versione di prima. Vedi il file per il
+  // perche'.
+  "build": {
+    "command": "node test/controllo-rapido.mjs"
+  },
+
   // Il dominio proprio. Dichiararlo qui invece di attaccarlo a mano dal
   // pannello vuol dire che il deploy lo rimette da solo: se un giorno il
   // Worker viene ricreato, l'indirizzo torna su senza che qualcuno si

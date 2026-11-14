@@ -1,0 +1,13 @@
+#!/bin/sh
+# Prima di ogni push: il controllo rapido e poi tutta la serie dei test.
+# Se qualcosa e' rosso il push non parte.
+#
+# Si attiva una volta per copia del repo:  git config core.hooksPath .githooks
+# Il 14 novembre 2026 un sw.js vuoto e' andato online perche' prima del
+# push erano stati lanciati solo i test delle parti toccate.
+cd "$(git rev-parse --show-toplevel)" || exit 1
+node test/controllo-rapido.mjs || exit 1
+echo "serie completa dei test (un paio di minuti)…"
+esito=$(cd test && NODE_PATH=$(npm root -g) node prova.js 2>&1)
+echo "$esito" | tail -3
+echo "$esito" | grep -q "tutti passati" || { echo "$esito" | grep -vE "^\s*ok " | tail -30; echo "PUSH FERMATO: la serie non è tutta verde."; exit 1; }
