@@ -5015,7 +5015,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.135';
+const CB_VERSIONE = '1.136';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13463,7 +13463,9 @@ function pdlQuantoAvanti(v) {
   const t = String(v || '');
   // Il numero dev'essere attaccato alla sigla e non far parte di una data:
   // in "PDL del 30.10.2026" il trenta e' il giorno, non la versione.
-  const n = t.match(/PDL\s*#?\s*(\d{1,3})(?![\d.\/-])/i);
+  // ...e nemmeno di una data scritta col mese: in "PDL 02 SETTEMBRE" il
+  // due e' il giorno.
+  const n = t.match(/PDL\s*#?\s*(\d{1,3})(?![\d.\/-])(?!\s*(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre))/i);
   return { numero: n ? +n[1] : null, data: odgDataDaNome(t) };
 }
 

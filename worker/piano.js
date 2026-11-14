@@ -141,23 +141,32 @@ export function pianoLeggibile(p) {
    il giorno, non la versione. */
 const MESI = { gennaio: 1, febbraio: 2, marzo: 3, aprile: 4, maggio: 5, giugno: 6, luglio: 7, agosto: 8,
                settembre: 9, ottobre: 10, novembre: 11, dicembre: 12 };
-function quantoAvanti(v) {
+const MESE_RE = Object.keys(MESI).join('|');
+function quantoAvanti(v, anno) {
   const t = String(v || '');
-  const n = t.match(/PDL\s*#?\s*(\d{1,3})(?![\d.\/-])/i);
+  /* Il numero della versione sta attaccato alla sigla e non e' un giorno:
+     ne' "PDL del 30.10.2026" ne' "PDL 02 SETTEMBRE" hanno una versione. */
+  const n = t.match(new RegExp('PDL\\s*#?\\s*(\\d{1,3})(?![\\d.\\/-])(?!\\s*(?:' + MESE_RE + '))', 'i'));
   let data = null;
-  const a = t.match(/(\d{1,2})\s+([a-zà-ÿ]+)\s+(\d{4})/i);
-  if (a && MESI[a[2].toLowerCase()])
-    data = a[3] + '-' + String(MESI[a[2].toLowerCase()]).padStart(2, '0') + '-' + String(+a[1]).padStart(2, '0');
+  const a = t.match(new RegExp('(\\d{1,2})\\s+(' + MESE_RE + ')(?:\\s+(\\d{4}))?', 'i'));
+  if (a && (a[3] || anno))
+    data = (a[3] || anno) + '-' + String(MESI[a[2].toLowerCase()]).padStart(2, '0') + '-' + String(+a[1]).padStart(2, '0');
   else {
     const b = t.match(/(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2,4})/);
     if (b) data = (b[3].length === 2 ? '20' + b[3] : b[3]) + '-' + String(+b[2]).padStart(2, '0') + '-' + String(+b[1]).padStart(2, '0');
   }
   return { numero: n ? +n[1] : null, data };
 }
-export function pianoPiuVecchio(nuovo, vecchio) {
-  const a = quantoAvanti(nuovo), b = quantoAvanti(vecchio);
+/* `anno` serve ai piani che scrivono la data senza l'anno ("PDL 19
+   SETTEMBRE"): e' quello delle giornate del piano nuovo. */
+export function pianoPiuVecchio(nuovo, vecchio, anno) {
+  const a = quantoAvanti(nuovo, anno), b = quantoAvanti(vecchio, anno);
   if (a.numero != null && b.numero != null && a.numero !== b.numero) return a.numero < b.numero;
-  if (a.data && b.data && a.data !== b.data) return a.data < b.data;
+  if (a.data && b.data && a.data !== b.data) {
+    // Senza anno, a cavallo di capodanno: dicembre viene prima di gennaio.
+    if (Math.abs(Date.parse(a.data) - Date.parse(b.data)) > 200 * 86400000) return a.data > b.data;
+    return a.data < b.data;
+  }
   return false;            // nel dubbio si lascia passare
 }
 
@@ -209,7 +218,7 @@ export async function scriviPiano(env, riga, letto, opz = {}) {
   const c = (await db(env, `pdl_versions?select=data,user_id&analysis_id=eq.${an.id}&limit=1`) || [])[0];
   const vecchio = c && c.data && c.data.settimane ? c.data : null;
 
-  if (vecchio && pianoPiuVecchio(nuovo.versione, vecchio.versione))
+  if (vecchio && pianoPiuVecchio(nuovo.versione, vecchio.versione, (nuovo.data_inizio || '').slice(0, 4)))
     return { scritto: false, vecchio: true, versione: nuovo.versione, inUso: vecchio.versione || null };
 
   let proprietario = c && c.user_id;

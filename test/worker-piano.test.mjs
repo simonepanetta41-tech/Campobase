@@ -89,6 +89,13 @@ ok('e dalla data, se il numero non c\'è', pianoPiuVecchio('PDL del 30.10.2099',
 ok('"PDL del 30.10" non è la versione 30', pianoPiuVecchio('PDL del 30.10.2099', 'PdL 7 del 3 Novembre 2099'), true);
 ok('lo stesso piano non è più vecchio', pianoPiuVecchio('PdL 7 del 3 Novembre 2099', 'PdL 7 del 3 Novembre 2099'), false);
 ok('nel dubbio passa', pianoPiuVecchio('piano nuovo', 'PdL 7'), false);
+/* Visto su un piano vero: "PDL 02 SETTEMBRE". Il 2 e' il giorno, non la
+   versione: letto come versione, il piano del 2 ottobre sarebbe stato
+   "piu' vecchio" di quello del 30 settembre. */
+ok('⚠ "PDL 30 SETTEMBRE" poi "PDL 02 OTTOBRE": è più nuovo', pianoPiuVecchio('PDL 02 OTTOBRE', 'PDL 30 SETTEMBRE', '2099'), false);
+ok('⚠ e al contrario è più vecchio', pianoPiuVecchio('PDL 30 SETTEMBRE', 'PDL 02 OTTOBRE', '2099'), true);
+ok('data senza anno, a cavallo di capodanno', pianoPiuVecchio('PDL 08 GENNAIO', 'PDL 20 DICEMBRE', '2099'), false);
+ok('"PdL 7 del 3 Novembre" resta la versione 7', pianoPiuVecchio('PdL 7 del 3 Novembre 2099', 'PdL 8 del 1 Novembre 2099'), true);
 ok('la notifica', notificaPiano(u), 'Nuovo piano di lavorazione!\nPdL 8 del 12 Novembre 2099 · fino al 18 novembre');
 
 // ── Il mondo finto ──────────────────────────────────────────────────────────
