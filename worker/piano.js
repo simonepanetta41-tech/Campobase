@@ -116,11 +116,27 @@ export function orarioDaTesto(testo) {
            incerto: /\boppure\b|\bo\b|\btbd\b|\?/i.test(resto) };
 }
 
+/* "1 1/8", "6/8", "2" in ottavi di pagina; null se non e' una quantita'. */
+export function ottavi(t) {
+  const s = pulito(t);
+  let m = /^(?:(\d+)\s+)?(\d+)\/8$/.exec(s);
+  if (m) return (+(m[1] || 0)) * 8 + +m[2];
+  m = /^\d+$/.exec(s);
+  return m ? +s * 8 : null;
+}
+/* INT, EXT o INT/EXT, comunque lo scriva il piano ("I/E", "EXT/INT"). */
+function intExt(t) {
+  const s = pulito(t).toUpperCase().replace(/\./g, '');
+  const i = /\bI(NT)?\b/.test(s), e = /\bE(XT|ST)?\b/.test(s);
+  return i && e ? 'INT/EXT' : i ? 'INT' : e ? 'EXT' : s;
+}
+
 /* Il piano nella forma che l'app sa disegnare: e' quella che produce il
    suo lettore (index.html, pdlComponi), campo per campo. In piu' ci sono
    l'ambiente di ogni scena e il segno che l'ha scritto il server. */
 export function pianoPerApp(letto, adesso) {
   const problemi = [];
+  let nonVerificate = 0;
   const giorni = (letto.giorni || []).filter(g => g && Number.isFinite(+g.n)).map(g => {
     const n = +g.n;
     const delModello = /^\d{4}-\d{2}-\d{2}$/.test(String(g.data || '')) ? g.data : null;
@@ -139,7 +155,7 @@ export function pianoPerApp(letto, adesso) {
       const m = pulito(s.m);
       return {
         numero: pulito(s.n),
-        int_ext: pulito(s.ie).toUpperCase(),
+        int_ext: intExt(s.ie),
         momento: (MOMENTI.find(x => x[0].test(m)) || [0, 'D'])[1],
         location: pulito(s.luogo) || pulito(s.ambiente),
         ambiente: pulito(s.ambiente),
@@ -148,6 +164,14 @@ export function pianoPerApp(letto, adesso) {
         stunt: /stunt|\bstu\b/i.test(String(s.note || ''))
       };
     });
+    /* Le scene sono nella giornata giusta? Il piano scrive le pagine di
+       ogni scena e il totale della giornata sulla riga di chiusura: se la
+       somma non torna, una scena e' finita nella giornata accanto o e'
+       stata saltata. Visto davvero, su un piano di un'altra produzione. */
+    const totale = ottavi(g.pagine), parti = scene.map(x => ottavi(x.pagine));
+    if (scene.length && (totale == null || parti.includes(null))) nonVerificate++;
+    else if (totale != null && parti.reduce((x, y) => x + y, 0) !== totale)
+      problemi.push(`la giornata ${n}: le pagine delle scene non fanno il totale della giornata (${pulito(g.pagine)})`);
     const conta = {};
     scene.forEach(s => { if (s.location) conta[s.location] = (conta[s.location] || 0) + 1; });
     const o = orarioDaTesto(g.orario)
@@ -162,6 +186,9 @@ export function pianoPerApp(letto, adesso) {
       _sett: Number.isFinite(+g.settimana) && g.settimana != null ? +g.settimana : null
     };
   });
+
+  if (giorni.length && nonVerificate > giorni.length / 10)
+    problemi.push(`${nonVerificate} giornate su ${giorni.length} senza pagine con cui controllare le scene`);
 
   /* Le settimane dai segni "FINE Na SETTIMANA": la giornata col segno
      chiude la settimana N, quelle dopo sono della N+1. Un segno saltato

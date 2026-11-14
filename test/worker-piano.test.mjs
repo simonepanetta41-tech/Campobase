@@ -33,15 +33,15 @@ const MM = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'lugli
 /* La riga di chiusura come la stampa il piano, col giorno della settimana giusto. */
 const chiusura = (n, data, pag = '1') => { const d = new Date(data + 'T12:00:00Z');
   return `End of Day ${n} -- ${GS[d.getUTCDay()]} ${d.getUTCDate()} ${MM[d.getUTCMonth()]} ${d.getUTCFullYear()} -- ${pag} Pag --`; };
-const giorno = (n, data, piu = {}) => ({ n, data, chiusura: chiusura(n, data, piu.pagine), gs: '', orario: '', inizio: '', fine: '', pagine: '1', fineSettimana: null, scene: [sc('1')], ...piu });
+const giorno = (n, data, piu = {}) => ({ n, data, chiusura: chiusura(n, data, piu.pagine), gs: '', orario: '', inizio: '', fine: '', pagine: '1 1/8', fineSettimana: null, scene: [sc('1')], ...piu });
 const LETTO = (piu = {}) => ({ titolo: 'MISSIONE SAN GENNARO', regista: '', versione: 'PdL 8 del 12 Novembre 2099',
   attori: [{ id: '1', ruolo: 'PRINCIPE COLONNA' }, { id: '2', ruolo: 'GIUSEPPE NAVARRA' }, { id: '3M', ruolo: 'PAOLINO' }, { id: '4', ruolo: 'TERESA NAVARRA' }],
   giorni: [
     giorno(25, '2099-11-14', { orario: '12 / 19', inizio: '12.00', fine: '19.00', pagine: '7/8', fineSettimana: 5,
-      scene: [sc('58End', { ie: 'INT', m: 'Notte', luogo: '', ambiente: 'CHIESA PAESE', note: 'STUNT' })] }),
-    giorno(26, '2099-11-17', { orario: '16 / 24 oppure 17 / 01', inizio: '16', fine: '24', pagine: '3/8',
-      scene: [sc('2', { m: 'Alba' }), sc('3Apt', { m: 'Tramonto', luogo: 'ASCALESI' }), sc('', {})] }),
-    giorno(27, '2099-11-18', { orario: 'TBD', inizio: '', fine: 'TBD', pagine: '3 6/8', scene: [sc('3Pt')] })],
+      scene: [sc('58End', { ie: 'INT', m: 'Notte', luogo: '', ambiente: 'CHIESA PAESE', note: 'STUNT', pag: '7/8' })] }),
+    giorno(26, '2099-11-17', { orario: '16 / 24 oppure 17 / 01', inizio: '16', fine: '24', pagine: '3 3/8',
+      scene: [sc('2', { m: 'Alba', ie: 'I/E' }), sc('3Apt', { m: 'Tramonto', luogo: 'ASCALESI', pag: '2 2/8' }), sc('', {})] }),
+    giorno(27, '2099-11-18', { orario: 'TBD', inizio: '', fine: 'TBD', pagine: '2', scene: [sc('3Pt', { pag: '2' })] })],
   viaggi: [{ data: '2099-11-16', destinazione: 'Napoli', etichetta: 'lunedì 16 novembre -- TRASFERIMENTO TROUPE A NAPOLI --' },
            { data: '2099-11-17', destinazione: 'Roma', etichetta: '' }, { data: 'boh', destinazione: 'X' }], ...piu });
 
@@ -85,6 +85,13 @@ ok('⚠ niente con cui controllare la data: no',
    'la giornata 25 non ha il giorno della settimana per');
 ok('senza riga ma col giorno della settimana giusto: sì',
    pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map(x => ({ ...x, chiusura: '', gs: GS[new Date(x.data + 'T12:00:00Z').getUTCDay()] })) }))), null);
+/* Visto davvero: le due scene dell'ultima giornata finite in quella prima. */
+ok('⚠ una scena finita nella giornata accanto: le pagine non tornano',
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, scene: x.scene.slice(0, 1) } : i === 2 ? { ...x, scene: [...x.scene, sc('3Apt', { pag: '2 2/8' })] } : x) }))).slice(0, 72),
+   'la giornata 26: le pagine delle scene non fanno il totale della giornata');
+ok('⚠ troppe giornate senza pagine da controllare', /senza pagine con cui controllare/.test(
+   pianoLeggibile(pianoPerApp(LETTO({ giorni: LETTO().giorni.map(x => ({ ...x, pagine: '' })) })))), true);
+ok('"I/E" è INT/EXT', g[1].scene[0].int_ext, 'INT/EXT');
 ok('l\'orario dal testo copiato, anche se il modello lo sbaglia',
    (({ ora_inizio, ora_fine, ora_incerta }) => [ora_inizio, ora_fine, ora_incerta])(pianoPerApp(LETTO({ giorni: LETTO().giorni.map((x, i) =>
      i === 0 ? { ...x, orario: '13.30 / 21.30', inizio: '13.00', fine: '21.00' } : x) })).settimane[0].giorni[0]), ['13:30', '21:30', false]);
@@ -93,11 +100,12 @@ console.log('\n── ⚠ un piano che non sta in piedi non si scrive ──');
 const cattivo = (piu) => pianoLeggibile(pianoPerApp(LETTO(piu)));
 ok('letto bene', pianoLeggibile(p), null);
 ok('una giornata sola', cattivo({ giorni: LETTO().giorni.slice(0, 1) }), 'meno di due giornate');
-ok('nessuna scena', cattivo({ giorni: LETTO().giorni.map(x => ({ ...x, scene: [] })) }), 'nessuna scena');
+ok('nessuna scena', cattivo({ giorni: LETTO().giorni.map(x => ({ ...x, scene: [], pagine: '' })) }), 'nessuna scena');
 ok('una giornata senza data', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 1 ? { ...x, data: '17/11', chiusura: 'End of Day 26', gs: '' } : x) }), 'la giornata 26 non ha la data');
 ok('la stessa giornata due volte', cattivo({ giorni: [...LETTO().giorni, giorno(27, '2099-11-19')] }), 'la giornata 27 compare due volte');
 ok('date che tornano indietro', cattivo({ giorni: LETTO().giorni.map((x, i) => i === 2 ? giorno(27, '2099-11-15') : x) }), 'le giornate 26 e 27 non sono in ordine');
-ok('troppe giornate vuote', cattivo({ giorni: LETTO().giorni.map((x, i) => i ? { ...x, scene: [] } : x) }), '2 giornate su 3 senza scene');
+ok('troppe giornate vuote', cattivo({ giorni: LETTO().giorni.map((x, i) => i ? { ...x, scene: [], pagine: '' } : x) }), '2 giornate su 3 senza scene');
+ok('⚠ una giornata vuota che sul piano ha delle pagine: manca qualcosa', /non fanno il totale/.test(cattivo({ giorni: LETTO().giorni.map((x, i) => i ? { ...x, scene: [] } : x) })), true);
 
 console.log('\n── il piano nuovo sopra quello che c\'è ──');
 const VECCHIO = { titolo: 'MSG', versione: 'PdL 7 del 3 Novembre 2099', totale_giorni: 4, totale_scene: 4,
