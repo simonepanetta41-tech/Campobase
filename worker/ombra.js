@@ -46,21 +46,30 @@ export const OMBRA_SYS = `Leggi l'ordine del giorno di una produzione cinematogr
 
 Restituisci SOLO JSON compatto, senza backtick e senza testo attorno:
 {"numero":"","data":"","convocazione":"","prontiAGirare":"","pausa":"","catering":"","cestini":"","fineRiprese":"","fineLavorazione":"","ambiente":"","pagine":"",
+ "meteo":"","dawn":"","alba":"","tramonto":"","dusk":"","ospedale":"",
+ "luoghi":[{"nome":"","indirizzo":"","url":""}],
+ "contatti":[{"ruolo":"","nome":"","tel":""}],
  "scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}],
  "cast":[{"id":"","ruolo":"","interprete":"","scene":"","pickup":"","set":""}],
  "troupe":[{"reparto":"","ruolo":"","nome":"","partenza":"","set":""}],
  "fabbisogni":[{"reparto":"","voci":[{"scene":"","cosa":""}]}],
+ "domani":{"etichetta":"","scene":[{"n":"","ie":"","m":"","ambiente":"","sinossi":"","ids":"","pag":"","nota":""}],"fabbisogni":[{"reparto":"","voci":[{"scene":"","cosa":""}]}]},
  "tratte":[{"autista":"","tel":"","partenza":"","luogo":"","indirizzo":"","passeggeri":[""],"arrivo":"","destinazione":"","nota":""}]}
 
 numero: il numero dell'ordine del giorno ("24"). data: la data di lavorazione in formato AAAA-MM-GG.
 Gli orari sempre nel formato "07.30", col punto, anche dove il foglio per errore ha una virgola. convocazione: la convocazione generale della troupe. prontiAGirare, pausa (come è scritta: "Rotazione 20'", "13.00-14.00"), catering (l'ora), cestini (il numero), fineRiprese, fineLavorazione. Fine riprese e fine lavorazione sono due orari diversi: non scambiarli e non copiare l'uno nell'altro. Se uno dei due non c'è, lascialo vuoto.
 ambiente: l'ambiente o il set del giorno come è scritto in testa. pagine: il totale delle pagine del giorno ("6 6/8").
+meteo: la previsione come è scritta ("Nuvoloso"). dawn, alba, tramonto, dusk: i quattro orari della luce, nel formato "06.36".
+ospedale: il nome dell'ospedale più vicino e il suo indirizzo, su una riga sola, come sono scritti.
+luoghi: i posti della giornata che in testa al foglio hanno un link a una mappa — il set o la location, il campo base, i mezzi tecnici, il parcheggio. nome: l'etichetta che il foglio dà a quel posto ("CB/ MEZZI TECNICI", "LOCATION"), senza i due punti. indirizzo: quello scritto accanto, se c'è. url: il link, copiato carattere per carattere; se non sei sicuro di ogni carattere lascia fuori quel posto. Un posto senza link non va in luoghi; l'ospedale non va qui.
+contatti: le persone della produzione che in testa al foglio hanno un numero di telefono (organizzatore, direttore di produzione, ispettore, aiuto regista…). ruolo e nome come sono scritti; tel: sole cifre.
 
 scene: le scene del giorno nell'ordine della tabella. n è il numero esatto con le lettere (32END, 65C, 36PT). ie: E, I oppure I/E. m: la lettera della colonna G/N come è scritta (G giorno, N notte, ma anche A alba o T tramonto): non ricondurla a G o N. ids: i numeri del cast separati da virgola. pag: le pagine di quella scena per intero, come sono scritte — "6 6/8", "1", "3/8" — compreso il numero intero davanti agli ottavi. Subito prima c'è la colonna DAY, un numero solo (la giornata del racconto): quello non fa parte delle pagine. In "1, 2 4 3 3/8" gli ID sono 1 e 2, DAY è 4 e le pagine sono "3 3/8"; la somma delle pagine delle scene deve dare il totale scritto sotto la tabella.
 Una riga della tabella può essere alta e andare a capo: resta UNA scena. Una scena esiste solo dove c'è il suo numero nella colonna delle scene; il totale delle pagine e la colonna SCENE del cast ti dicono quante e quali sono. Una riga senza numero con una scritta sola (TRASFERIMENTO, PRANZO, SECOND UNIT) è uno stacco: rendila come {"n":"","nota":"TRASFERIMENTO"}.
 
 cast: una riga per interprete convocato, comprese le figurazioni speciali. scene: i numeri di scena di quella riga. pickup: la colonna P/UP. set: l'ultima colonna, SET. id e ruolo come sono stampati: non aggiungere fra parentesi il nome della tabella (figurazione, minori, stunt) e non cambiare l'id.
 troupe: tutte le persone sotto "CONVOCAZIONE TROUPE", ognuna con il reparto della sua intestazione. partenza e set sono le due colonne di orario: guarda sotto quale delle due intestazioni è stampato ogni valore e mettilo lì, lasciando vuota l'altra; "O.C.", "Vedi GA" e "--" riportali come stanno.
+domani: la tabella sotto "PROGRAMMA DEL GIORNO SUCCESSIVO", con le stesse regole delle scene. etichetta: giorno, data e fascia oraria come sono scritti nell'intestazione di quella tabella ("MARTEDI' 17 NOVEMBRE - 16.00-00.00"). Se sotto ha una sua griglia di fabbisogni, va in domani.fabbisogni. Se il foglio non ha quella tabella, domani vale null.
 fabbisogni: cosa serve quel giorno, reparto per reparto, con i nomi dei reparti alla lettera. Metti una voce sotto un reparto solo se sei sicuro che sia sua; nel dubbio lasciala fuori.
 
 tratte: dai giri auto, una per ogni viaggio — un mezzo che parte da un posto a un'ora con un gruppo di persone. Ogni produzione ordina le colonne a modo suo e lo scrive nell'intestazione: usa l'ordine che dichiara. partenza è l'ora del pick-up, arrivo quella di arrivo. passeggeri: i nomi come sono scritti sul foglio, uno per elemento, senza le annotazioni fra parentesi; un albergo, un indirizzo o un orario non sono passeggeri. autista: solo il nome, senza il tipo di mezzo (Van, Auto) che gli sta accanto. tel: sole cifre. partenza e arrivo sono sempre e solo orari. Una scritta nella stessa casella ("TBC", "da confermare") va in nota, e l'orario resta al suo posto: una casella con "TBC" e sotto "10.00" dà partenza "10.00" e nota "TBC". Se c'è solo la scritta e nessun orario, partenza resta vuota e la scritta va in nota. Se i giri auto non ci sono, tratte vale [].
