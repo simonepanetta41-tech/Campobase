@@ -35,13 +35,17 @@ console.log('\n── l\'ora di partenza la dicono i giri auto ──');
 await mostra({...BASE, pickup:{ora:'07.00',luogo:'TURSPORT HOTEL RESIDENCE'}});
 await p.waitForTimeout(200);
 ok('il numero grande è la convocazione', await p.evaluate(()=>document.querySelector('.odg-badge .o').textContent), '07.30');
-ok('e sotto c\'è il pick-up vero', await p.evaluate(()=>document.querySelector('.odg-badge .p').textContent), 'pick-up 07.00');
-ok('non dice più partenza 07.30', await p.evaluate(()=>/partenza/.test(document.querySelector('.odg-badge').textContent)), false);
+/* I due orari stanno affiancati, ognuno con la sua etichetta: prima quello
+   che succede prima. */
+const fianco=()=>p.evaluate(()=>{const e=document.querySelector('.odg-badge .p'); return e?[e.querySelector('.et').textContent, e.querySelector('b').textContent]:null;});
+ok('e accanto c\'è il pick-up vero', await fianco(), ['Pick-up','07.00']);
+ok('il pick-up viene prima della convocazione', await p.evaluate(()=>[...document.querySelectorAll('.odg-badge .ore .et')].map(e=>e.textContent)), ['Pick-up','Convocazione']);
+ok('non dice più partenza 07.30', await p.evaluate(()=>/partenza/i.test(document.querySelector('.odg-badge').textContent)), false);
 
 console.log('\n── senza giri auto vale la convocazione troupe ──');
 await mostra({...BASE, troupe: riga('06.30','07.30')});
 await p.waitForTimeout(150);
-ok('la partenza della tabella', await p.evaluate(()=>document.querySelector('.odg-badge .p')?.textContent||''), 'partenza 06.30');
+ok('la partenza della tabella', await fianco(), ['Partenza','06.30']);
 await mostra({...BASE});
 await p.waitForTimeout(150);
 ok('se coincide col grande, non si ripete', await p.evaluate(()=>!document.querySelector('.odg-badge .p')), true);

@@ -783,7 +783,14 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:1px solid rgba(245,197,66,.4);cursor:pointer}
 .odg-badge .r{flex:1;min-width:0;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--yellow)}
 .odg-badge .o{font-family:'DM Mono',monospace;font-size:27px;color:var(--yellow);line-height:1}
-.odg-badge .p{flex-basis:100%;font-size:11.5px;color:var(--white-dim)}
+.odg-badge.due{display:block}
+.odg-badge.due .r{display:block;margin-bottom:10px}
+.odg-badge .ore{display:flex;gap:10px}
+.odg-badge .ore>div{flex:1;min-width:0}
+.odg-badge .ore .c{border-left:1px solid rgba(245,197,66,.3);padding-left:14px}
+.odg-badge .et{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--white-dim);margin-bottom:4px}
+.odg-badge .ore b{font-family:'DM Mono',monospace;font-weight:400;font-size:25px;line-height:1;color:var(--white)}
+.odg-badge .ore b.o{color:var(--yellow)}
 
 .odg-chi{margin-top:13px;border:1px solid var(--border);border-radius:13px;overflow:hidden}
 .odg-chi .t{padding:14px 16px 2px;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600}
@@ -5015,7 +5022,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.139';
+const CB_VERSIONE = '1.140';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13249,10 +13256,20 @@ function odgBadgeHtml(d, io) {
     ? { ora: d.pickup.ora, voce: 'pick-up' }
     : (!d.pickup && mie.partenza && mie.partenza !== ora
         ? { ora: mie.partenza, voce: 'partenza' } : null);
+  const chi = `<span class="r">${[io.ruolo, io.reparto].filter(Boolean).map(esc).join(' · ')}</span>`;
+  /* Con un pick-up i due orari stanno affiancati, con lo stesso peso e
+     nell'ordine in cui succedono: il primo che serve la mattina e' quando
+     passa il van, e in piccolo sotto la convocazione non si vedeva. */
+  if (part) return `<div class="odg-badge due" onclick="odgCambiaIo()" title="Tocca per cambiare persona">
+    ${chi}
+    <div class="ore">
+      <div class="p"><span class="et">${part.voce === 'pick-up' ? 'Pick-up' : 'Partenza'}</span><b class="num">${esc(part.ora)}</b></div>
+      <div class="c"><span class="et">Convocazione</span><b class="o num">${esc(ora)}</b></div>
+    </div>
+  </div>`;
   return `<div class="odg-badge" onclick="odgCambiaIo()" title="Tocca per cambiare persona">
-    <span class="r">${[io.ruolo, io.reparto].filter(Boolean).map(esc).join(' · ')}</span>
+    ${chi}
     <span class="o num">${esc(ora)}</span>
-    ${part ? `<span class="p num">${part.voce} ${esc(part.ora)}</span>` : ''}
   </div>`;
 }
 

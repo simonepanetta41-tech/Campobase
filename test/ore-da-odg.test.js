@@ -85,7 +85,9 @@ console.log('\n── la stessa regola sulla scheda della convocazione ──');
    "12.30 · pick-up 13.00", cioe' il pick-up dopo la convocazione. */
 const scheda = (io, d) => p.evaluate(a=>{
   const h = odgBadgeHtml(a.d, a.io);
-  return [(/class="o num">([^<]*)</.exec(h)||[])[1], (/class="p num">([^<]*)</.exec(h)||[,''])[1]];
+  // Convocazione, e l'orario accanto con la sua etichetta ("pick-up 13.00").
+  const m = /class="p"><span class="et">([^<]*)<\/span><b class="num">([^<]*)</.exec(h);
+  return [(/class="o num">([^<]*)</.exec(h)||[])[1], m ? m[1].toLowerCase() + ' ' + m[2] : ''];
 }, {io, d});
 const D25 = {data:'2026-11-14', convocazione:'12.30', pickup:{ora:'13.00'}};
 ok('il data manager, col suo orario sotto "partenza"',
