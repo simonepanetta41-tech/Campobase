@@ -122,6 +122,33 @@ r=await p.evaluate(async(p7)=>{
 },P7);
 ok('senza niente sul cloud si salva come sempre', r, 1);
 
+console.log('\n── ⚠ l\'avviso una volta per piano, non una per apertura ──');
+/* Visto davvero: a ogni apertura dell'app tornava "Piano di lavorazione
+   aggiornato". All'avvio il piano non e' ancora in memoria, e quello del
+   cloud risultava nuovo tutte le volte. */
+await entra();
+r=await p.evaluate(async([p7,p8])=>{
+  let avvisi=0; const vero=showToast; showToast=(t)=>{ if(/Piano di lavorazione aggiornato/.test(t)) avvisi++; };
+  FINTO.cloud={data:p7,shooting_data:{}};
+  const riapri=async()=>{ pdlData=null; window.pdlData=null; return pianoCloudNuovo(); };   // come all'avvio
+  const out={};
+  await riapri(); out.primo=avvisi;
+  out.preso=!!pdlData;
+  await riapri(); await riapri(); out.riaperture=avvisi;
+  FINTO.cloud={data:p8,shooting_data:{}};
+  await riapri(); out.nuovo=avvisi;
+  await riapri(); out.dopo=avvisi;
+  filmCorrente=()=>({id:'f2',titolo:'ALTRO'}); FINTO.cloud={data:p7,shooting_data:{}};
+  await riapri(); out.altroFilm=avvisi;
+  showToast=vero; return out;
+},[P7,P8]);
+ok('la prima volta avvisa', r.primo, 1);
+ok('⚠ riaprendo l\'app non avvisa più', r.riaperture, 1);
+ok('ma il piano lo prende lo stesso', r.preso, true);
+ok('un piano nuovo avvisa', r.nuovo, 2);
+ok('una volta sola anche lui', r.dopo, 2);
+ok('ogni film il suo', r.altroFilm, 3);
+
 ok('nessun errore di pagina', errori, []);
 await b.close();
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');

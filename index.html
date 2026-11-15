@@ -5056,7 +5056,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.147';
+const CB_VERSIONE = '1.148';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8565,6 +8565,20 @@ function pianoAdotta(p, segnate){
   try { renderPdlDashboard(); } catch (e) { console.log('[piano] non ridisegnato:', e.message); }
 }
 
+/* Questo piano l'ho gia' annunciato su questo telefono? Il segno e' il
+   timbro del piano, film per film. Torna true la prima volta, e se lo segna. */
+const PIANO_VISTO = 'cb_piano_visto';
+function pianoNuovoDavvero(filmId, piano){
+  const timbro = String((piano && piano.caricatoIl) || '');
+  if (!filmId || !timbro) return false;
+  let visti = {};
+  try { visti = JSON.parse(localStorage.getItem(PIANO_VISTO) || '{}') || {}; } catch (_) {}
+  if (visti[filmId] === timbro) return false;
+  visti[filmId] = timbro;
+  try { localStorage.setItem(PIANO_VISTO, JSON.stringify(visti)); } catch (_) {}
+  return true;
+}
+
 /* Si guarda se sul cloud c'e' un piano piu' nuovo, come per l'ordine del
    giorno (odgCloudNuovo): a ogni ritorno sull'app. Torna true se l'ha
    cambiato. */
@@ -8578,7 +8592,12 @@ async function pianoCloudNuovo(){
     const p = (data || [])[0];
     if (!p || !pianoCloudVince(p.data, pdlData)) return false;
     pianoAdotta(p.data, p.shooting_data || null);
-    showToast('Piano di lavorazione aggiornato — ' + (pdlData.versione || 'nuova versione'), 'yellow', 4000);
+    /* L'avviso si da' una volta per piano, non una volta per apertura.
+       All'avvio il piano non e' ancora in memoria, quindi quello del cloud
+       "vince" sempre: senza questo segno l'avviso tornava ogni volta che
+       si apriva l'app. */
+    if (pianoNuovoDavvero(f.id, p.data))
+      showToast('Piano di lavorazione aggiornato — ' + (pdlData.versione || 'nuova versione'), 'yellow', 4000);
     /* Col piano il server aggiorna anche la lista del cast, dalla legenda
        dei personaggi: si riprende quella, senza aspettare che l'app venga
        riaperta. */
