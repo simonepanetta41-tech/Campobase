@@ -71,6 +71,11 @@ ok('l\'intestazione senza i numeri attorno', altra.map(x=>x.testa), ['EST. CASA 
 ok('il numero di pagina non entra nel testo', altra[0].blocchi.map(x=>x.t), ['Un casolare in collina domina il territorio circostante.']);
 ok('azione, nome, battuta', altra[1].blocchi.map(x=>x.k), ['azione','chi','battuta']);
 ok('le righe d\'azione si riuniscono', /davanti casa di Andrea/.test(altra[1].blocchi[0].t), true);
+/* L'ordine del giorno la chiama "92pt2", gli stralci "92". */
+ok('⚠ "92pt2" apre lo stralcio della 92', await p.evaluate(()=>[
+  odgHaStralcio({sceneggiatura:[{n:'92'},{n:'2'}]}, '92pt2'), odgHaStralcio({sceneggiatura:[{n:'92'}]}, '92Pt'),
+  odgHaStralcio({sceneggiatura:[{n:'58'}]}, '58END'), odgHaStralcio({sceneggiatura:[{n:'92'}]}, '93pt2'),
+  odgHaStralcio({sceneggiatura:[{n:'2'}]}, '92pt2')]), [true,true,true,false,false]);
 
 console.log('\n── il lettore ──');
 await p.evaluate(s=>{

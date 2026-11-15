@@ -5056,7 +5056,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.146';
+const CB_VERSIONE = '1.147';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -10230,7 +10230,10 @@ function odgStralci(testo) {
  * senza il suffisso — ma 65C resta 65C, perche' li' la lettera fa parte
  * del numero di scena, non dice che pezzo si gira.
  */
-const CODE_PARZIALI = /(END|PT|PTE|INIZIO|FINE|BIS)$/i;
+/* La coda che dice "e' un pezzo della scena": 58END, 37PT, e anche
+   92PT2 — la seconda parte della 92. Sta in un posto solo: prima era
+   scritta quattro volte, e il "2" di PT2 mancava in tutte. */
+const CODE_PARZIALI = /(END|PTE?|INIZIO|FINE|BIS)\d*$/i;
 function odgStralcioDi(stralci, n) {
   if (!stralci || !n) return null;
   const k = String(n).toUpperCase().replace(/\s+/g, '');
@@ -12408,7 +12411,7 @@ function odgStacco(s){
 function odgHaStralcio(d, n){
   if (!d || !n) return false;
   const k = String(n).toUpperCase().replace(/\s+/g,'');
-  const base = k.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'');
+  const base = k.replace(CODE_PARZIALI,'');
   const sc = d.sceneggiatura || [];
   if (sc.some(x => x.n === k || x.n === base)) return true;
   return !!odgStralcioDi(d.stralci, n);
@@ -12694,7 +12697,7 @@ async function odgApriScena(n){
     const k = String(numero).toUpperCase();
     const r = (d.scene||[]).find(x => {
       const a = String(x.n).toUpperCase().replace(/\s+/g,'');
-      return a === k || a.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'') === k;
+      return a === k || a.replace(CODE_PARZIALI,'') === k;
     });
     return r && r.ids ? r.ids : null;
   };
@@ -12724,7 +12727,7 @@ function odgVaiScena(n, subito){
   const scene = odgCorrente?.sceneggiatura || [];
   const k = String(n).toUpperCase().replace(/\s+/g,'');
   // "92PT2" sull'ordine del giorno e' la scena 92 degli stralci.
-  const base = k.replace(/(END|PTE?|INIZIO|FINE|BIS)\d*$/i,'');
+  const base = k.replace(CODE_PARZIALI,'');
   const sc = scene.find(x => x.n === k) || scene.find(x => x.n === base);
   if (!sc) return;
   // Sul PDF ci si sposta di pagina, sulla ricostruzione di sezione.
