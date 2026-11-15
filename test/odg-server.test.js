@@ -31,7 +31,8 @@ await p.addInitScript(()=>{
       },
       upsert:async()=>{ if(nome==='odg') window.FINTO.salvati++; return {error:null}; },
       update(){return {eq:async()=>({error:null})}},
-      single:async()=>({data:null}), maybeSingle:async()=>({data:null}),
+      single:async()=>({data: nome==='analyses' ? (window.FINTO.analisi||null) : null}),
+      maybeSingle:async()=>({data: nome==='projects' && window.FINTO.progetto ? window.FINTO.progetto : null}),
       then(ok){ return Promise.resolve({data:[],error:null}).then(ok); } };
     return q; };
   window.supabase={createClient:()=>({
@@ -193,6 +194,25 @@ ok('⚠ un film senza ordini del giorno resta vuoto', r.vuoto, null);
 ok('e non ha cancellato quello degli altri', r.ancora, '25');
 ok('⚠ telefono appena aggiornato, aperto sull\'altro film', r.vecchioAltrove, '35');
 ok('telefono appena aggiornato, aperto sul suo', r.vecchioSuo, '25');
+
+/* Il proprietario non entra nel suo film dalla scheda del film ma da
+   quella dell'analisi, che e' un'altra strada: da li' l'ordine del giorno
+   non veniva ripreso, e restava a schermo quello del film aperto prima. */
+await entra('Simone','Panetta');
+r=await p.evaluate(async(d)=>{
+  const A=Object.assign({},d,{numero:'25',data:'2026-11-14'}), B=Object.assign({},d,{numero:'35',data:'2026-04-16'});
+  FINTO.odg=[{project_id:'f1',data:A.data,dati:A},{project_id:'f2',data:B.data,dati:B}];
+  localStorage.setItem('cb_film', JSON.stringify({id:'f2',titolo:'PROVA'}));
+  filmCorrente=()=>{ try { return JSON.parse(localStorage.getItem('cb_film')||'null'); } catch(_) { return null; } };
+  await odgRipristina(); const prima=odgCorrente&&odgCorrente.numero;
+  FINTO.analisi={data:{titolo:'MSG',scene:[],personaggi:[]},notes:null,project_id:'f1'};
+  FINTO.progetto={id:'f1',titolo:'MSG',codice:'ABCD1234',casella:'x',user_id:'u-Panetta'};
+  try { await loadFromHistory('a1'); } catch(e) { return {errore:e.message}; }
+  await new Promise(r=>setTimeout(r,300));
+  return {prima, dopo:odgCorrente&&odgCorrente.numero, film:filmCorrente()&&filmCorrente().id};
+}, DATI());
+ok('nel film di prova c\'era il suo', r.prima, '35');
+ok('⚠ aprendo il proprio film dall\'analisi arriva il suo', [r.film, r.dopo], ['f1','25']);
 
 ok('nessun errore di pagina', errori, []);
 await b.close();

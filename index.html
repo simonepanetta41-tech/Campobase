@@ -3635,7 +3635,11 @@ async function loadFromHistory(id) {
   if (error || !data) { alert('Errore caricamento analisi'); return; }
   // Da qui in poi il film corrente e' questo: ci si appende la troupe,
   // l'ordine del giorno e, piu' avanti, la casella della posta.
-  if (data.project_id) filmCarica(data.project_id);
+  /* E l'ordine del giorno va ripreso per QUESTO film. Da qui non lo si
+     faceva: chi apriva il suo film dalla scheda dell'analisi si teneva a
+     schermo l'ordine del giorno del film aperto prima. */
+  if (data.project_id) filmCarica(data.project_id).then(() => odgRipristina()).then(() => postaControlla())
+    .catch(e => console.log('[film] ordine del giorno non ripreso:', e && e.message));
   pdfB64Array = []; modalPdfDoc = null;
   currentAnalysisId = id;
   hideHomeShowResults();
@@ -3834,7 +3838,8 @@ async function saveAnalysis(data) {
     data: { ...data, _owner_id: currentUser.id }
   }).select('id').single();
   currentAnalysisId = saved?.id || null;
-  if (projectId) filmCarica(projectId);
+  if (projectId) filmCarica(projectId).then(() => odgRipristina())
+    .catch(e => console.log('[film] ordine del giorno non ripreso:', e && e.message));
   if (saved?.id && projectId) await portaAvanti(projectId, saved.id);
 
   // Upload PDF to Supabase Storage (best effort, don't block on failure)
@@ -5051,7 +5056,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.143';
+const CB_VERSIONE = '1.144';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
