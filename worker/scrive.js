@@ -219,6 +219,8 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
   const d = datiPerApp(letto, riga, adesso);
   const manca = leggibile(d);
   if (manca) throw new Error('lettura insufficiente: ' + manca);
+  // L'indice degli stralci (stralci.js): scena → pagina, per l'app.
+  if (opz.stralciIndice && opz.stralciIndice.length) d.stralciIndice = opz.stralciIndice;
 
   const film = (await db(env, `projects?select=user_id,titolo&id=eq.${riga.project_id}&limit=1`) || [])[0];
   if (!film || !film.user_id) throw new Error('film senza proprietario');

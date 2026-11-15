@@ -40,14 +40,14 @@ const LETTO = {
 };
 
 // ── Il mondo finto ──────────────────────────────────────────────────────────
-let T, modello, rotto, documenti, smista, smistati;
+let T, modello, rotto, documenti, smista, smistati, indice, indici;
 function mondo() {
   T = { projects: [{ id: 'f1', casella: 'abc123', titolo: 'Missione San Gennaro', user_id: 'u1', mittente: null, marcatore: null }],
         film_membri: [{ project_id: 'f1', user_id: 'u1' }, { project_id: 'f1', user_id: 'u2' }, { project_id: 'f1', user_id: 'u3' }],
         profiles: [{ id: 'u1', nome: 'Simone', cognome: 'Panetta' }, { id: 'u2', nome: 'Valerio', cognome: 'Leone' },
                    { id: 'u3', nome: 'Rossella', cognome: 'Aprea' }],
         posta: [], odg: [], push_appuntamenti: [], push_iscrizioni: [] };
-  rotto = null; documenti = null; smista = []; smistati = [];
+  rotto = null; documenti = null; smista = []; smistati = []; indice = []; indici = 0;
   modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: {}, content: [{ type: 'text', text: JSON.stringify(LETTO) }] }), { status: 200 });
 }
 function passa(r, params) {
@@ -68,6 +68,11 @@ globalThis.fetch = async (url, opz = {}) => {
   const u = new URL(url); const R = (x, s = 200) => new Response(x === null ? null : JSON.stringify(x), { status: s });
   if (u.hostname === 'api.anthropic.com') {
     const corpo = JSON.parse(opz.body);
+    if (/stralci del giorno/.test(corpo.system)) {              // e' l'indice degli stralci
+      indici++;
+      if (indice === null) return new Response('{"error":"overloaded"}', { status: 529 });
+      return new Response(JSON.stringify({ usage: {}, content: [{ type: 'text', text: typeof indice === 'string' ? indice : JSON.stringify(indice) }] }), { status: 200 });
+    }
     if (/numerati/.test(corpo.system)) {                       // e' lo smistamento
       smistati.push(corpo.messages[0].content.filter(c => c.type === 'document').length);
       if (smista === null) return new Response('{"error":"overloaded"}', { status: 529 });
@@ -187,6 +192,35 @@ await arriva([ODG, MOV], SPENTO); await leggiInOmbra(SPENTO);
 ok('con l\'ordine del giorno: l\'allegato col dubbio, niente smistamento', [documenti[1], smistati], ['ALTRO ALLEGATO ' + MOV, []]);
 /* Senza che il server scriva l'ordine del giorno non c'e' niente da aspettare. */
 ok('smistamento acceso ma server spento: al telefono', await arriva([FOGLIO, MOV], { ...BASE, SMISTA: 'si' }), 'nuova');
+
+console.log('\n── l\'indice degli stralci: a che pagina comincia ogni scena ──');
+const { indicePulito, allegatoStralci } = await import(RADICE + '/worker/stralci.js');
+const STR = 'Stralci Gio 16 Apr.pdf';
+const CON = { ...BASE, OMBRA_SCRIVE: 'si', STRALCI: 'si' };
+ok('pulito: numeri, pagine, intestazioni', indicePulito([{ n: '2', p: 1, testa: 'EST.  CASA ANDREA - GIORNO' }, { n: '93', p: 2, testa: 'x' }, { n: ' 65c ', p: 2 }]),
+   [{ n: '2', p: 1, testa: 'EST. CASA ANDREA - GIORNO' }, { n: '93', p: 2, testa: 'x' }, { n: '65C', p: 2, testa: '' }]);
+/* Sul foglio c'e' stampato "149.": e' la pagina della sceneggiatura intera, non del file. */
+ok('⚠ il numero stampato sul foglio non è la pagina del file', indicePulito([{ n: '93', p: 149 }, { n: '94', p: 150 }]), []);
+ok('⚠ pagine che tornano indietro: non ci si fida di niente', indicePulito([{ n: '2', p: 1 }, { n: '93', p: 5 }, { n: '94', p: 3 }]), []);
+ok('una scena due volte, o senza numero: si scarta quella', indicePulito([{ n: '2', p: 1 }, { n: '2', p: 2 }, { n: 'TITOLI', p: 2 }, { n: '', p: 3 }, { n: '5', p: 'tre' }]).map(x => x.n), ['2']);
+ok('una risposta che non è una lista', indicePulito({ scene: [] }), []);
+ok('lo stralcio si trova dal nome', allegatoStralci([{ nome: ODG, tenuto: true, percorso: 'a' }, { nome: STR, tenuto: true, percorso: 'b' }]).nome, STR);
+ok('o da quello che ha detto lo smistamento', allegatoStralci([{ nome: 'letture.pdf', tenuto: true, percorso: 'b', smistato: true, genere: 'stralci' }]).nome, 'letture.pdf');
+ok('un "altro" che si chiama stralci non lo è più', allegatoStralci([{ nome: STR, tenuto: true, percorso: 'b', smistato: true, genere: 'altro' }]), null);
+
+mondo(); await posta.riceviPosta(mail([ODG, GIRI, STR]), CON, {});
+indice = [{ n: '2', p: 1, testa: 'EST. CASA ANDREA - GIORNO' }, { n: '93', p: 2, testa: 'EST/INT. CASA DI ANDREA - GIORNO' }];
+ok('letta', await leggiInOmbra(CON), 'fatta');
+ok('l\'indice arriva all\'app con l\'ordine del giorno', T.odg[0].dati.stralciIndice.map(x => x.n + '@' + x.p), ['2@1', '93@2']);
+ok('e resta scritto accanto alla lettura', T.posta[0].ombra.info.stralci.length, 2);
+mondo(); await posta.riceviPosta(mail([ODG, GIRI, STR]), CON, {}); indice = null;
+ok('⚠ se l\'indice non riesce l\'ordine del giorno si scrive lo stesso', [await leggiInOmbra(CON), T.odg.length, T.odg[0].dati.stralciIndice], ['fatta', 1, undefined]);
+mondo(); await posta.riceviPosta(mail([ODG, GIRI, STR]), CON, {}); indice = 'non lo so';
+ok('⚠ e anche se risponde a parole', [await leggiInOmbra(CON), T.odg.length], ['fatta', 1]);
+mondo(); await posta.riceviPosta(mail([ODG, GIRI]), CON, {});
+ok('senza stralci nella mail non si chiede niente', [await leggiInOmbra(CON), indici], ['fatta', 0]);
+mondo(); await posta.riceviPosta(mail([ODG, GIRI, STR]), { ...BASE, OMBRA_SCRIVE: 'si' }, {});
+ok('spento: non si chiede niente', [await leggiInOmbra({ ...BASE, OMBRA_SCRIVE: 'si' }), indici, T.odg[0].dati.stralciIndice], ['fatta', 0, undefined]);
 
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);

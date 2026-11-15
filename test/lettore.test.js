@@ -71,6 +71,40 @@ ok('l\'intestazione senza i numeri attorno', altra.map(x=>x.testa), ['EST. CASA 
 ok('il numero di pagina non entra nel testo', altra[0].blocchi.map(x=>x.t), ['Un casolare in collina domina il territorio circostante.']);
 ok('azione, nome, battuta', altra[1].blocchi.map(x=>x.k), ['azione','chi','battuta']);
 ok('le righe d\'azione si riuniscono', /davanti casa di Andrea/.test(altra[1].blocchi[0].t), true);
+console.log('\n── l\'indice degli stralci mandato dal server ──');
+/* Dove la lettura dai rientri non trova niente — un'impaginazione che non
+   conosce — le scene si aprono lo stesso, alla pagina detta dal server. */
+const ind = await p.evaluate(async ()=>{
+  const salvaVero = odgSalva; odgSalva = async()=>{};
+  const base = () => ({ data:'2026-04-16', numero:'35', troupe:[], scene:[{n:'93'}], allegati:[{nome:'letture.pdf',tipo:'stralci',percorso:'x'}] });
+  const out = {};
+  // 1. il telefono non legge niente (PDF non scaricabile): vale l'indice
+  odgByteDi = async()=>null;
+  odgCorrente = Object.assign(base(), { stralciIndice:[{n:'2',p:1,testa:'EST. CASA - GIORNO'},{n:'93',p:2,testa:''}] });
+  await odgStralciRipara();
+  out.soloIndice = odgCorrente.sceneggiatura.map(x=>x.n+'@'+x.p);
+  out.cliccabile = [odgHaStralcio(odgCorrente,'93'), odgHaStralcio(odgCorrente,'94')];
+  // 2. il telefono legge il PDF: dove ha letto vale la sua pagina, l'indice aggiunge il resto
+  odgByteDi = async()=>new ArrayBuffer(8);
+  odgTestoDaPdf = async()=>({ testo:'', righe:[
+    {x:54,p:1,t:'2   EST. CASA ANDREA - GIORNO   2'},{x:108,p:1,t:'Un casolare.'},
+    {x:54,p:3,t:'93   EST/INT. CASA DI ANDREA - GIORNO   93'},{x:108,p:3,t:'Una moto.'},{x:108,p:4,t:'Fine.'}] });
+  odgCorrente = Object.assign(base(), { stralciIndice:[{n:'2',p:1},{n:'93',p:2},{n:'94',p:4},{n:'88',p:9}] });
+  await odgStralciRipara();
+  out.insieme = odgCorrente.sceneggiatura.map(x=>x.n+'@'+x.p+(x.daIndice?'*':''));
+  // 3. senza indice: come sempre
+  odgCorrente = base();
+  await odgStralciRipara();
+  out.senza = odgCorrente.sceneggiatura.map(x=>x.n+'@'+x.p);
+  odgSalva = salvaVero; return out;
+});
+ok('⚠ il telefono non legge niente: valgono le pagine del server', ind.soloIndice, ['2@1','93@2']);
+ok('e le scene diventano cliccabili', ind.cliccabile, [true,false]);
+ok('⚠ dove il telefono ha letto, vale la sua pagina', ind.insieme.slice(0,2), ['2@1','93@3']);
+ok('l\'indice aggiunge solo quello che manca', ind.insieme[2], '94@4*');
+ok('⚠ una pagina che nel file non c\'è si scarta', ind.insieme.length, 3);
+ok('senza indice tutto come prima', ind.senza, ['2@1','93@3']);
+
 /* L'ordine del giorno la chiama "92pt2", gli stralci "92". */
 ok('⚠ "92pt2" apre lo stralcio della 92', await p.evaluate(()=>[
   odgHaStralcio({sceneggiatura:[{n:'92'},{n:'2'}]}, '92pt2'), odgHaStralcio({sceneggiatura:[{n:'92'}]}, '92Pt'),

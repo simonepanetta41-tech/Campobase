@@ -37,6 +37,7 @@
 import { avvisiDalServer } from './avvisi.js';
 import { scriviTutto, rilascia, rilasciaInRitardo, pianoInSospeso } from './scrive.js';
 import { smista, daSmistare, genereDi, toccaAlServer } from './smista.js';
+import { indiceStralci } from './stralci.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -325,13 +326,18 @@ export async function leggiInOmbra(env) {
          apre davvero — sono trentamila caratteri, una volta sola. */
       let avvisi = null, scritto = null;
       const letto = JSON.parse(j);          // se non e' JSON si finisce nel catch qui sotto
+      /* A che pagina comincia ogni scena negli stralci (stralci.js). Si
+         chiede a parte, a un modello piccolo, e non ferma niente: se non
+         riesce l'ordine del giorno si scrive senza. */
+      const stralciIndice = fatta === 'fatta' ? await indiceStralci(env, riga.allegati) : null;
+      if (stralciIndice) coda.stralci = stralciIndice;
       if (mia(riga) && !prova) {
         /* La troupe aspetta questa lettura. Intera: si scrive l'ordine del
            giorno e partono le notifiche (scrive.js). Troncata, o se la
            scrittura non riesce: si rilascia e ci pensa il telefono. */
         try {
           if (fatta !== 'fatta') throw new Error('lettura troncata');
-          scritto = await scriviTutto(env, riga, letto);
+          scritto = await scriviTutto(env, riga, letto, { stralciIndice });
         } catch (e) {
           scritto = { scritto: false, errore: String(e.message).slice(0, 200) };
           await rilascia(env, riga, scritto.errore);

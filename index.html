@@ -5063,7 +5063,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.149';
+const CB_VERSIONE = '1.150';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12686,11 +12686,38 @@ async function odgByteDi(att){
  * posta. Lo si rilegge una volta e si salva per tutti.
  */
 let odgStralciInCorso = false;
+
+/* L'indice che manda il server (worker/stralci.js): a che pagina comincia
+   ogni scena. Serve dove la lettura dai rientri non riesce — gli stralci
+   di un'altra produzione, impaginati in un altro modo. Ha la forma delle
+   scene lette dal telefono, ma senza il testo: basta per aprire il PDF
+   alla pagina giusta. */
+function odgSceneDaIndice(d, pagine){
+  return (d.stralciIndice || [])
+    .filter(x => x && x.n && (!pagine || (x.p >= 1 && x.p <= pagine)))
+    .map(x => ({ n: String(x.n).toUpperCase(), testa: x.testa || '', blocchi: [], p: x.p, daIndice: true }));
+}
+
 async function odgStralciRipara(){
   const d = odgCorrente;
-  if (!d || odgStralciInCorso || (d.sceneggiatura || []).length) return;
+  if (!d || odgStralciInCorso) return;
+  const lette = (d.sceneggiatura || []).filter(x => !x.daIndice);
+  // Gia' lette dal telefono, e l'indice non ha niente da aggiungere.
+  if (lette.length && !(d.stralciIndice || []).some(x => !lette.some(y => y.n === String(x.n).toUpperCase()))) return;
+  // Intanto l'indice, subito: le scene si aprono anche se il PDF tarda.
+  if (!(d.sceneggiatura || []).length && (d.stralciIndice || []).length) {
+    d.sceneggiatura = odgSceneDaIndice(d);
+    if (d.sceneggiatura.length) odgRender();
+  }
   const att = (d.allegati || []).find(a => a && a.tipo === 'stralci');
   if (!att || typeof pdfjsLib === 'undefined') return;
+  if (lette.length) {
+    // Il PDF e' gia' stato letto: si aggiungono solo le scene che ha in piu' l'indice.
+    const piu = odgSceneDaIndice(d).filter(x => !lette.some(y => y.n === x.n));
+    if (piu.length) { d.sceneggiatura = lette.concat(piu).sort((a, b) => (a.p || 0) - (b.p || 0)); odgRender(); }
+    return;
+  }
+  if (d.stralciRiletti) return;                         // il PDF si rilegge una volta sola
   odgStralciInCorso = true;
   try {
     const buf = await odgByteDi(att);
@@ -12699,9 +12726,18 @@ async function odgStralciRipara(){
     const f = new File([buf.slice(0)], att.nome || 'stralci.pdf', { type: 'application/pdf' });
     const r = await odgTestoDaPdf(f, true);
     const scene = stralciDaRighe(r.righe || []);
-    if (!scene.length || odgCorrente !== d) return;
-    d.sceneggiatura = scene;
-    d.stralci = odgStralci(r.testo);
+    if (odgCorrente !== d) return;
+    /* Dove il telefono la scena l'ha letta davvero, vale la sua: ha il
+       testo e la pagina misurata sul file. L'indice del server aggiunge
+       solo le scene che qui non si sono trovate, e solo se la pagina
+       esiste. */
+    const pagine = Math.max(0, ...(r.righe || []).map(x => x.p || 0));
+    const dalServer = odgSceneDaIndice(d, pagine).filter(x => !scene.some(y => y.n === x.n));
+    const tutte = scene.concat(dalServer).sort((a, b) => (a.p || 0) - (b.p || 0));
+    d.stralciRiletti = true;
+    if (!tutte.length) return;
+    d.sceneggiatura = tutte;
+    if (scene.length) d.stralci = odgStralci(r.testo);
     await odgSalva(d);
     odgRender();
   } catch (e) {
