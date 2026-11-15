@@ -21,6 +21,7 @@
  */
 import { db, firma, ragionamento, genereDalNome } from './ombra.js';
 import { rilascia } from './scrive.js';
+import { genereDi } from './smista.js';
 
 const MODELLO = 'claude-sonnet-5-5';
 const FINESTRA_ORE = 36;
@@ -426,7 +427,7 @@ const FINITE = ['fatta', 'tronca', 'saltata', 'errore'];
 /* La mail e' a posto se anche l'ordine del giorno, quando tocca al
    server, e' gia' stato scritto. Si chiude solo se e' ancora 'al server'. */
 async function chiudi(env, riga, nota) {
-  const haOdg = (riga.allegati || []).some(a => a && a.tenuto && genereDalNome(a.nome) === 'odg');
+  const haOdg = (riga.allegati || []).some(a => a && a.tenuto && genereDi(a) === 'odg');
   const odgInSospeso = haOdg && String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si' && !FINITE.includes(riga.ombra_stato);
   if (odgInSospeso) return false;
   await db(env, `posta?id=eq.${riga.id}&stato=eq.al%20server`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
@@ -455,7 +456,7 @@ export async function leggiPiano(env) {
   if (!riga) {
     righe = await db(env, campi + '&piano_stato=is.null&stato=in.(nuova,%22in%20analisi%22,fatta,%22al%20server%22)'
       + `&ricevuta=gte.${encodeURIComponent(da)}&order=ricevuta.desc&limit=5`) || [];
-    const ha = (r) => (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDalNome(a.nome) === 'pdl');
+    const ha = (r) => (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
     riga = righe.find(ha);
     // Le mail senza piano si segnano in un colpo solo, e non si riguardano.
     const senza = righe.filter(r => !ha(r)).map(r => r.id);
@@ -465,7 +466,7 @@ export async function leggiPiano(env) {
   if (!riga) return 'niente da leggere';
   const mia = scrive && !prova && riga.stato === 'al server';        // la troupe aspetta questo
 
-  const pdl = (riga.allegati || []).find(a => a && a.tenuto && a.percorso && genereDalNome(a.nome) === 'pdl');
+  const pdl = (riga.allegati || []).find(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
   if (!pdl) { await scrivi(env, riga.id, JSON.stringify({ piano_stato: 'saltata' })); return 'saltata: nessun piano'; }
 
   // Lo stesso piano inoltrato due volte si legge una volta sola.

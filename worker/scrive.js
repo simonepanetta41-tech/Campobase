@@ -33,6 +33,7 @@
 import { avvisaPosta } from './push.js';
 import { nomeCorrisponde, avvisiPer } from './avvisi.js';
 import { genereDalNome } from './ombra.js';
+import { genereDi } from './smista.js';
 
 export const ATTESA_MINUTI = 4;       // oltre, si rilascia e ci pensa il telefono
 
@@ -61,12 +62,14 @@ export function pagineNumero(s) {
   return n > 0 && n < 40 ? n : null;
 }
 
-function tipoDalNome(nome) {
-  const n = String(nome || '').toLowerCase().replace(/[_-]/g, ' ');
+/* Il tipo di un allegato come lo vuole l'app. Vale quello detto dallo
+   smistamento (smista.js), se c'e' stato; se no il nome. */
+function tipoDi(a) {
+  if (a && a.smistato) return ['odg', 'giri', 'stralci'].includes(a.genere) ? a.genere : null;
+  const n = String(a && a.nome || '').toLowerCase().replace(/[_-]/g, ' ');
   if (/stralc/.test(n)) return 'stralci';
-  if (genereDalNome(nome) === 'giri') return 'giri';
-  if (/\bodg\b|ordine\s*del\s*giorno|call\s*sheet/.test(n)) return 'odg';
-  return null;
+  const g = genereDalNome(a && a.nome);
+  return g === 'giri' || g === 'odg' ? g : null;
 }
 
 function scene(l) {
@@ -100,7 +103,7 @@ function fabbisogni(l) {
 export function datiPerApp(letto, riga, adesso) {
   const L = letto || {};
   const allegati = (riga && riga.allegati || []).filter(a => a && a.tenuto && a.percorso)
-    .map(a => ({ nome: a.nome, tipo: tipoDalNome(a.nome), percorso: a.percorso, file: null }));
+    .map(a => ({ nome: a.nome, tipo: tipoDi(a), percorso: a.percorso, file: null }));
   const odg = allegati.find(a => a.tipo === 'odg');
   const d = {
     daServer: true,
@@ -273,7 +276,7 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
    colonne di sql/piano.sql non ci sono) la risposta e' no: l'ordine del
    giorno non deve restare appeso a una cosa che non parte. */
 const ATTESA_PIANO_MINUTI = 8;
-const haPiano = (riga) => (riga.allegati || []).some(a => a && a.tenuto && genereDalNome(a.nome) === 'pdl');
+const haPiano = (riga) => (riga.allegati || []).some(a => a && a.tenuto && genereDi(a) === 'pdl');
 export async function pianoInSospeso(env, riga) {
   if (String(env.PIANO_SCRIVE || '').toLowerCase() !== 'si' || !haPiano(riga)) return false;
   try {
@@ -293,7 +296,7 @@ export async function rilascia(env, riga, motivo) {
   });
   if (!prese || !prese.length) return false;
   try {
-    const generi = (riga.allegati || []).filter(a => a && a.tenuto).map(a => genereDalNome(a.nome));
+    const generi = (riga.allegati || []).filter(a => a && a.tenuto).map(a => genereDi(a));
     await avvisaPosta(env, riga.project_id, ['odg', 'pdl'].filter(g => generi.includes(g)), riga.oggetto);
   } catch (e) { console.error('scrive: avviso di riserva non partito', e.message); }
   console.log('scrive: rilasciata al telefono —', motivo);

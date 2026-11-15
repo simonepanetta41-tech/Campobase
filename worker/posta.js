@@ -27,6 +27,7 @@ import { leggiMessaggio } from './mime.js';
    errore di programmazione. */
 import { avvisaPosta, avvisaMailDaParte } from './push.js';
 import { genereDalNome } from './ombra.js';
+import { daSmistare, toccaAlServer } from './smista.js';
 
 // Quello che vale la pena tenere. Le immagini no: nei pacchetti sono firme
 // e loghi della mail, non documenti.
@@ -359,11 +360,14 @@ export async function riceviPosta(message, env, ctx) {
    * Tutto il resto — DOOD, memo, alloggi — il server non lo apre: si
    * riconosce dal nome solo quello che serve (genereDalNome). */
   if (riga.stato === 'nuova') {
-    const si = (v) => String(v || '').toLowerCase() === 'si';
-    const generi = (riga.allegati || []).filter(v => v && v.tenuto && v.percorso).map(v => genereDalNome(v.nome));
-    const haOdg = generi.includes('odg'), haPiano = generi.includes('pdl');
-    const alTelefono = (haOdg && !si(env.OMBRA_SCRIVE)) || (haPiano && !si(env.PIANO_SCRIVE));
-    if ((haOdg || haPiano) && !alTelefono) riga.stato = 'al server';
+    if (toccaAlServer(env, riga.allegati)) riga.stato = 'al server';
+    /* Dai nomi non c'e' niente per il server, ma c'e' un PDF che non si
+       capisce cosa sia: lo guarda il server fra un minuto (smista.js), e
+       se non e' roba sua la mail torna qui com'era. Vale solo se il server
+       l'ordine del giorno lo scrive: se no non c'e' niente da aspettare. */
+    else if (String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si' && daSmistare(env, riga.allegati)
+             && !riga.allegati.some(v => v && v.tenuto && ['odg', 'pdl'].includes(genereDalNome(v.nome))))
+      riga.stato = 'al server';
   }
 
   if (!riga.data_invio) delete riga.data_invio;

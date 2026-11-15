@@ -36,6 +36,7 @@
 
 import { avvisiDalServer } from './avvisi.js';
 import { scriviTutto, rilascia, rilasciaInRitardo, pianoInSospeso } from './scrive.js';
+import { smista, daSmistare, genereDi, toccaAlServer } from './smista.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -199,15 +200,29 @@ export async function leggiInOmbra(env) {
   if (!riga) return 'niente da leggere';
   const tentativi = ((riga.ombra && riga.ombra.tentativi) || 0) + 1;
 
+  /* Prima di tutto, se serve, si capisce cosa sono gli allegati dal nome
+     strano (smista.js). Puo' cambiare tutto: una mail che sembrava senza
+     ordine del giorno ne ha uno, o non tocca affatto al server. */
+  if (!ripresa && daSmistare(env, riga.allegati)) {
+    riga.allegati = await smista(env, riga);
+    if (riga.stato === 'al server' && !toccaAlServer(env, riga.allegati)) {
+      // Guardati dentro, non c'e' niente che il server sappia leggere per
+      // intero: torna al telefono, con la notifica di sempre.
+      await db(env, `posta?id=eq.${riga.id}&ombra_stato=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ ombra_stato: 'saltata', ombra_il: new Date().toISOString(), ombra: { nota: 'smistata: niente per il server' } }) });
+      try { await rilascia(env, riga, 'smistata: niente che il server sappia leggere'); } catch (_) {}
+      return 'saltata: smistata, al telefono';
+    }
+  }
   const file = (riga.allegati || []).filter(a => a && a.tenuto && a.percorso)
-    .map(a => ({ ...a, genere: genereDalNome(a.nome) }));
+    .map(a => ({ ...a, genere: genereDi(a) }));
   const odg = file.find(a => a.genere === 'odg');
   const giri = file.find(a => a.genere === 'giri');
   /* Niente giri auto riconosciuti dal nome: se nella mail c'e' un altro PDF
      che non si sa cosa sia, lo si da' al modello dicendogli che forse sono
      quelli. Uno solo, e non enorme: un nome strano non deve costare il
      pick-up a tutta la troupe, ma nemmeno far leggere dieci allegati. */
-  const forse = giri ? null : file.find(a => a.genere == null && /\.pdf$/i.test(a.nome || '')
+  const forse = giri ? null : file.find(a => a.genere == null && !a.smistato && /\.pdf$/i.test(a.nome || '')
     && !daIgnorare(a.nome) && (a.byte || 0) < 3000000);
 
   /* Lo stesso ordine del giorno arriva spesso due o tre volte: l'inoltro
