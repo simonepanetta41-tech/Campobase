@@ -5051,7 +5051,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.142';
+const CB_VERSIONE = '1.143';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11040,6 +11040,17 @@ async function troupeCopiaMail(){
 }
 
 const ODG_LOCALE = 'cb_odg';
+/* Di quale film e' l'ordine del giorno tenuto sul telefono. Senza, chi ha
+   due film apriva il secondo e ci trovava l'ordine del giorno del primo:
+   quello sul telefono vinceva sempre, di chiunque fosse. */
+const ODG_LOCALE_FILM = 'cb_odg_film';
+function odgTieni(d){
+  try {
+    localStorage.setItem(ODG_LOCALE, JSON.stringify(d));
+    const f = filmCorrente();
+    localStorage.setItem(ODG_LOCALE_FILM, (f && f.id) || '');
+  } catch (_) {}
+}
 
 function odgFilm() {
   return (document.getElementById('tt-film')?.value || '').trim();
@@ -11055,7 +11066,7 @@ async function odgSalva(d, opzioni) {
   // Un ordine del giorno vecchio si salva sul cloud ma non diventa quello
   // che il telefono riapre domattina.
   if (!(opzioni && opzioni.nonMostrare)) {
-    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(d)); } catch (_) {}
+    odgTieni(d);
   }
   if (!currentUser || !d.data) return;
   const f = filmCorrente();
@@ -11208,7 +11219,7 @@ async function odgCloudNuovo(){
     let tolto = null; try { tolto = localStorage.getItem(ODG_TOLTO); } catch (_) {}
     if (!odgCloudVince(r, odgCorrente, tolto)) return false;
     odgCorrente = r.dati;
-    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(odgCorrente)); } catch (_) {}
+    odgTieni(odgCorrente);
     odgRicalcola();
     odgRender();
     odgPassatiCarica();
@@ -11221,19 +11232,31 @@ async function odgCloudNuovo(){
 }
 
 async function odgRipristina() {
+  const f = filmCorrente();
+  const qui = (f && f.id) || '';
+  let l = null, suo = null;
   try {
-    const l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
-    if (l) odgCorrente = l;
+    l = JSON.parse(localStorage.getItem(ODG_LOCALE) || 'null');
+    suo = localStorage.getItem(ODG_LOCALE_FILM);
   } catch (_) {}
+  // Quello sul telefono e' di un altro film: qui non si mostra. (Resta
+  // dov'e': tornando a quel film lo si ritrova, anche senza campo.)
+  if (l && suo !== null && suo !== qui) l = null;
+  // E si riparte sempre da qui: cambiando film senza chiudere l'app, in
+  // memoria c'e' ancora l'ordine del giorno di quello di prima.
+  odgCorrente = l;
   if (currentUser) {
     try {
-      const f = filmCorrente();
       const q = sb.from('odg').select('dati,data');
       // Sul film: anche quello caricato da un altro della troupe.
       const { data } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
         .order('data', { ascending: false }).limit(1);
       const r = data && data[0];
+      /* Un ordine del giorno tenuto prima che si segnasse il film: e' di
+         questo film solo se il cloud di questo film ha quella giornata. */
+      if (l && suo === null && f && !(r && r.data === l.data)) odgCorrente = null;
       if (odgCloudVince(r, odgCorrente)) odgCorrente = r.dati;
+      if (odgCorrente) odgTieni(odgCorrente);
     } catch (e) { console.log('[odg] cloud non raggiungibile:', e.message); }
   }
   odgRicalcola();
@@ -11742,7 +11765,7 @@ async function odgRimuovi() {
      dopo dieci secondi. Uno piu' nuovo, invece, arriva lo stesso. */
   try { localStorage.setItem(ODG_TOLTO, odgImpronta(odgCorrente)); } catch (_) {}
   odgCorrente = null; odgErrore = null;
-  try { localStorage.removeItem(ODG_LOCALE); } catch (_) {}
+  try { localStorage.removeItem(ODG_LOCALE); localStorage.removeItem(ODG_LOCALE_FILM); } catch (_) {}
   cbFileCancella('odg/');
   odgRender();
 }
@@ -13032,7 +13055,7 @@ async function odgRecupera() {
     }
     if (!r || !r.dati) { showToast('Sul cloud non c\'è nessun ordine del giorno.', 'red', 4000); return; }
     odgCorrente = r.dati;
-    try { localStorage.setItem(ODG_LOCALE, JSON.stringify(odgCorrente)); } catch (_) {}
+    odgTieni(odgCorrente);
     odgRicalcola();
     odgRender();
     showToast('Ripreso l\'ordine del giorno del ' + odgDataEstesa(r.data) + '.');

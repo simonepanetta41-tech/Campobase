@@ -25,6 +25,7 @@ await p.addInitScript(()=>{
       order(){return q},
       limit:async()=>{
         let r=(window.FINTO[nome]||[]).slice();
+        if(nome==='odg' && q._f.project_id) r=r.filter(x=>!x.project_id || x.project_id===q._f.project_id);
         if(q._in) r=r.filter(x=>q._in[1].includes(x[q._in[0]]));
         return {data:r,error:null};
       },
@@ -162,6 +163,36 @@ r=await p.evaluate(async(d)=>{
 ok('c\'era, e si toglie', [r.prima,r.tolto], [true,true]);
 ok('⚠ non ritorna da solo dopo dieci secondi', r.dopo, false);
 ok('quello di domani arriva lo stesso', r.nuovo, '26');
+
+console.log('\n── ⚠ due film sullo stesso telefono ──');
+/* Visto davvero: aperto un secondo film, ci si trovava l'ordine del giorno
+   del primo. Quello tenuto sul telefono vinceva sempre, di chiunque fosse. */
+await entra('Simone','Panetta');
+r=await p.evaluate(async(d)=>{
+  const A=Object.assign({},d,{numero:'25',data:'2026-11-14'}), B=Object.assign({},d,{numero:'35',data:'2026-04-16'});
+  FINTO.odg=[{project_id:'f1',data:A.data,dati:A},{project_id:'f2',data:B.data,dati:B}];
+  const film=(id)=>{ filmCorrente=()=>({id,titolo:id}); };
+  const out={};
+  film('f1'); await odgRipristina(); out.primo=odgCorrente&&odgCorrente.numero;
+  film('f2'); await odgRipristina(); out.secondo=odgCorrente&&odgCorrente.numero;
+  film('f1'); await odgRipristina(); out.ritorno=odgCorrente&&odgCorrente.numero;
+  // un terzo film senza ordini del giorno: non eredita quello di un altro
+  film('f3'); FINTO.odg=FINTO.odg.map(x=>x); await odgRipristina(); out.vuoto=odgCorrente;
+  film('f1'); await odgRipristina(); out.ancora=odgCorrente&&odgCorrente.numero;
+  // un telefono aggiornato adesso: l'ordine del giorno c'è, ma di quale film non è segnato
+  localStorage.removeItem('cb_odg_film'); odgCorrente=null;
+  film('f2'); await odgRipristina(); out.vecchioAltrove=odgCorrente&&odgCorrente.numero;
+  localStorage.setItem('cb_odg', JSON.stringify(A)); localStorage.removeItem('cb_odg_film'); odgCorrente=null;
+  film('f1'); await odgRipristina(); out.vecchioSuo=odgCorrente&&odgCorrente.numero;
+  return out;
+}, DATI());
+ok('nel primo film il suo', r.primo, '25');
+ok('⚠ nel secondo il suo, anche se è di una data più vecchia', r.secondo, '35');
+ok('tornando al primo, di nuovo il suo', r.ritorno, '25');
+ok('⚠ un film senza ordini del giorno resta vuoto', r.vuoto, null);
+ok('e non ha cancellato quello degli altri', r.ancora, '25');
+ok('⚠ telefono appena aggiornato, aperto sull\'altro film', r.vecchioAltrove, '35');
+ok('telefono appena aggiornato, aperto sul suo', r.vecchioSuo, '25');
 
 ok('nessun errore di pagina', errori, []);
 await b.close();
