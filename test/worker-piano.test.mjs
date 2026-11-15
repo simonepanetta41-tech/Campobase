@@ -135,6 +135,7 @@ ok('⚠ e al contrario è più vecchio', pianoPiuVecchio('PDL 30 SETTEMBRE', 'PD
 ok('data senza anno, a cavallo di capodanno', pianoPiuVecchio('PDL 08 GENNAIO', 'PDL 20 DICEMBRE', '2099'), false);
 ok('"PdL 7 del 3 Novembre" resta la versione 7', pianoPiuVecchio('PdL 7 del 3 Novembre 2099', 'PdL 8 del 1 Novembre 2099'), true);
 ok('la notifica', notificaPiano(u), 'Nuovo piano di lavorazione!\nPdL 8 del 12 Novembre 2099 · fino al 18 novembre');
+ok('senza "bozza" davanti', notificaPiano({ ...u, versione: 'bozza PdL 6 del 30 Ottobre 2099' }), 'Nuovo piano di lavorazione!\nPdL 6 del 30 Ottobre 2099 · fino al 18 novembre');
 
 // ── Il mondo finto ──────────────────────────────────────────────────────────
 let T, risposte, rotto, chiamate;

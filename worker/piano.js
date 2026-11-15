@@ -317,7 +317,11 @@ const MESI_IT = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', '
 export function notificaPiano(p) {
   const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(p.data_fine || ''));
   return 'Nuovo piano di lavorazione!\n'
-    + [p.versione, d ? 'fino al ' + (+d[3]) + ' ' + MESI_IT[+d[2] - 1] : ''].filter(Boolean).join(' · ');
+    /* "bozza PdL 6 del 30 Ottobre": sul foglio c'e' scritto cosi', ma in
+       una notifica "bozza" davanti stona. Nel piano la versione resta
+       com'e' stampata. */
+    + [String(p.versione || '').replace(/^\s*bozza\s+/i, ''),
+       d ? 'fino al ' + (+d[3]) + ' ' + MESI_IT[+d[2] - 1] : ''].filter(Boolean).join(' · ');
 }
 
 /* Scrive il piano dove i telefoni lo cercano e avvisa la troupe.
