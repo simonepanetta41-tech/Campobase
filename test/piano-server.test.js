@@ -128,7 +128,7 @@ console.log('\n── ⚠ l\'avviso una volta per piano, non una per apertura �
    cloud risultava nuovo tutte le volte. */
 await entra();
 r=await p.evaluate(async([p7,p8])=>{
-  let avvisi=0; const vero=showToast; showToast=(t)=>{ if(/Piano di lavorazione aggiornato/.test(t)) avvisi++; };
+  let avvisi=0; const vero=pianoAvvisa; pianoAvvisa=(x)=>{ avvisi++; vero(x); };
   FINTO.cloud={data:p7,shooting_data:{}};
   const riapri=async()=>{ pdlData=null; window.pdlData=null; return pianoCloudNuovo(); };   // come all'avvio
   const out={};
@@ -140,7 +140,15 @@ r=await p.evaluate(async([p7,p8])=>{
   await riapri(); out.dopo=avvisi;
   filmCorrente=()=>({id:'f2',titolo:'ALTRO'}); FINTO.cloud={data:p7,shooting_data:{}};
   await riapri(); out.altroFilm=avvisi;
-  showToast=vero; return out;
+  pianoAvvisa=vero;
+  out.aperto=document.getElementById('pianoPop').classList.contains('on');
+  out.testo=document.getElementById('pianoPop').innerText.replace(/\s+/g,' ').trim();
+  document.querySelector('#pianoPop .si').click();
+  out.chiuso=!document.getElementById('pianoPop').classList.contains('on');
+  out.testi=[pianoAvvisoTesti({versione:'bozza PdL 6 del 30 Ottobre 2026',data_fine:'2026-11-30'}),
+             pianoAvvisoTesti({versione:'PDL 02 SETTEMBRE',data_fine:'2026-10-09'}),
+             pianoAvvisoTesti({versione:'',data_fine:null})];
+  return out;
 },[P7,P8]);
 ok('la prima volta avvisa', r.primo, 1);
 ok('⚠ riaprendo l\'app non avvisa più', r.riaperture, 1);
@@ -148,6 +156,12 @@ ok('ma il piano lo prende lo stesso', r.preso, true);
 ok('un piano nuovo avvisa', r.nuovo, 2);
 ok('una volta sola anche lui', r.dopo, 2);
 ok('ogni film il suo', r.altroFilm, 3);
+ok('l\'avviso sta al centro e aspetta', r.aperto, true);
+ok('con la versione in grande e i due tasti', /PIANO DI LAVORAZIONE PdL 7 del 3 novembre · fino al 18 novembre Ho capito Vedi il piano/i.test(r.testo), true);
+ok('"Vedi il piano" lo chiude', r.chiuso, true);
+ok('senza "bozza" e senza l\'anno', r.testi[0], {titolo:'PdL 6', sotto:'del 30 ottobre · fino al 30 novembre'});
+ok('una versione scritta in un altro modo resta intera', r.testi[1], {titolo:'PDL 02 SETTEMBRE', sotto:'fino al 9 ottobre'});
+ok('senza versione dice comunque qualcosa', r.testi[2], {titolo:'Nuova versione', sotto:''});
 
 ok('nessun errore di pagina', errori, []);
 await b.close();

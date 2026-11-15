@@ -540,9 +540,15 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 /* Il richiamo alla prima apertura. Questo si tocca, a differenza
    dell'avviso della posta: mostra la voce per intero, e se e' una riga
    sola l'hai gia' letta e hai finito. */
-#fabPop{position:fixed;inset:0;z-index:9997;display:none;align-items:center;
+#fabPop,#pianoPop{position:fixed;inset:0;z-index:9997;display:none;align-items:center;
   justify-content:center;padding:28px;background:rgba(0,0,0,.55)}
-#fabPop.on{display:flex}
+#fabPop.on,#pianoPop.on{display:flex}
+/* L'avviso del piano nuovo: la versione in grande, al centro. */
+#pianoPop .fabpop-c{text-align:center}
+#pianoPop .so{font-size:11px;letter-spacing:.09em;color:var(--white-dim);text-transform:uppercase;margin-bottom:8px}
+#pianoPop .tt{font-size:24px}
+#pianoPop .gi{margin-top:6px;font-size:13.5px;line-height:1.45;color:var(--white-dim)}
+#pianoPop .fabpop-b{margin-top:20px}
 .fabpop-c{background:var(--surface);border:1px solid var(--yellow);border-radius:18px;
   padding:24px 22px 18px;max-width:320px;width:100%;text-align:center;
   box-shadow:0 18px 50px rgba(0,0,0,.6)}
@@ -2180,6 +2186,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <div id="odgScena" style="display:none"></div>
       <div id="odgFab"></div>
       <div id="fabPop"></div>
+      <div id="pianoPop"></div>
       <div id="odgMeteo"></div>
 
       <!-- ANALISI — il reparto e le categorie che si vogliono vedere.
@@ -5056,7 +5063,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.148';
+const CB_VERSIONE = '1.149';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8565,6 +8572,40 @@ function pianoAdotta(p, segnate){
   try { renderPdlDashboard(); } catch (e) { console.log('[piano] non ridisegnato:', e.message); }
 }
 
+/* L'avviso del piano nuovo: al centro, e resta finche' non lo si chiude.
+ * Prima era una striscia in alto che spariva da sola in quattro secondi,
+ * e un piano nuovo e' una cosa che si deve aver visto.
+ *
+ * "bozza PdL 6 del 30 Ottobre 2026" diventa "PdL 6" in grande e sotto
+ * "del 30 ottobre · fino al 30 novembre".
+ */
+const PIANO_MESI = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+function pianoAvvisoTesti(piano){
+  const v = String((piano && piano.versione) || '').replace(/^\s*bozza\s+/i, '').replace(/\s+/g, ' ').trim();
+  const m = /^(.*?)\s+(del(?:l[' ]|\s).+)$/i.exec(v);
+  const titolo = (m ? m[1] : v) || 'Nuova versione';
+  // L'anno non serve, e il mese si scrive minuscolo come nel resto dell'app.
+  const del = m ? m[2].replace(/\s+\d{4}\b/, '').toLowerCase() : '';
+  const f = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String((piano && piano.data_fine) || ''));
+  const fino = f ? 'fino al ' + (+f[3]) + ' ' + PIANO_MESI[+f[2] - 1] : '';
+  return { titolo, sotto: [del, fino].filter(Boolean).join(' · ') };
+}
+function pianoAvvisa(piano){
+  const el = document.getElementById('pianoPop');
+  if (!el) return;
+  const t = pianoAvvisoTesti(piano);
+  el.innerHTML = `<div class="fabpop-c">
+    <div class="so">Piano di lavorazione</div>
+    <div class="tt">${esc(t.titolo)}</div>
+    ${t.sotto ? `<div class="gi">${esc(t.sotto)}</div>` : ''}
+    <div class="fabpop-b">
+      <button class="no" onclick="pianoPopChiudi()">Ho capito</button>
+      <button class="si" onclick="pianoPopChiudi();switchResultTab('piano')">Vedi il piano</button>
+    </div></div>`;
+  el.classList.add('on');
+}
+function pianoPopChiudi(){ document.getElementById('pianoPop')?.classList.remove('on'); }
+
 /* Questo piano l'ho gia' annunciato su questo telefono? Il segno e' il
    timbro del piano, film per film. Torna true la prima volta, e se lo segna. */
 const PIANO_VISTO = 'cb_piano_visto';
@@ -8596,8 +8637,7 @@ async function pianoCloudNuovo(){
        All'avvio il piano non e' ancora in memoria, quindi quello del cloud
        "vince" sempre: senza questo segno l'avviso tornava ogni volta che
        si apriva l'app. */
-    if (pianoNuovoDavvero(f.id, p.data))
-      showToast('Piano di lavorazione aggiornato — ' + (pdlData.versione || 'nuova versione'), 'yellow', 4000);
+    if (pianoNuovoDavvero(f.id, p.data)) pianoAvvisa(pdlData);
     /* Col piano il server aggiorna anche la lista del cast, dalla legenda
        dei personaggi: si riprende quella, senza aspettare che l'app venga
        riaperta. */
