@@ -5056,7 +5056,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.145';
+const CB_VERSIONE = '1.146';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -8827,6 +8827,8 @@ const ODG_POSTI = [
   ['SET',            'Set'],
   ['LOCATION',       'Location'],
   ['CATERING',       'Catering'],
+  // "N° BUFFET: Catering/Running Lunch presso SET": e' dove si mangia.
+  ['BUFFET',         'Catering'],
   ['PARCHEGGIO',     'Parcheggio'],
   ['TRUCCO',         'Trucco e costumi'],
   ['OSPEDALE',       'Ospedale']
@@ -10107,13 +10109,22 @@ function stralciDaRighe(righe){
      tacca, con l'azione classificata come battuta e la battuta come nome.
      Senza intestazioni si ripiega sul piu' piccolo fra i rientri usati
      davvero, scartando i margini. */
+  /* In altri stralci il numero di scena non sta da solo nel margine: sta
+     sulla stessa riga dell'intestazione, prima e dopo — "93   EST/INT.
+     CASA DI ANDREA - GIORNO   93" — e il PDF la da' come una riga sola che
+     comincia col numero. Non cominciando per INT o EST non veniva
+     riconosciuta, e di scene non se ne trovava nessuna. */
+  const FUSA = /^(\d{1,3}[A-Za-z]{0,3})\s+((?:INT|EST|EXT|I\/E)\b[^]*?-\s*(?:GIORNO|NOTTE|ALBA|TRAMONTO|SERA|MATTINA|CONTINUA)[^]*?)(?:\s+\1)?\s*\*?$/i;
+
   const slug = righe.filter(r => SLUG.test(r.t));
   let azione;
   if (slug.length) {
     azione = Math.min(...slug.map(r => r.x));
   } else {
     const conta = new Map();
-    righe.filter(r => r.x < maxX * 0.6)
+    // Le intestazioni col numero davanti cominciano nel margine, dove sta
+    // il numero: non dicono dov'e' l'azione, e qui non si contano.
+    righe.filter(r => r.x < maxX * 0.6 && !FUSA.test(String(r.t).trim()))
          .forEach(r => conta.set(r.x, (conta.get(r.x)||0) + 1));
     const usati = [...conta.entries()].filter(([,n]) => n >= righe.length * 0.08);
     azione = usati.length ? Math.min(...usati.map(([x]) => x)) : 0;
@@ -10149,6 +10160,12 @@ function stralciDaRighe(righe){
   const scene = [];
   let corrente = null, ultimoNumero = null;
   for (const r of righe) {
+    const fusa = FUSA.exec(String(r.t).trim());
+    if (fusa) {
+      corrente = { n: fusa[1].toUpperCase(), testa: fusa[2].trim(), righe: [], p: r.p };
+      scene.push(corrente);
+      continue;
+    }
     const k = tipo(r);
     if (k === 'segno') continue;
     if (k === 'numero') { ultimoNumero = numero(r.t); continue; }
@@ -11699,7 +11716,7 @@ async function pushAppuntamenti(d){
    e gli ordini del giorno gia' salvati si rileggono da soli. Senza, la
    correzione valeva solo sul prossimo OdG — e quello di domani sera uno
    ce l'ha gia' in tasca con il nome sbagliato. */
-const ODG_LUOGHI_V = 1;
+const ODG_LUOGHI_V = 2;
 
 function odgRicalcola() {
   const d = odgCorrente;
@@ -12706,7 +12723,8 @@ async function odgApriScena(n){
 function odgVaiScena(n, subito){
   const scene = odgCorrente?.sceneggiatura || [];
   const k = String(n).toUpperCase().replace(/\s+/g,'');
-  const base = k.replace(/(END|PT|PTE|INIZIO|FINE|BIS)$/i,'');
+  // "92PT2" sull'ordine del giorno e' la scena 92 degli stralci.
+  const base = k.replace(/(END|PTE?|INIZIO|FINE|BIS)\d*$/i,'');
   const sc = scene.find(x => x.n === k) || scene.find(x => x.n === base);
   if (!sc) return;
   // Sul PDF ci si sposta di pagina, sulla ricostruzione di sezione.
@@ -13168,7 +13186,7 @@ function odgPienoHtml(d) {
       ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
-          ${d.location ? `<span class="s">${esc(d.location)}</span>` : ''}</span>
+          ${(l.indirizzo || d.location) ? `<span class="s">${esc(l.indirizzo || d.location)}</span>` : ''}</span>
           <span class="go">Mappa ›</span></a>`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>

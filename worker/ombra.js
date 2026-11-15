@@ -108,13 +108,23 @@ export function genereDalNome(nome) {
   /* Insieme al piano la produzione manda spesso il DOOD (day out of
      days), a volte con "PDL" nel nome: non e' il piano e non si legge. */
   if (/\bdood\b|day out of days/.test(p)) return null;
-  if (/giri|transport|trasport|movement/.test(p)) return 'giri';
+  /* I giri auto: ogni produzione li chiama a modo suo. "IS_TL_16.04.2026"
+     e' una transport list, e con la sigla sola non si riconosceva: l'ordine
+     del giorno arrivava senza pick-up. */
+  if (/giri|transport|trasport|movement|travel|transfer|\btl\b|pick ?up/.test(p)) return 'giri';
   if (/\bodg\b|ordine del giorno|call sheet/.test(p)) return 'odg';
   /* Il piano di lavorazione: "MSG_PDL7_03.11", "MSG - PDL6", "PDL8",
      "IS_PDL_23.02.26". Il numero della versione sta attaccato alla sigla,
      quindi qui \bpdl\b non basta. */
   if (/(^|[^a-z])pdl(?![a-z])|piano (di )?lavorazione/.test(p)) return 'pdl';
   return null;
+}
+
+/* Gli allegati che di sicuro non sono i giri auto: non vale la pena
+   farli leggere al modello "nel dubbio". */
+export function daIgnorare(nome) {
+  const p = String(nome || '').toLowerCase().replace(/[_\-.]+/g, ' ');
+  return /stralc|mappa|memo|sceneggiatura|script|\bdood\b|day out of days|(^|[^a-z])pdl(?![a-z])|piano (di )?lavorazione|accommodation|alloggi|rooming|hotel|sicurezza|covid|\bdpi\b|planimetr|storyboard|fabbisogn/.test(p);
 }
 
 export async function firma(env, percorso) {
@@ -193,6 +203,12 @@ export async function leggiInOmbra(env) {
     .map(a => ({ ...a, genere: genereDalNome(a.nome) }));
   const odg = file.find(a => a.genere === 'odg');
   const giri = file.find(a => a.genere === 'giri');
+  /* Niente giri auto riconosciuti dal nome: se nella mail c'e' un altro PDF
+     che non si sa cosa sia, lo si da' al modello dicendogli che forse sono
+     quelli. Uno solo, e non enorme: un nome strano non deve costare il
+     pick-up a tutta la troupe, ma nemmeno far leggere dieci allegati. */
+  const forse = giri ? null : file.find(a => a.genere == null && /\.pdf$/i.test(a.nome || '')
+    && !daIgnorare(a.nome) && (a.byte || 0) < 3000000);
 
   /* Lo stesso ordine del giorno arriva spesso due o tre volte: l'inoltro
      automatico, poi quello a mano dal telefono. Leggerlo una volta basta,
@@ -251,6 +267,10 @@ export async function leggiInOmbra(env) {
     if (giri) contenuto.push(
       { type: 'text', text: 'GIRI AUTO (' + giri.nome + '):' },
       { type: 'document', source: { type: 'url', url: await firma(env, giri.percorso) } });
+    else if (forse) contenuto.push(
+      { type: 'text', text: 'ALTRO ALLEGATO (' + forse.nome + '): se è la lista dei giri auto / transport list '
+        + 'usalo per le tratte; se è un\'altra cosa ignoralo del tutto.' },
+      { type: 'document', source: { type: 'url', url: await firma(env, forse.percorso) } });
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

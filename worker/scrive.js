@@ -64,7 +64,7 @@ export function pagineNumero(s) {
 function tipoDalNome(nome) {
   const n = String(nome || '').toLowerCase().replace(/[_-]/g, ' ');
   if (/stralc/.test(n)) return 'stralci';
-  if (/giri|transport|trasport|movement/.test(n)) return 'giri';
+  if (genereDalNome(nome) === 'giri') return 'giri';
   if (/\bodg\b|ordine\s*del\s*giorno|call\s*sheet/.test(n)) return 'odg';
   return null;
 }

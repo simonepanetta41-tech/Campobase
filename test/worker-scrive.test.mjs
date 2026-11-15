@@ -95,7 +95,7 @@ ok('"O.C." non è un orario: vale la generale', convocazioneDi(d, { nome: 'Rosse
 ok('chi non è in troupe: la generale', convocazioneDi(d, { nome: 'Mario', cognome: 'Rossi' }), '12.30');
 
 // ── Il mondo finto ──────────────────────────────────────────────────────────
-let T, modello, rotto;
+let T, modello, rotto, documenti;
 function mondo() {
   T = { projects: [{ id: 'f1', casella: 'abc123', titolo: 'Missione San Gennaro', user_id: 'u1', mittente: null, marcatore: null }],
         film_membri: [{ project_id: 'f1', user_id: 'u1' }, { project_id: 'f1', user_id: 'u2' }, { project_id: 'f1', user_id: 'u3' }],
@@ -121,7 +121,10 @@ function passa(r, params) {
 let seq = 0;
 globalThis.fetch = async (url, opz = {}) => {
   const u = new URL(url); const R = (x, s = 200) => new Response(x === null ? null : JSON.stringify(x), { status: s });
-  if (u.hostname === 'api.anthropic.com') return modello();
+  if (u.hostname === 'api.anthropic.com') {
+    documenti = JSON.parse(opz.body).messages[0].content.filter(c => c.type === 'text').map(c => c.text.split(' (')[0]);
+    return modello();
+  }
   if (u.pathname.startsWith('/storage/v1/object/sign/')) return R({ signedURL: '/object/sign/x?token=t' });
   if (u.pathname.startsWith('/storage/v1/object/')) return R({ Key: 'ok' });
   const tav = u.pathname.replace('/rest/v1/', '');
@@ -237,6 +240,19 @@ await posta.riceviPosta(mail([ODG, GIRI], 'Fwd: MSG - ODG #25'), ACCESO, {});
 T.posta[1].ricevuta = new Date(Date.now() + 1000).toISOString();
 ok('la seconda si chiude senza rileggere', [await leggiInOmbra(ACCESO), T.posta[1].stato], ['saltata: doppione', 'fatta']);
 ok('e senza altre notifiche', T.push_appuntamenti.filter(a => a.genere === 'posta').length, 3);
+
+console.log('\n── ⚠ i giri auto, comunque si chiamino ──');
+/* Visto davvero: "IS_TL_16.04.2026.pdf" e' una transport list. Dal nome
+   non si riconosceva, il server leggeva solo l'ordine del giorno e
+   l'ordine del giorno arrivava a tutti senza pick-up. */
+const letti = async (nomi) => { mondo(); documenti = null; await posta.riceviPosta(mail(nomi), ACCESO, {}); await leggiInOmbra(ACCESO); return documenti; };
+ok('"GIRI AUTO" nel nome', await letti([ODG, GIRI]), ['ORDINE DEL GIORNO', 'GIRI AUTO']);
+ok('⚠ "TL" nel nome: è la transport list', await letti([ODG, 'IS_TL_16.04.2026.pdf']), ['ORDINE DEL GIORNO', 'GIRI AUTO']);
+ok('⚠ un nome qualunque: al modello, col dubbio', await letti([ODG, 'Movimenti 16.04.pdf']), ['ORDINE DEL GIORNO', 'ALTRO ALLEGATO']);
+ok('stralci, DOOD e alloggi no: non sono giri', await letti([ODG, 'Stralci Gio 16 Apr.pdf', 'MSG_DOOD.pdf', 'MSG_ACCOMMODATION NAPOLI.pdf']), ['ORDINE DEL GIORNO']);
+ok('se i giri ci sono, l\'allegato strano non si legge', await letti([ODG, GIRI, 'Movimenti 16.04.pdf']), ['ORDINE DEL GIORNO', 'GIRI AUTO']);
+ok('la transport list resta fra gli allegati come "giri"', (() => { const { allegati } = datiPerApp(LETTO, { id: 'p', project_id: 'f', allegati: [
+  { nome: 'IS ODG_35 16.04.2026.pdf', tenuto: true, percorso: 'a' }, { nome: 'IS_TL_16.04.2026.pdf', tenuto: true, percorso: 'b' }] }); return allegati.map(a => a.tipo); })(), ['odg', 'giri']);
 
 console.log('\n── cosa non passa dal server ──');
 /* Il piano di lavorazione lo sa leggere solo il telefono. */

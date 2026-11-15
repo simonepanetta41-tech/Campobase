@@ -48,6 +48,30 @@ ok('lo spazio fra le parole del nome',
 ok('la didascalia riconosciuta', b33.some(x=>x.k==='didascalia'), true);
 ok('le righe spezzate si riuniscono', /Grazie del passaggio, siete stati molto gentili/.test(b33[4].t), true);
 
+console.log('\n── ⚠ stralci col numero sulla riga dell\'intestazione ──');
+/* Un'altra produzione, un'altra impaginazione: il numero di scena non sta
+   da solo nel margine ma sulla stessa riga, prima e dopo. Il PDF la da'
+   come una riga sola che comincia col numero, e di scene non se ne
+   trovava nessuna: sull'app gli stralci non si aprivano. Le righe sono
+   quelle vere, come le restituisce il lettore. */
+const altra = await p.evaluate(()=>stralciDaRighe([
+  {x:508,p:1,t:'3.'},
+  {x:54,p:1,t:'2   EST. CASA ANDREA - GIORNO   2'},
+  {x:108,p:1,t:'Un casolare in collina domina il territorio circostante.'},
+  {x:494,p:2,t:'149.'},
+  {x:54,p:2,t:'93   EST/INT. CASA DI ANDREA - GIORNO   93'},
+  {x:108,p:2,t:'Il ROMBO di una moto anticipa l\u2019arrivo del veicolo davanti'},
+  {x:108,p:2,t:'casa di Andrea, sotto un cielo lattiginoso.'},
+  {x:252,p:2,t:'ANDREA'},
+  {x:180,p:2,t:'Vitaliano.'},
+  {x:54,p:3,t:'92A   INT/EST. MACCHINA AMODIO/ STRADE CASALEGNO - ALBA   92A *'},
+  {x:108,p:3,t:'Amodio guida.'}]));
+ok('le scene si trovano, col loro numero', altra.map(x=>x.n), ['2','93','92A']);
+ok('l\'intestazione senza i numeri attorno', altra.map(x=>x.testa), ['EST. CASA ANDREA - GIORNO','EST/INT. CASA DI ANDREA - GIORNO','INT/EST. MACCHINA AMODIO/ STRADE CASALEGNO - ALBA']);
+ok('il numero di pagina non entra nel testo', altra[0].blocchi.map(x=>x.t), ['Un casolare in collina domina il territorio circostante.']);
+ok('azione, nome, battuta', altra[1].blocchi.map(x=>x.k), ['azione','chi','battuta']);
+ok('le righe d\'azione si riuniscono', /davanti casa di Andrea/.test(altra[1].blocchi[0].t), true);
+
 console.log('\n── il lettore ──');
 await p.evaluate(s=>{
   window.currentUser=null;
