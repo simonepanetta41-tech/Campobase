@@ -92,7 +92,8 @@ ok('memorizza la grafia del documento',
                        await p.evaluate(()=>JSON.parse(localStorage.getItem('cb_odg_io')).nome), 'S. Panetta');
 
 console.log('\n── "non sono io" riapre l\'elenco intero ──');
-await p.evaluate(()=>{localStorage.removeItem('cb_odg_io');odgForzaElenco=false;odgRender()});
+// Come si fa nell'app: toccando il riquadro per cambiare persona.
+await p.evaluate(()=>odgCambiaIo());
 await p.click('.odg-chi .sino .no'); await p.waitForTimeout(200);
 ok('elenco completo',  await p.evaluate(()=>document.querySelectorAll('.odg-chi .el button').length), 3);
 

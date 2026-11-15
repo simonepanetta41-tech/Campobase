@@ -214,6 +214,32 @@ r=await p.evaluate(async(d)=>{
 ok('nel film di prova c\'era il suo', r.prima, '35');
 ok('⚠ aprendo il proprio film dall\'analisi arriva il suo', [r.film, r.dopo], ['f1','25']);
 
+console.log('\n── "Sì, sono io" si dice una volta sola ──');
+/* Ogni produzione scrive il nome a modo suo, e cambiando film la domanda
+   tornava ogni volta. */
+await entra('Simone','Panetta');
+r=await p.evaluate(async(d)=>{
+  const chiede=()=>/Sei tu\?/.test(document.getElementById('odgSection').innerHTML);
+  const ora=()=>{const e=document.querySelector('.odg-badge .o'); return e&&e.textContent;};
+  const A=Object.assign({},d,{troupe:[{reparto:'SUONO',ruolo:'Microfonista',nome:'S. Panetta',partenza:'',set:'12.30'},{reparto:'FOTO',ruolo:'DM',nome:'V. Leone',partenza:'',set:'13.30'}]});
+  const B=Object.assign({},d,{numero:'35',tratte:[],troupe:[{reparto:'Suono',ruolo:'Boom operator',nome:'Simone Panetta',partenza:'',set:'14.00'},{reparto:'Regia',ruolo:'Aiuto',nome:'M. Rossi',partenza:'',set:'13.00'}]});
+  const C=Object.assign({},d,{numero:'36',tratte:[],troupe:[{reparto:'Suono',ruolo:'Boom',nome:'Simone Panetta',partenza:'',set:'07.00'},{reparto:'Suono',ruolo:'Fonico',nome:'Panetta S.',partenza:'',set:'08.00'}]});
+  const out={};
+  odgCorrente=A; odgRicalcola(); odgRender(); out.primaVolta=chiede();
+  odgSceltoIo(0); out.dopoIlSi=[chiede(), ora()];
+  odgCorrente=B; odgRicalcola(); odgRender(); out.altroFilm=[chiede(), ora()];
+  odgCorrente=A; odgRicalcola(); odgRender(); out.ritorno=[chiede(), ora()];
+  odgCorrente=C; odgRicalcola(); odgRender(); out.dueOmonimi=chiede()||/odg-chi/.test(document.getElementById('odgSection').innerHTML);
+  odgCorrente=A; odgRicalcola(); odgRender(); odgCambiaIo(); out.cambio=chiede();
+  return out;
+}, DATI());
+ok('la prima volta si chiede', r.primaVolta, true);
+ok('detto sì, c\'è il tuo orario', r.dopoIlSi, [false,'12.30']);
+ok('⚠ in un altro film, scritto diverso: non richiede', r.altroFilm, [false,'14.00']);
+ok('⚠ e tornando indietro nemmeno', r.ritorno, [false,'12.30']);
+ok('⚠ con due che possono essere te si chiede ancora', r.dueOmonimi, true);
+ok('toccando per cambiare persona si ricomincia', r.cambio, true);
+
 ok('nessun errore di pagina', errori, []);
 await b.close();
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');

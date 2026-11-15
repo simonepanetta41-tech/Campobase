@@ -5056,7 +5056,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.144';
+const CB_VERSIONE = '1.145';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11789,15 +11789,32 @@ const ODG_IO = 'cb_odg_io';
 function odgIo() {
   try { return JSON.parse(localStorage.getItem(ODG_IO) || 'null'); } catch (_) { return null; }
 }
+/* "Si', sono io" si dice una volta sola.
+ *
+ * La risposta si ricordava col nome com'e' stampato su quel foglio. Ma
+ * ogni produzione ti scrive a modo suo ("S. Panetta", "Simone Panetta"),
+ * e ogni film ha il suo ruolo: cambiando film il nome non combaciava piu'
+ * e la domanda tornava, tutte le volte. Ora, detto si' una volta alla
+ * riga trovata col tuo nome, quella riga si prende da sola anche sui
+ * fogli dopo — finche' e' una sola. Se ce ne sono due, o nessuna, si
+ * chiede come prima. Toccando il riquadro per cambiare persona si
+ * ricomincia da capo.
+ */
+const ODG_IO_OK = 'cb_odg_io_ok';
 function odgSceltoIo(i) {
   const t = (odgCorrente?.troupe || [])[i];
   if (!t) return;
-  try { localStorage.setItem(ODG_IO, JSON.stringify({ nome: t.nome, ruolo: t.ruolo, reparto: t.reparto })); } catch (_) {}
+  try {
+    localStorage.setItem(ODG_IO, JSON.stringify({ nome: t.nome, ruolo: t.ruolo, reparto: t.reparto }));
+    // Solo se la riga scelta e' quella del proprio nome: chi sceglie a
+    // mano un'altra persona non ha detto "sono io, sempre".
+    if (nomeCorrisponde(t.nome, profilo())) localStorage.setItem(ODG_IO_OK, '1');
+  } catch (_) {}
   odgRender();
 }
 let odgForzaElenco=false;
 function odgElencoIntero(){ odgForzaElenco=true; odgRender(); }
-function odgCambiaIo() { odgForzaElenco=false; try { localStorage.removeItem(ODG_IO); } catch (_) {} odgRender(); }
+function odgCambiaIo() { odgForzaElenco=false; try { localStorage.removeItem(ODG_IO); localStorage.removeItem(ODG_IO_OK); } catch (_) {} odgRender(); }
 
 /*
  * Trovarsi nella convocazione troupe senza passare dal modello.
@@ -11852,8 +11869,19 @@ function odgTrovamiNelTesto(testo, prof) {
 /* La riga della troupe che corrisponde a chi siamo, cercata per nome
    esatto: e' quello che abbiamo memorizzato scegliendola. */
 function odgMiaRiga() {
-  const io = odgIo(); if (!io) return null;
-  return (odgCorrente?.troupe || []).find(t => t.nome === io.nome) || null;
+  const troupe = odgCorrente?.troupe || [];
+  const io = odgIo();
+  const mia = io ? troupe.find(t => t.nome === io.nome) : null;
+  if (mia) return mia;
+  // Su questo foglio il nome e' scritto diverso, o e' un altro film: chi
+  // ha gia' detto "sono io" non se lo sente chiedere di nuovo.
+  let gia = false; try { gia = localStorage.getItem(ODG_IO_OK) === '1'; } catch (_) {}
+  if (!gia) return null;
+  const i = profiloTrovaInTroupe(troupe);
+  if (i < 0) return null;
+  const t = troupe[i];
+  try { localStorage.setItem(ODG_IO, JSON.stringify({ nome: t.nome, ruolo: t.ruolo, reparto: t.reparto })); } catch (_) {}
+  return t;
 }
 
 const ODG_SEGNI = {
