@@ -87,6 +87,8 @@ body.light {
    schede fissa in basso, che sparivano sotto il bordo finche' non si
    lasciava la presa. */
 html, body { overscroll-behavior-y: none; }
+/* Niente zoom col doppio tocco: e' un'app, non una pagina web. */
+body { touch-action: manipulation; }
 body { background: var(--bg); color: var(--white); font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; min-height: 100vh; }
 .num, .mono { font-family: 'DM Mono', monospace; }
 
@@ -2881,6 +2883,20 @@ async function showApp() {
     .finally(() => odgRipristina().finally(postaControlla));
 }
 
+/* Niente zoom con due dita.
+   Ingrandiva tutta l'app come una pagina web: la barra in basso usciva
+   dallo schermo e il layout si perdeva. Resta solo dove serve davvero,
+   cioe' sulle pagine dei documenti (sceneggiatura, ordine del giorno,
+   stralci), che sono tutte disegnate su un canvas: un PDF sul telefono
+   senza poterlo ingrandire non si legge.
+   iOS ignora "user-scalable=no", quindi lo si ferma qui: gesturestart su
+   iPhone, il movimento a due dita altrove. */
+function zoomAmmesso(t){ return !!(t && t.closest && t.closest('canvas')); }
+document.addEventListener('gesturestart', e => { if (!zoomAmmesso(e.target)) e.preventDefault(); }, { passive: false });
+document.addEventListener('touchmove', e => {
+  if (e.touches && e.touches.length > 1 && !zoomAmmesso(e.target)) e.preventDefault();
+}, { passive: false });
+
 /* Si torna a guardare la posta quando l'app torna davanti, non a tempo.
    Un'app di set sta in tasca tutto il giorno: chiedere ogni minuto
    consumerebbe batteria e campo per niente, visto che il pacchetto della
@@ -5094,7 +5110,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.157';
+const CB_VERSIONE = '1.158';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
