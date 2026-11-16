@@ -5091,7 +5091,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.155';
+const CB_VERSIONE = '1.156';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11054,13 +11054,13 @@ async function troupeRender(){
       Analizza una sceneggiatura, oppure fatti mandare l'invito da chi ci lavora.</div>`;
     return;
   }
-  /* L'invito lo fa chi ha aperto il film, e basta.
-     Il QR e il codice sono la chiave d'ingresso: lasciarli a tutti vuol
-     dire che chiunque sia entrato puo' far entrare altri, e nessuno se ne
-     accorge. Chi e' dentro vede la troupe, non la porta. */
+  /* L'invito lo puo' fare chiunque sia nel film: su un set il QR passa di
+     mano in mano, e se lo avesse solo chi ha aperto il film tutti
+     dovrebbero cercare lui. La casella della posta e i permessi no:
+     quelli restano a chi ha aperto il film. */
   box.innerHTML = `
     <div class="sp-testa"><span class="t">${esc(f.titolo || 'Il film')}</span></div>
-    ${f.mio ? `
+    ${f.codice ? `
       <div class="tr-qr"><div id="troupeQr"></div><div class="c num">${esc(f.codice || '')}</div></div>
       <div class="sp-azioni">
         <button onclick="troupeCondividi()">Manda l'invito</button>
@@ -11081,7 +11081,7 @@ async function troupeRender(){
       </div>` : ''}
     <div class="odg-sez" style="margin-top:22px">IN QUESTO FILM</div>
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
-  if (f.mio) troupeQr(f.codice);
+  if (f.codice) troupeQr(f.codice);
   const m = await troupeMembri();
   await segnaChiCarica();
   const el = document.getElementById('troupeElenco');

@@ -76,9 +76,9 @@ ok('la troupe elencata',  await p.evaluate(()=>[...document.querySelectorAll('#t
    ['Simone Panetta','Alfredo De Marchi']);
 ok('con il reparto',      await p.evaluate(()=>document.querySelector('#troupeElenco .odg-att .s').textContent), 'Suono');
 ok('e chi l\'ha aperto',  await p.evaluate(()=>document.querySelector('#troupeElenco .cast-m').textContent), 'ha aperto il film');
-ok('ma niente QR: la porta non è sua', await p.evaluate(()=>!document.querySelector('.tr-qr')), true);
-ok('né i tasti per invitare',          await p.evaluate(()=>!document.querySelector('#troupeCorpo .sp-azioni')), true);
-ok('né la casella della posta',        await p.evaluate(()=>!document.getElementById('troupeMail')), true);
+ok('⚠ il QR ce l\'ha anche lui, col codice', await p.evaluate(()=>[!!document.querySelector('.tr-qr svg'), document.querySelector('.tr-qr .c')?.textContent]), [true,'A1B2C3D4']);
+ok('e i tasti per invitare',           await p.evaluate(()=>[...document.querySelectorAll('#troupeCorpo .sp-azioni button')].map(b=>b.textContent)), ["Manda l'invito",'Copia il link']);
+ok('⚠ ma non la casella della posta',        await p.evaluate(()=>!document.getElementById('troupeMail')), true);
 ok('e nessuna spiegazione a nessuno',  await p.evaluate(()=>!document.querySelector('.tr-spiega')), true);
 
 console.log('\n── la pagina di chi il film l\'ha aperto ──');
