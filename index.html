@@ -5110,7 +5110,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.158';
+const CB_VERSIONE = '1.159';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13144,6 +13144,13 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
+/* Il comune, solo se l'indirizzo ha il CAP davanti: "..., 80131 Napoli NA". */
+function odgComuneCap(indirizzo){
+  const m = String(indirizzo || '').replace(/\s+/g, ' ').trim()
+    .match(/\b\d{5}\s+([A-Za-z\u00c0-\u017f' ]{2,30}?)(?:\s+\(?[A-Z]{2}\)?)?\s*$/);
+  return m ? m[1].trim() : null;
+}
+
 async function odgCoordinate(comune){
   const u = 'https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&format=json&country=IT&name='
           + encodeURIComponent(comune);
@@ -13215,12 +13222,23 @@ async function odgPosto(d){
      link non si e' sciolto, se l'OdG non aveva indirizzi o se era il
      geocoder a non conoscere il paese. */
   const motivi = [];
-  for (const l of [...(d.luoghi || [])].sort((a, b) => peso(a) - peso(b))) {
+  const posti = [...(d.luoghi || [])].sort((a, b) => peso(a) - peso(b));
+  for (const l of posti) {
+    if (!l.url) continue;
     try {
       const c = await odgCoordDaLink(l.url);
       d.posto = { ...c, nome: c.nome || l.nome };
       return d.posto;
     } catch (e) { motivi.push(l.nome + ': ' + e.message); }
+  }
+  /* Poi gli indirizzi scritti accanto ai posti, nello stesso ordine. Solo
+     quelli con il CAP: "SEMINARIO ARCIVESCOVILE ALESSIO ASCALESI" e' un
+     nome, e a tirarne fuori un comune si finisce in un paese a caso. */
+  for (const l of posti) {
+    const comune = odgComuneCap(l.indirizzo);
+    if (!comune) continue;
+    try { d.posto = await odgCoordinate(comune); return d.posto; }
+    catch (e) { motivi.push(comune + ': ' + e.message); }
   }
   /* Gli ordini del giorno all'antica scrivono l'indirizzo per esteso, nel
      campo location: e quello e' l'indirizzo del campo base.
@@ -13231,7 +13249,9 @@ async function odgPosto(d){
      Roma — e il meteo di Roma mentre a Viterbo piove e' peggio di nessun
      meteo. La posizione viene dal link di Google o dall'indirizzo del
      campo base, e da nient'altro. */
-  const comune = odgComune(d.location);
+  /* In fondo, l'ospedale piu' vicino: lo sceglie la produzione partendo
+     dal set, quindi il suo comune e' quello del set o quello accanto. */
+  const comune = odgComune(d.location) || odgComuneCap(d.ospedale);
   if (!comune) {
     motivi.push('nei documenti non c\'è un indirizzo con il CAP');
   } else {
@@ -13371,7 +13391,7 @@ async function odgPrevisione(d){
 /* La versione sale quando cambia cosa si chiede o come si cerca il posto:
    le previsioni gia' salvate si rifanno da sole, se no chi ha l'OdG di
    ieri resta con una scheda che non si puo' aprire. */
-const ODG_METEO_V = 7;
+const ODG_METEO_V = 8;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
@@ -13544,7 +13564,7 @@ function odgPienoHtml(d) {
   ${(d.location || (d.luoghi || []).length) ? `<div class="odg-sez">DOVE</div>
   <div class="card">
     ${(d.luoghi || []).length
-      ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url)}" target="_blank" rel="noopener">
+      ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url || odgMaps(l.indirizzo || l.nome))}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
           ${l.indirizzo ? `<span class="s">${esc(l.indirizzo)}</span>` : ''}</span>

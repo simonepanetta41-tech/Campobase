@@ -114,8 +114,14 @@ export function datiPerApp(letto, riga, adesso) {
     ambiente: testo(L.ambiente), meteo: testo(L.meteo), ospedale: testo(L.ospedale),
     dawn: ora2(L.dawn), alba: ora2(L.alba), tramonto: ora2(L.tramonto), dusk: ora2(L.dusk),
     luoghi: (Array.isArray(L.luoghi) ? L.luoghi : [])
-      .filter(l => l && /^https?:\/\//.test(testo(l.url)) && testo(l.nome))
-      .map(l => ({ nome: testo(l.nome), url: testo(l.url), indirizzo: testo(l.indirizzo) })),
+      /* Un posto vale se ha un link o qualcosa di scritto accanto: molti
+         fogli (Missione San Gennaro) non mettono link, scrivono
+         l'indirizzo. Senza quelli l'app non sa dove si gira, e non da'
+         ne' la mappa ne' il meteo. Un link che non e' un link si butta,
+         il posto resta. */
+      .map(l => ({ nome: testo(l && l.nome), url: /^https?:\/\//.test(testo(l && l.url)) ? testo(l.url) : '',
+                   indirizzo: testo(l && l.indirizzo) }))
+      .filter(l => l.nome && (l.url || l.indirizzo)),
     contatti: (Array.isArray(L.contatti) ? L.contatti : [])
       .map(c => ({ nome: testo(c && c.nome), ruolo: testo(c && c.ruolo), tel: testo(c && c.tel).replace(/[^\d+]/g, '') }))
       .filter(c => c.nome && c.tel),

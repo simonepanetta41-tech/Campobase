@@ -168,6 +168,29 @@ ok('col trattino', await p.evaluate(()=>odgComune('Masseria Lamie Strada Vicinal
 ok('senza niente', await p.evaluate(()=>odgComune('Grottaglie')), 'Grottaglie');
 ok('e vuoto è vuoto', await p.evaluate(()=>odgComune('')), null);
 
+console.log('\n── ⚠ il posto, quando il foglio non ha link ──');
+{ const r=await p.evaluate(async()=>{
+    const veri=[odgCoordinate, odgCoordDaLink]; const chiesti=[];
+    odgCoordinate=async(c)=>{ chiesti.push('comune:'+c); return {lat:1,lon:2,nome:c}; };
+    odgCoordDaLink=async(u)=>{ chiesti.push('link:'+u); if(/rotto/.test(u)) throw new Error('niente'); return {lat:3,lon:4,nome:'dal link'}; };
+    const prova=async(d)=>{ chiesti.length=0; const x=await odgPosto(d); return [x&&x.nome, chiesti.slice(), d.motivoPosto||'']; };
+    const msg={luoghi:[{nome:'Location',url:'',indirizzo:'SEMINARIO ARCIVESCOVILE ALESSIO ASCALESI'},
+                       {nome:'Mezzi tecnici',url:'',indirizzo:'Viale Colli Aminei, 3, 80131 Napoli NA'}]};
+    const out={ msg: await prova(msg),
+      link:    await prova({luoghi:[{nome:'Mezzi tecnici',url:'',indirizzo:'Via Roma 1, 00100 Roma RM'},{nome:'Set',url:'https://maps/x',indirizzo:''}]}),
+      rotto:   await prova({luoghi:[{nome:'Set',url:'https://maps/rotto',indirizzo:'Via del Faro, 58, 74122 Taranto (TA)'}]}),
+      osp:     await prova({luoghi:[], ospedale:'PRONTO SOCCORSO DEL C.T.O. DI NAPOLI - Viale Colli Aminei, 21, 80131 Napoli NA'}),
+      niente:  await prova({luoghi:[{nome:'Location',url:'',indirizzo:'CASA PAESE'}], ospedale:'OSPEDALE MOSCATI - VIA PER MARTINA FRANCA'}),
+      cap:[odgComuneCap('Viale Colli Aminei, 3, 80131 Napoli NA'), odgComuneCap('SEMINARIO ARCIVESCOVILE'), odgComuneCap('Via X, 74023 Grottaglie'), odgComuneCap('')] };
+    [odgCoordinate, odgCoordDaLink]=veri; return out; });
+  ok('⚠ dall\'indirizzo dei mezzi tecnici, non dal nome della location', r.msg, ['Napoli',['comune:Napoli'],'']);
+  ok('un link vince sempre su un indirizzo', r.link, ['dal link',['link:https://maps/x'],'']);
+  ok('link rotto: si ripiega sull\'indirizzo', r.rotto.slice(0,2), ['Taranto',['link:https://maps/rotto','comune:Taranto']]);
+  ok('⚠ senza posti, il comune dell\'ospedale più vicino', r.osp, ['Napoli',['comune:Napoli'],'']);
+  ok('⚠ senza un CAP da nessuna parte, nessun meteo', r.niente, [null,[],"nei documenti non c'è un indirizzo con il CAP"]);
+  ok('il comune si prende solo dietro a un CAP', r.cap, ['Napoli',null,'Grottaglie',null]);
+}
+
 console.log('\n── come si vede nella scheda ──');
 await p.evaluate(()=>{
   odgCorrente={data:'2026-11-10',numero:21,scene:[],

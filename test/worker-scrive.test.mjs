@@ -28,7 +28,9 @@ const LETTO = {
   ambiente: 'CHIESA PAESE', pagine: '6 6/8', meteo: 'Nuvoloso', ospedale: 'OSPEDALE SAN GIUSEPPE MOSCATI - VIA PER MARTINA FRANCA',
   dawn: '06:36', alba: '07.03', tramonto: '17.59', dusk: '18.25',
   luoghi: [{ nome: 'CB/ MEZZI TECNICI', url: 'https://maps.app.goo.gl/abc?g_st=iw', indirizzo: '' },
-           { nome: 'PARCHEGGIO', url: '', indirizzo: 'senza link' }],
+           { nome: 'LOCATION', url: '', indirizzo: 'SEMINARIO ARCIVESCOVILE' },
+           { nome: 'SET', url: 'non è un link', indirizzo: 'Viale Colli Aminei, 3, 80131 Napoli NA' },
+           { nome: 'PARCHEGGIO', url: '', indirizzo: '' }],
   contatti: [{ ruolo: 'Direttore di prod.', nome: 'Attilio Montagna', tel: '333 9973678' }],
   scene: [{ n: '58END', ie: 'I', m: 'G', ambiente: 'CHIESA PAESE', sinossi: 'Il tesoro.', ids: '1, 2', pag: '6 6/8' },
           { n: '', nota: 'TRASFERIMENTO' }],
@@ -62,7 +64,8 @@ ok('i viaggi coi nomi che vuole l\'app', d.tratte[0].nomi, ['F.Lombardi', 'D.De 
 ok('l\'autista senza il mezzo', d.tratte[0].autista, 'Luca Cammarosano');
 ok('il telefono in sole cifre', d.tratte[0].tel, '3398408475');
 ok('un van senza passeggeri non è un viaggio', d.tratte.length, 2);
-ok('un posto senza link non va nel Dove', d.luoghi.map(l => l.nome), ['CB/ MEZZI TECNICI']);
+ok('⚠ un posto senza link ma con l\'indirizzo resta', d.luoghi.map(l => [l.nome, l.url ? 'link' : '', l.indirizzo]),
+   [['CB/ MEZZI TECNICI','link',''], ['LOCATION','','SEMINARIO ARCIVESCOVILE'], ['SET','','Viale Colli Aminei, 3, 80131 Napoli NA']]);
 ok('"--" non è un pick-up', d.cast[1].pickup, '');
 ok('gli stacchi restano', d.scene[1].nota, 'TRASFERIMENTO');
 ok('una voce vuota dei fabbisogni no', d.fabbisogni[0].voci.length, 1);
