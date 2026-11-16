@@ -115,7 +115,7 @@ const fabbrica = new Function('UTENTE', 'CORPO',
      const readJson = async () => ({ body: CORPO() });
      const requireUser = async () => (UTENTE() ? { user: UTENTE() } : { error: json({ error: 'no' }, 401) });`)
     .replace(/^\s*export /gm, '')
-  + '\nreturn {mandaScadute, handleIscrivi, handleAppuntamenti, handleMessaggio, avvisaPosta};');
+  + '\nreturn {mandaScadute, handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, avvisaPosta};');
 const push = fabbrica(() => utenteFinto, () => corpoFinto);
 
 let ko = 0;
@@ -129,6 +129,19 @@ const CHIAVI = { p256dh: 'BF4BPyee1TQoLPfRSpi44AI1OaBt0rbxqW-UsWYMoj1v47BJA-E4K-
                  auth: 'ApgKVXuggagJ0ieG6dxfBw' };
 const iscrivi = (user, endpoint, chiavi = CHIAVI) =>
   tavoli.push_iscrizioni.push({ id: 'i' + endpoint, user_id: user, endpoint, ...chiavi });
+
+console.log('\n── spegnere le notifiche toglie l\'iscrizione, solo la propria ──');
+azzera();
+iscrivi('u1', 'https://web.push.apple.com/mio');
+iscrivi('u2', 'https://web.push.apple.com/suo');
+utenteFinto = { id: 'u1' }; corpoFinto = { endpoint: 'https://web.push.apple.com/suo' };
+await push.handleTogli({}, ENV);
+ok('⚠ quella di un altro non si tocca', tavoli.push_iscrizioni.map(i => i.user_id), ['u1', 'u2']);
+corpoFinto = { endpoint: 'https://web.push.apple.com/mio' };
+await push.handleTogli({}, ENV);
+ok('la mia sparisce', tavoli.push_iscrizioni.map(i => i.user_id), ['u2']);
+corpoFinto = {};
+ok('senza indirizzo, errore', (await push.handleTogli({}, ENV)).status, 400);
 
 console.log('\n── un appuntamento scaduto si manda, e una volta sola ──');
 azzera();

@@ -306,6 +306,19 @@ export async function handleIscrivi(request, env) {
   return json({ ok: true });
 }
 
+/* Spegnere le notifiche su un telefono: si toglie la sua iscrizione.
+ * Solo la propria: l'indirizzo da solo non basta, deve essere di chi chiede. */
+export async function handleTogli(request, env) {
+  const { user, error } = await requireUser(request, env);
+  if (error) return error;
+  const { body: b, error: malformato } = await readJson(request);
+  if (malformato) return malformato;
+  if (!b?.endpoint) return json({ error: 'manca endpoint' }, 400);
+  await db(env, `push_iscrizioni?endpoint=eq.${encodeURIComponent(b.endpoint)}&user_id=eq.${user.id}`,
+    { method: 'DELETE' });
+  return json({ ok: true });
+}
+
 /* L'app registra i suoi appuntamenti: il pick-up e il catering di oggi.
  * Li manda a ogni apertura dell'ordine del giorno, e la chiave fa in modo
  * che riscriverli aggiorni l'ora invece di aggiungere una notifica. */

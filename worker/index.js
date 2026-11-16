@@ -12,7 +12,7 @@
 import { json, readJson, requireUser, consumeQuota, callAnthropic, CORS } from './shared.js';
 import { handleWrap } from './wrap.js';
 import { riceviPosta } from './posta.js';
-import { handleIscrivi, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
+import { handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
 import { handleAttore } from './attore.js';
 import { leggiInOmbra } from './ombra.js';
 import { leggiPiano } from './piano.js';
@@ -272,6 +272,7 @@ const ROUTES = {
   '/api/mappa':   handleMappa,
   '/api/attore':  handleAttore,
   '/api/push/iscrivi':       handleIscrivi,
+  '/api/push/togli':         handleTogli,
   '/api/push/appuntamenti':  handleAppuntamenti,
   '/api/push/messaggio':     handleMessaggio
 };

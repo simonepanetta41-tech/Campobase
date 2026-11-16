@@ -1313,7 +1313,16 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .settings-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
 .settings-title::after { content:''; flex:1; height:1px; background:var(--border); }
 .settings-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; gap: 16px; flex-wrap: wrap; }
+.settings-row + .settings-row { margin-top: 10px; }
 .settings-row-info { flex: 1; }
+/* L'interruttore, come quelli del telefono. */
+.cb-int{position:relative;flex:none;width:51px;height:31px;border-radius:99px;border:none;padding:0;cursor:pointer;
+  background:var(--border-l);transition:background .2s}
+.cb-int::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.35);transition:transform .2s}
+.cb-int.on{background:var(--yellow)}
+.cb-int.on::after{transform:translateX(20px)}
+.cb-int:disabled{opacity:.4;cursor:default}
 .settings-row-label { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 3px; }
 .settings-row-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
 .settings-input-wrap { display: flex; gap: 8px; min-width: 240px; flex: 1; }
@@ -1623,14 +1632,14 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
             <div class="settings-row-label">Avvisi sul telefono</div>
             <div class="settings-row-desc" id="pushDesc">Quando la produzione manda un ordine del giorno o un piano, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering.</div>
           </div>
-          <button id="pushTasto" onclick="pushAttiva()" style="flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--white);padding:9px 14px;border-radius:9px;font-family:'DM Mono',monospace;font-size:11.5px;cursor:pointer">Attiva</button>
+<button id="pushTasto" class="cb-int" role="switch" aria-checked="false" aria-label="Avvisi sul telefono" onclick="pushCambia()"></button>
         </div>
         <div class="settings-row" id="pushProvaRiga" style="display:none">
           <div class="settings-row-info">
             <div class="settings-row-label">Prova</div>
-            <div class="settings-row-desc">Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.</div>
+            <div class="settings-row-desc" id="pushProvaDesc">Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.</div>
           </div>
-          <button onclick="pushProva()" style="flex-shrink:0;background:var(--surface2);border:1px solid var(--border);color:var(--white);padding:9px 14px;border-radius:9px;font-family:'DM Mono',monospace;font-size:11.5px;cursor:pointer">Provala</button>
+          <button id="pushProvaTasto" class="cb-int" role="switch" aria-checked="false" aria-label="Prova" onclick="pushProva()"></button>
         </div>
       </div>
       <div class="settings-section">
@@ -5113,7 +5122,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.161';
+const CB_VERSIONE = '1.162';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11792,13 +11801,38 @@ async function pushCapi(){
   return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (s && s.access_token) };
 }
 
+/* L'interruttore: acceso iscrive questo telefono, spento lo toglie. */
+async function pushCambia(){
+  const t = document.getElementById('pushTasto');
+  if (t && t.classList.contains('on')) return pushSpegni();
+  return pushAttiva();
+}
+async function pushSpegni(){
+  const t = document.getElementById('pushTasto');
+  if (t) t.disabled = true;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await fetch('/api/push/togli', {
+        method: 'POST', headers: await pushCapi(), body: JSON.stringify({ endpoint: sub.endpoint })
+      }).catch(() => {});
+      await sub.unsubscribe();
+    }
+  } catch (e) {
+    showToast('Non ci sono riuscito: ' + e.message, 'red', 6000);
+  } finally {
+    await pushRender();
+  }
+}
+
 async function pushAttiva(){
   if (!pushPossibile()) {
     showToast('Questo telefono non le sa fare. Su iPhone l\'app deve stare sulla schermata home.', 'red', 6000);
     return;
   }
   const t = document.getElementById('pushTasto');
-  if (t) { t.disabled = true; t.textContent = '…'; }
+  if (t) t.disabled = true;
   try {
     if ((await Notification.requestPermission()) !== 'granted') {
       showToast('Permesso negato. Si riattiva dalle impostazioni del telefono.', 'red', 6000);
@@ -11816,7 +11850,6 @@ async function pushAttiva(){
       body: JSON.stringify({ endpoint: sub.endpoint, p256dh: k.p256dh, auth: k.auth })
     });
     if (!r.ok) throw new Error(((await r.json().catch(() => null)) || {}).error || ('iscrizione ' + r.status));
-    showToast('Notifiche attive su questo telefono.', 'yellow', 3000);
     if (odgCorrente) pushAppuntamenti(odgCorrente);
   } catch (e) {
     showToast('Non ci sono riuscito: ' + e.message, 'red', 6000);
@@ -11927,8 +11960,9 @@ async function pushRender(){
   const prova = document.getElementById('pushProvaRiga');
   if (!t) return;
   t.disabled = false;
+  const acceso = si => { t.classList.toggle('on', !!si); t.setAttribute('aria-checked', si ? 'true' : 'false'); };
   if (!pushPossibile()) {
-    t.textContent = 'Non disponibile';
+    acceso(false);
     t.disabled = true;
     if (d) d.textContent = 'Su iPhone le notifiche arrivano solo se l\'app sta sulla schermata home: aprila dal segnalibro, non da Safari.';
     if (prova) prova.style.display = 'none';
@@ -11939,16 +11973,12 @@ async function pushRender(){
     const reg = await navigator.serviceWorker.ready;
     iscritto = Notification.permission === 'granted' && !!(await reg.pushManager.getSubscription());
   } catch (_) {}
-  t.textContent = iscritto ? 'Attive' : Notification.permission === 'denied' ? 'Bloccate' : 'Attiva';
-  /* Il tasto resta premibile anche quando dice "Attive".
-     "Attive" lo dice guardando il telefono: permesso dato, iscrizione
-     presente. Ma il server potrebbe non saperne niente — e la prima volta
-     e' andata proprio cosi': l'iscrizione non era stata registrata, il
-     tasto diceva "Attive", era disabilitato, e non c'era modo di
-     riprovare. Ora si puo' ripremere, e intanto l'iscrizione si rimanda da
-     sola ogni volta che si apre questa pagina: il server la riscrive al
-     posto di quella che ha, quindi rimandarla non costa niente e rimette a
-     posto un telefono che si era perso. */
+  acceso(iscritto);
+  /* "Acceso" lo dice guardando il telefono: permesso dato, iscrizione
+     presente. Ma il server potrebbe non saperne niente — la prima volta
+     e' andata proprio cosi'. Per questo l'iscrizione si rimanda da sola
+     ogni volta che si apre questa pagina: il server la riscrive al posto
+     di quella che ha, e un telefono che si era perso torna a posto. */
   t.disabled = Notification.permission === 'denied';
   if (iscritto) pushRimanda();
   if (prova) prova.style.display = iscritto ? '' : 'none';
@@ -11958,7 +11988,18 @@ async function pushRender(){
 
 /* Una notifica finta fra un minuto, per sapere se arrivano davvero senza
    dover aspettare il catering. */
+/* La prova e' un interruttore che si spegne da solo: acceso finche' la
+   notifica finta e' in viaggio, poi torna com'era. */
+const PUSH_PROVA_TESTO = 'Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.';
+let pushProvaTimer = null;
+function pushProvaStato(accesa){
+  const t = document.getElementById('pushProvaTasto'), d = document.getElementById('pushProvaDesc');
+  if (t) { t.classList.toggle('on', accesa); t.setAttribute('aria-checked', accesa ? 'true' : 'false'); }
+  if (d) d.textContent = accesa ? 'Arriva fra un minuto. Puoi anche chiudere l\'app.' : PUSH_PROVA_TESTO;
+}
 async function pushProva(){
+  if (pushProvaTimer) return;                 // gia' in viaggio
+  pushProvaStato(true);
   try {
     const r = await fetch('/api/push/appuntamenti', {
       method: 'POST', headers: await pushCapi(),
@@ -11969,8 +12010,9 @@ async function pushProva(){
       }] })
     });
     if (!r.ok) throw new Error('prova ' + r.status);
-    showToast('Fra un minuto dovrebbe arrivare.', 'yellow', 4000);
+    pushProvaTimer = setTimeout(() => { pushProvaTimer = null; pushProvaStato(false); }, 75000);
   } catch (e) {
+    pushProvaStato(false);
     showToast('Non ci sono riuscito: ' + e.message, 'red', 5000);
   }
 }

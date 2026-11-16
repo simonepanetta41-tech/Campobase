@@ -164,6 +164,32 @@ ok('gli appuntamenti si registrano comunque',
    (chiesti.find(c=>c.url==='/api/push/appuntamenti')||{corpo:{lista:[]}}).corpo.lista.map(a=>a.genere),
    ['catering']);
 
+console.log('\n── ⚠ gli interruttori delle notifiche ──');
+{ const r = await p.evaluate(async()=>{
+    const t=document.getElementById('pushTasto'), pt=document.getElementById('pushProvaTasto'), d=document.getElementById('pushProvaDesc');
+    const veri=[pushAttiva, pushSpegni, pushCapi, window.fetch, window.setTimeout];
+    const chiamate=[]; pushAttiva=async()=>{ chiamate.push('accendi'); }; pushSpegni=async()=>{ chiamate.push('spegni'); };
+    t.classList.remove('on'); await pushCambia(); t.classList.add('on'); await pushCambia(); t.classList.remove('on');
+    // la prova: accesa finche' la notifica e' in viaggio, poi torna spenta da sola
+    pushCapi=async()=>({}); let scatta=null, attesa=0;
+    window.setTimeout=(f,ms)=>{ scatta=f; attesa=ms; return 1; };
+    window.fetch=async()=>({ok:true,json:async()=>({})});
+    const prima=[pt.className, pt.tagName, t.className];
+    await pushProva(); const accesa=[pt.classList.contains('on'), d.textContent]; const attesaProva=attesa;
+    await pushProva(); const doppia=chiamate.length;
+    scatta(); const dopo=[pt.classList.contains('on'), d.textContent];
+    // se il server dice di no, si rispegne subito
+    window.fetch=async()=>({ok:false,status:500}); await pushProva(); const fallita=pt.classList.contains('on');
+    [pushAttiva, pushSpegni, pushCapi, window.fetch, window.setTimeout]=veri; pushProvaTimer=null;
+    return {chiamate, prima, accesa, attesa:attesaProva, dopo, fallita, testo:t.textContent};
+  });
+  ok('spento, toccarlo accende; acceso, spegne', r.chiamate, ['accendi','spegni']);
+  ok('sono interruttori, non tasti con la scritta', [r.prima, r.testo], [['cb-int','BUTTON','cb-int'], '']);
+  ok('⚠ la prova resta accesa mentre la notifica viaggia', r.accesa, [true, "Arriva fra un minuto. Puoi anche chiudere l'app."]);
+  ok('⚠ e si spegne da sola, poco dopo il minuto', [r.attesa, r.dopo], [75000, [false, 'Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.']]);
+  ok('se la prova non parte, torna subito spenta', r.fallita, false);
+}
+
 console.log('\n── il service worker che riceve il testo cifrato ──');
 // La strada normale: il testo e' dentro la notifica, decifrato dal sistema
 // operativo prima di arrivare qui.
