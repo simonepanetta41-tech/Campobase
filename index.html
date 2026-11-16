@@ -650,6 +650,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:1px solid var(--border-l);border-radius:12px;color:var(--white);
   font-family:'Space Grotesk',sans-serif;font-size:14.5px;cursor:pointer}
 .sp-vai .p{font-family:'DM Mono',monospace;font-size:13px;color:var(--yellow);white-space:nowrap}
+.sp-girata .p{color:var(--white-dim)}
+.sp-girata.on{border-color:rgba(110,231,183,.45);color:rgb(110,231,183)}
+.sp-girata.on .p{color:rgba(110,231,183,.75);font-size:12px}
+.pdl-chip-segna{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--border-l);background:none;
+  color:var(--white-dim);font-size:14px;line-height:1;cursor:pointer;flex:none}
+.pdl-chip-segna.on{border-color:rgba(110,231,183,.6);color:rgb(110,231,183);background:rgba(110,231,183,.1)}
 .sp-riga{display:flex;align-items:baseline;gap:12px;padding:11px 14px;border-top:1px solid var(--border)}
 .sp-riga .k{flex:0 0 112px;font-size:12.5px;color:var(--muted);line-height:1.4}
 .sp-riga .v{flex:1;min-width:0;font-size:14px;color:var(--white);line-height:1.5}
@@ -4758,12 +4764,25 @@ function spoglioApriScena(n){
         `<span class="sp-chip">${esc(p)}</span>`).join('')}</div>` : ''}
       ${pagina ? `<button class="sp-vai" onclick="spoglioVaiAllaPagina(${pagina})">
         <span>Apri nella sceneggiatura</span><span class="p">p. ${pagina} ›</span></button>` : ''}
+      <button class="sp-vai sp-girata" id="spGirataBtn" data-n="${esc(catNumero(num))}" onclick="scenaSegna('${esc(num)}')"></button>
       ${miei.map(blocco).join('')}
       ${altri.length ? `<button class="sp-altri" id="spAltriBtn" onclick="spoglioAltriRep()">
           ${esc(altri.map(g => g.rnome).join(' · '))} ▾</button>
         <div id="spAltri" style="display:none;margin-top:10px">${altri.map(blocco).join('')}</div>` : ''}
     </div>`;
   box.style.display = 'flex';
+  spoglioGirataBottone(catNumero(num));
+}
+
+/* Il tasto dice com'e' adesso e cosa succede toccandolo. */
+function spoglioGirataBottone(k){
+  const b = document.getElementById('spGirataBtn');
+  if (!b || b.dataset.n !== k) return;
+  const fatta = sceneFatte().has(k);
+  b.classList.toggle('on', fatta);
+  b.innerHTML = fatta
+    ? '<span>Girata</span><span class="p">✓ tocca per riaccenderla</span>'
+    : '<span>Segna come girata</span><span class="p">○</span>';
 }
 
 function spoglioChiudiScena(){
@@ -5063,7 +5082,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.152';
+const CB_VERSIONE = '1.153';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11210,7 +11229,80 @@ function oggiLocale(adesso){
        + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+/* ── Le scene segnate a mano ──────────────────────────────────────────
+ *
+ * I documenti non dicono tutto: una scena recuperata, una saltata, i
+ * giorni girati prima di cominciare a usare l'app. Dalla scheda di una
+ * scena, nello spoglio o nel piano, la si puo' segnare come girata — o
+ * riaccendere una che i fogli danno per fatta. Il segno e' uno solo per
+ * film e vale per tutta la troupe (tabella scene_segnate, sql/segnate.sql):
+ * chi lo mette nello spoglio lo ritrova nel piano, e viceversa.
+ *
+ * Si tiene anche sul telefono: senza campo, o finche' la tabella non c'e',
+ * resta di chi l'ha messo e si vede lo stesso.
+ */
+const SEGNATE = 'cb_scene_segnate';
+let sceneSegnate = {};          // { numero: 'girata' | 'da_girare' }
+function segnateChiave(){ const f = filmCorrente(); return SEGNATE + ':' + (f ? f.id : 'io'); }
+function segnateTieni(){ try { localStorage.setItem(segnateChiave(), JSON.stringify(sceneSegnate)); } catch (_) {} }
+
+async function sceneSegnateCarica(){
+  try { sceneSegnate = JSON.parse(localStorage.getItem(segnateChiave()) || '{}') || {}; } catch (_) { sceneSegnate = {}; }
+  const f = filmCorrente();
+  if (currentUser && f && f.id) {
+    try {
+      const { data, error } = await sb.from('scene_segnate').select('scena,stato').eq('project_id', f.id).limit(2000);
+      if (error) throw new Error(error.message);
+      const dalCloud = {};
+      for (const r of data || []) if (r && r.scena && (r.stato === 'girata' || r.stato === 'da_girare')) dalCloud[r.scena] = r.stato;
+      sceneSegnate = dalCloud;
+      segnateTieni();
+    } catch (e) { console.log('[scene segnate] cloud non letto, restano quelle sul telefono:', e.message); }
+  }
+  segnateRidisegna();
+}
+
+function segnateRidisegna(){
+  sceneFatteAggiorna();
+  try { if (pdlData && document.getElementById('pdlProgBars')) renderPdlStats(); } catch (_) {}
+  try { if (window._pdlModalG && document.getElementById('pdlDayModal')?.classList.contains('open')) renderPdlModalChips(window._pdlModalG); } catch (_) {}
+}
+
+/* Gira lo stato di una scena: girata ↔ da girare. Se quello che si vuole
+   e' gia' quello che dicono i documenti, il segno a mano si toglie: non
+   serve, e cosi' la scena torna a seguire i fogli. */
+async function scenaSegna(n){
+  const k = catNumero(n);
+  if (!k) return;
+  const adesso = sceneFatte().has(k);
+  const voglio = !adesso;
+  const daSola = sceneFatteDaiDocumenti().has(k);
+  const f = filmCorrente();
+  if (daSola === voglio) delete sceneSegnate[k];
+  else sceneSegnate[k] = voglio ? 'girata' : 'da_girare';
+  segnateTieni();
+  segnateRidisegna();
+  spoglioGirataBottone(k);
+  if (!currentUser || !f || !f.id) return;
+  try {
+    const r = (k in sceneSegnate)
+      ? await sb.from('scene_segnate').upsert({ project_id: f.id, scena: k, stato: sceneSegnate[k], user_id: currentUser.id,
+                                                aggiornato: new Date().toISOString() }, { onConflict: 'project_id,scena' })
+      : await sb.from('scene_segnate').delete().eq('project_id', f.id).eq('scena', k);
+    if (r && r.error) throw new Error(r.error.message);
+  } catch (e) { console.log('[scene segnate] non salvata sul cloud, resta sul telefono:', e.message); }
+}
+
 function sceneFatte(adesso){
+  const fatte = sceneFatteDaiDocumenti(adesso);
+  for (const [k, stato] of Object.entries(sceneSegnate || {})) {
+    if (stato === 'girata') fatte.add(k);
+    else if (stato === 'da_girare') fatte.delete(k);
+  }
+  return fatte;
+}
+
+function sceneFatteDaiDocumenti(adesso){
   const oggi = oggiLocale(adesso);
   const num = x => catNumero(x);
 
@@ -11255,6 +11347,7 @@ function sceneFatte(adesso){
    set il campo va e viene, e lo spoglio non deve riaccendersi tutto
    perche' manca la rete. */
 async function odgPassatiCarica(){
+  sceneSegnateCarica();          // insieme: sono le due meta' della stessa domanda
   const f = filmCorrente();
   const chiave = ODG_PASSATI + ':' + (f ? f.id : 'io');
   try { odgPassati = JSON.parse(localStorage.getItem(chiave) || '[]') || []; } catch (_) { odgPassati = []; }
@@ -14166,11 +14259,18 @@ function openPdlDayModal(dayNum) {
 
 function renderPdlModalChips(g) {
   const castMap = new Map(castData.map(c => [String(c.id_ufficiale ?? c.character_id), c]));
+  window._pdlModalG = g;                 // per ridisegnare quando una scena cambia stato
+  const fatte = sceneFatte();
 
   document.getElementById('pdlModalChips').innerHTML = (g.scene||[]).map(sc => {
-    const stato = pdlModalSceneStates[sc.numero] || 'pending';
+    /* Girata se lo dicono i documenti o se qualcuno l'ha segnata — la
+       stessa regola dello spoglio, cosi' le due sezioni dicono sempre la
+       stessa cosa. Lo stato vecchio, giorno per giorno, vale ancora per
+       l'attesa. */
+    const girata = fatte.has(catNumero(sc.numero));
+    const stato = girata ? 'done' : (pdlModalSceneStates[sc.numero] === 'standby' ? 'standby' : 'pending');
     const typeClass = getPdlSceneTypeClass(sc.int_ext, sc.momento);
-    const icon = stato==='done' ? '✓' : stato==='standby' ? '⏸' : '';
+    const icon = stato==='standby' ? '⏸' : '';
     const crit = isSceneCritical(sc.numero);
 
     const sceneIds = (sc.cast||[]).slice().sort((a,b) => Number(a)-Number(b));
@@ -14193,7 +14293,9 @@ function renderPdlModalChips(g) {
         <span class="pdl-chip-num">${sc.numero}</span>
         <span class="q">${[sc.int_ext,sc.momento].filter(Boolean).join(' ')}</span>
         ${crit?'<span class="q" style="color:var(--danger)">critica</span>':''}
-        <span class="ch">›</span>
+        <button class="pdl-chip-segna${girata ? ' on' : ''}" title="${girata ? 'Girata: tocca per riaccenderla' : 'Segna come girata'}"
+          onclick="event.stopPropagation();scenaSegna('${sc.numero}')">✓</button>
+        <span class="ch" style="margin-left:6px">›</span>
       </div>
       ${castBlock}
     </div>`;

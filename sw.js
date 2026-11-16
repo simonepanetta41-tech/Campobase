@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v152';
+const CACHE = 'campobase-v153';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
