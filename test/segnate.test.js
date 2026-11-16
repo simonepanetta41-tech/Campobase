@@ -193,7 +193,7 @@ r=await p.evaluate(async()=>{
 ok('chi ha aperto il film vede un tasto per ognuno', r.prima, [['Simone P','ha aperto il film'],['Anna R','no'],['Luca B','no']]);
 ok('⚠ toccato, il permesso è dato', [r.dopo[1], r.dato], [['Anna R','sì'], [['u2',true]]]);
 ok('ritoccato, è tolto', [r.tolto[1], r.dati2], [['Anna R','no'], [['u2',false]]]);
-ok('⚠ un membro vede chi segna, senza tasti', [r.daMembro, r.tasti], [[['Simone P','ha aperto il film'],['Anna R',''],['Luca B','segna le scene']], 0]);
+ok('⚠ un membro vede solo la lista: né tasti né chi segna', [r.daMembro, r.tasti], [[['Simone P','ha aperto il film'],['Anna R',''],['Luca B','']], 0]);
 ok('e non può darselo da solo', r.furbo, 2);
 
 console.log('\n── di tutta la troupe, ma anche senza cloud ──');

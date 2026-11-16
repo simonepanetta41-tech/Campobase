@@ -5091,7 +5091,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.154';
+const CB_VERSIONE = '1.155';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11087,10 +11087,10 @@ async function troupeRender(){
   const el = document.getElementById('troupeElenco');
   if (!el) return;
   /* Accanto a ognuno, chi ha aperto il film dice se puo' segnare le scene
-     come girate. Gli altri vedono solo chi ce l'ha. */
+     come girate. Gli altri vedono la lista e basta. */
   const segna = x => x.ruolo === 'capo' ? '<span class="cast-m">ha aperto il film</span>'
     : f.mio ? `<button class="tr-segna${segnaChi[x.user_id] ? ' on' : ''}" onclick="troupeSegna('${esc(x.user_id)}', ${segnaChi[x.user_id] ? 'false' : 'true'})">${segnaChi[x.user_id] ? '✓ Segna le scene' : 'Segna le scene'}</button>`
-    : segnaChi[x.user_id] ? '<span class="cast-m">segna le scene</span>' : '';
+    : '';
   el.innerHTML = m.length ? m.map(x => `<div class="odg-att">
       <span class="c"><span class="t">${esc([x.nome, x.cognome].filter(Boolean).join(' ') || 'Senza nome')}</span>
       ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
