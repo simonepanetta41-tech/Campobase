@@ -5063,7 +5063,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.150';
+const CB_VERSIONE = '1.151';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11780,9 +11780,19 @@ async function pushAppuntamenti(d){
    ce l'ha gia' in tasca con il nome sbagliato. */
 const ODG_LUOGHI_V = 2;
 
+function odgNonEUnPosto(t){
+  return /pronti\s+a\s+girare|convocazion|fine\s+(riprese|lavorazione)|\bpausa\b|\bcatering\b|\bcestini\b/i.test(String(t || ''))
+      || /^\s*\d{1,2}[.:]\d{2}\s*$/.test(String(t || ''));
+}
 function odgRicalcola() {
   const d = odgCorrente;
   if (!d) return;
+  /* Il posto della giornata letto dal telefono a volte non e' un posto:
+     sul foglio accanto a "LOCATION" c'e' una casella vuota e la lettura
+     prendeva quella dopo — "PRONTI A GIRARE 13.30". Finiva scritto sotto
+     "Mezzi tecnici", e nella ricerca del parcheggio e del meteo. Un posto
+     non e' un orario ne' una voce dell'orario. */
+  if (d.location && odgNonEUnPosto(d.location)) d.location = '';
   /* Un ordine del giorno gia' salvato con una scena spezzata si ricuce
      qui, su ogni telefono che lo apre: testo e cast sono salvati con lui,
      non serve richiamare il modello. */
@@ -13284,7 +13294,7 @@ function odgPienoHtml(d) {
       ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
-          ${(l.indirizzo || d.location) ? `<span class="s">${esc(l.indirizzo || d.location)}</span>` : ''}</span>
+          ${l.indirizzo ? `<span class="s">${esc(l.indirizzo)}</span>` : ''}</span>
           <span class="go">Mappa ›</span></a>`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>

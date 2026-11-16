@@ -214,6 +214,23 @@ r=await p.evaluate(async(d)=>{
 ok('nel film di prova c\'era il suo', r.prima, '35');
 ok('⚠ aprendo il proprio film dall\'analisi arriva il suo', [r.film, r.dopo], ['f1','25']);
 
+console.log('\n── ⚠ sotto un posto ci sta il suo indirizzo, non una riga dell\'orario ──');
+/* Visto davvero: sotto "Mezzi tecnici" c'era scritto "PRONTI A GIRARE 13.30". */
+await entra('Simone','Panetta');
+r=await p.evaluate((d)=>{
+  const dove=()=>[...document.querySelectorAll('#odgSection .odg-posto .c')].map(e=>e.innerText.replace(/\s+/g,' ').trim());
+  const out={};
+  odgCorrente=Object.assign({},d,{daServer:false,pickup:null,tratte:[],location:'PRONTI A GIRARE 13.30',luoghi:[{nome:'Mezzi tecnici',url:'https://maps.app.goo.gl/a'}]});
+  odgRicalcola(); odgRender(); out.sbagliato=[dove(), odgCorrente.location];
+  odgCorrente=Object.assign({},d,{pickup:null,tratte:[],location:'',luoghi:[{nome:'Catering',url:'https://maps.app.goo.gl/a',indirizzo:'Via Crocetta 22 - Este (PD)'}]});
+  odgRicalcola(); odgRender(); out.conIndirizzo=dove();
+  out.posti=['Via Roma 3, Taranto','MASSERIA SAN PIETRO - Ginosa','13.30','Convocazione 12.30'].map(odgNonEUnPosto);
+  return out;
+}, DATI());
+ok('⚠ la riga dell\'orario non compare più', r.sbagliato, [['Mezzi tecnici'], '']);
+ok('l\'indirizzo vero sì', r.conIndirizzo, ['Catering Via Crocetta 22 - Este (PD)']);
+ok('un posto vero resta un posto', r.posti, [false,false,true,true]);
+
 console.log('\n── "Sì, sono io" si dice una volta sola ──');
 /* Ogni produzione scrive il nome a modo suo, e cambiando film la domanda
    tornava ogni volta. */
