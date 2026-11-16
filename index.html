@@ -650,12 +650,20 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:1px solid var(--border-l);border-radius:12px;color:var(--white);
   font-family:'Space Grotesk',sans-serif;font-size:14.5px;cursor:pointer}
 .sp-vai .p{font-family:'DM Mono',monospace;font-size:13px;color:var(--yellow);white-space:nowrap}
-.sp-girata .p{color:var(--white-dim)}
-.sp-girata.on{border-color:rgba(110,231,183,.45);color:rgb(110,231,183)}
-.sp-girata.on .p{color:rgba(110,231,183,.75);font-size:12px}
-.pdl-chip-segna{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--border-l);background:none;
-  color:var(--white-dim);font-size:14px;line-height:1;cursor:pointer;flex:none}
-.pdl-chip-segna.on{border-color:rgba(110,231,183,.6);color:rgb(110,231,183);background:rgba(110,231,183,.1)}
+.sp-girata-riga{display:flex;justify-content:center;margin:22px 0 8px}
+.sp-girata-riga:empty{display:none}
+.sp-pillola{display:inline-flex;align-items:center;gap:9px;padding:13px 30px;border-radius:99px;border:none;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;background:var(--yellow);color:#111}
+.sp-pillola i{font-style:normal;font-size:17px;line-height:1}
+.sp-pillola.on{background:rgba(110,231,183,.12);border:1.5px solid rgba(110,231,183,.6);color:rgb(110,231,183)}
+.sp-pillola.ferma{cursor:default}
+/* La scheda di una scena aperta dal piano sta sopra la giornata; e la
+   pagina della sceneggiatura, che dalla scheda si apre, sopra la scheda. */
+#spScena.sopra{z-index:1050}
+#pageModal{z-index:1100}
+.tr-segna{margin-left:auto;padding:6px 12px;border-radius:99px;border:1px solid var(--border-l);background:none;
+  color:var(--white-dim);font-size:12px;cursor:pointer;white-space:nowrap}
+.tr-segna.on{border-color:rgba(110,231,183,.6);color:rgb(110,231,183);background:rgba(110,231,183,.1)}
 .sp-riga{display:flex;align-items:baseline;gap:12px;padding:11px 14px;border-top:1px solid var(--border)}
 .sp-riga .k{flex:0 0 112px;font-size:12.5px;color:var(--muted);line-height:1.4}
 .sp-riga .v{flex:1;min-width:0;font-size:14px;color:var(--white);line-height:1.5}
@@ -4764,30 +4772,31 @@ function spoglioApriScena(n){
         `<span class="sp-chip">${esc(p)}</span>`).join('')}</div>` : ''}
       ${pagina ? `<button class="sp-vai" onclick="spoglioVaiAllaPagina(${pagina})">
         <span>Apri nella sceneggiatura</span><span class="p">p. ${pagina} ›</span></button>` : ''}
-      <button class="sp-vai sp-girata" id="spGirataBtn" data-n="${esc(catNumero(num))}" onclick="scenaSegna('${esc(num)}')"></button>
       ${miei.map(blocco).join('')}
       ${altri.length ? `<button class="sp-altri" id="spAltriBtn" onclick="spoglioAltriRep()">
           ${esc(altri.map(g => g.rnome).join(' · '))} ▾</button>
         <div id="spAltri" style="display:none;margin-top:10px">${altri.map(blocco).join('')}</div>` : ''}
+      <div class="sp-girata-riga" id="spGirata" data-n="${esc(catNumero(num))}"></div>
     </div>`;
   box.style.display = 'flex';
   spoglioGirataBottone(catNumero(num));
 }
 
-/* Il tasto dice com'e' adesso e cosa succede toccandolo. */
+/* La pillola sotto l'ultima categoria: gialla finche' la scena e' da
+   girare, verde quando e' girata. Chi non ha il permesso di segnare vede
+   solo lo stato, e solo quando c'e' qualcosa da dire. */
 function spoglioGirataBottone(k){
-  const b = document.getElementById('spGirataBtn');
-  if (!b || b.dataset.n !== k) return;
-  const fatta = sceneFatte().has(k);
-  b.classList.toggle('on', fatta);
-  b.innerHTML = fatta
-    ? '<span>Girata</span><span class="p">✓ tocca per riaccenderla</span>'
-    : '<span>Segna come girata</span><span class="p">○</span>';
+  const box = document.getElementById('spGirata');
+  if (!box || box.dataset.n !== k) return;
+  const fatta = sceneFatte().has(k), posso = possoSegnare();
+  if (!posso) { box.innerHTML = fatta ? '<span class="sp-pillola on ferma"><i>✓</i>Girata</span>' : ''; return; }
+  box.innerHTML = `<button class="sp-pillola${fatta ? ' on' : ''}" onclick="scenaSegna('${esc(k)}')">
+    <i>✓</i>${fatta ? 'Girata' : 'Segna come girata'}</button>`;
 }
 
 function spoglioChiudiScena(){
   const box = document.getElementById('spScena');
-  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; box.classList.remove('sopra'); }
 }
 
 function spoglioAltriRep(){
@@ -5082,7 +5091,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.153';
+const CB_VERSIONE = '1.154';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11074,14 +11083,30 @@ async function troupeRender(){
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
   if (f.mio) troupeQr(f.codice);
   const m = await troupeMembri();
+  await segnaChiCarica();
   const el = document.getElementById('troupeElenco');
   if (!el) return;
+  /* Accanto a ognuno, chi ha aperto il film dice se puo' segnare le scene
+     come girate. Gli altri vedono solo chi ce l'ha. */
+  const segna = x => x.ruolo === 'capo' ? '<span class="cast-m">ha aperto il film</span>'
+    : f.mio ? `<button class="tr-segna${segnaChi[x.user_id] ? ' on' : ''}" onclick="troupeSegna('${esc(x.user_id)}', ${segnaChi[x.user_id] ? 'false' : 'true'})">${segnaChi[x.user_id] ? '✓ Segna le scene' : 'Segna le scene'}</button>`
+    : segnaChi[x.user_id] ? '<span class="cast-m">segna le scene</span>' : '';
   el.innerHTML = m.length ? m.map(x => `<div class="odg-att">
       <span class="c"><span class="t">${esc([x.nome, x.cognome].filter(Boolean).join(' ') || 'Senza nome')}</span>
       ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
-      ${x.ruolo === 'capo' ? '<span class="cast-m">ha aperto il film</span>' : ''}
+      ${segna(x)}
     </div>`).join('')
     : `<div class="sp-vuoto" style="padding:18px">Per ora ci sei solo tu.</div>`;
+}
+
+async function troupeSegna(utente, vale){
+  const f = filmCorrente();
+  if (!f || !f.mio) return;
+  try {
+    const { error } = await sb.rpc('permesso_segna', { p_film: f.id, p_utente: utente, p_vale: !!vale });
+    if (error) throw new Error(error.message);
+  } catch (e) { showToast('Permesso non salvato', 'default', 3000); console.log('[troupe] permesso:', e.message); }
+  troupeRender();
 }
 
 /* Il QR si disegna sul telefono, non lo si va a chiedere a un servizio:
@@ -11246,9 +11271,36 @@ let sceneSegnate = {};          // { numero: 'girata' | 'da_girare' }
 function segnateChiave(){ const f = filmCorrente(); return SEGNATE + ':' + (f ? f.id : 'io'); }
 function segnateTieni(){ try { localStorage.setItem(segnateChiave(), JSON.stringify(sceneSegnate)); } catch (_) {} }
 
+/* Chi puo' segnare. Chi ha aperto il film, e le persone a cui lui ha dato
+   il permesso dalla lista della troupe: un avanzamento che chiunque puo'
+   cambiare e' un avanzamento di cui nessuno si fida. Gli altri vedono.
+   Il no vero lo dice il database; questo serve a non mostrare un tasto
+   che non funzionerebbe. */
+let segnaChi = {};               // { user_id: true } — chi ha il permesso in questo film
+function possoSegnare(){
+  const f = filmCorrente();
+  if (!f || !f.id) return true;                       // un'analisi senza film e' solo mia
+  if (f.mio) return true;
+  return !!(currentUser && segnaChi[currentUser.id]);
+}
+async function segnaChiCarica(){
+  const f = filmCorrente();
+  const chiave = 'cb_segna_chi:' + (f ? f.id : 'io');
+  try { segnaChi = JSON.parse(localStorage.getItem(chiave) || '{}') || {}; } catch (_) { segnaChi = {}; }
+  if (!currentUser || !f || !f.id) return;
+  try {
+    const { data, error } = await sb.rpc('troupe_segna', { p_film: f.id });
+    if (error) throw new Error(error.message);
+    segnaChi = {};
+    for (const r of data || []) if (r && r.segna) segnaChi[r.user_id] = true;
+    try { localStorage.setItem(chiave, JSON.stringify(segnaChi)); } catch (_) {}
+  } catch (e) { console.log('[scene segnate] permessi non letti:', e.message); }
+}
+
 async function sceneSegnateCarica(){
   try { sceneSegnate = JSON.parse(localStorage.getItem(segnateChiave()) || '{}') || {}; } catch (_) { sceneSegnate = {}; }
   const f = filmCorrente();
+  await segnaChiCarica();
   if (currentUser && f && f.id) {
     try {
       const { data, error } = await sb.from('scene_segnate').select('scena,stato').eq('project_id', f.id).limit(2000);
@@ -11273,8 +11325,12 @@ function segnateRidisegna(){
    serve, e cosi' la scena torna a seguire i fogli. */
 async function scenaSegna(n){
   const k = catNumero(n);
-  if (!k) return;
+  if (!k || !possoSegnare()) return;
   const adesso = sceneFatte().has(k);
+  /* Riaccendere una scena girata e' l'errore che non deve capitare con un
+     tocco di troppo: lo si chiede. Segnarla girata no, e' il gesto di
+     tutti i giorni. */
+  if (adesso && !(await askConfirm('Riaccendere la scena ' + k + '?', { conferma: 'Riaccendi', pericolo: false }))) return;
   const voglio = !adesso;
   const daSola = sceneFatteDaiDocumenti().has(k);
   const f = filmCorrente();
@@ -14270,7 +14326,7 @@ function renderPdlModalChips(g) {
     const girata = fatte.has(catNumero(sc.numero));
     const stato = girata ? 'done' : (pdlModalSceneStates[sc.numero] === 'standby' ? 'standby' : 'pending');
     const typeClass = getPdlSceneTypeClass(sc.int_ext, sc.momento);
-    const icon = stato==='standby' ? '⏸' : '';
+    const icon = stato==='done' ? '✓' : stato==='standby' ? '⏸' : '';
     const crit = isSceneCritical(sc.numero);
 
     const sceneIds = (sc.cast||[]).slice().sort((a,b) => Number(a)-Number(b));
@@ -14293,9 +14349,7 @@ function renderPdlModalChips(g) {
         <span class="pdl-chip-num">${sc.numero}</span>
         <span class="q">${[sc.int_ext,sc.momento].filter(Boolean).join(' ')}</span>
         ${crit?'<span class="q" style="color:var(--danger)">critica</span>':''}
-        <button class="pdl-chip-segna${girata ? ' on' : ''}" title="${girata ? 'Girata: tocca per riaccenderla' : 'Segna come girata'}"
-          onclick="event.stopPropagation();scenaSegna('${sc.numero}')">✓</button>
-        <span class="ch" style="margin-left:6px">›</span>
+        <span class="ch">›</span>
       </div>
       ${castBlock}
     </div>`;
@@ -14359,6 +14413,15 @@ function updatePdlModalStatus(g) {
 
 async function openSceneFromPdl(scNum, e) {
   if (e) e.stopPropagation();
+  /* Dal piano si apre la stessa scheda dello spoglio: le segnalazioni
+     della scena, il tasto per la sceneggiatura e quello per segnarla
+     girata. Una scheda sola, da qualunque parte ci si arrivi. Senza uno
+     spoglio a cui chiederla, si va dritti alla pagina come prima. */
+  if (window.analysisData || analysisData) {
+    spoglioApriScena(catNumero(scNum) || scNum);
+    const box = document.getElementById('spScena');
+    if (box && box.style.display !== 'none') { box.classList.add('sopra'); return; }
+  }
   if (!pdfB64Array.length) { alert('PDF non disponibile — ricarica la sceneggiatura'); return; }
 
   // Load analysisData from Supabase if not in memory
