@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v159';
+const CACHE = 'campobase-v160';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -140,20 +140,30 @@ self.addEventListener('push', e => {
     let testo = null;
     // Di solito il testo e' dentro la notifica, cifrato: si legge e basta.
     try { testo = (e.data && e.data.json() || {}).testo || null; } catch (_) {}
-    if (testo) { await mostra(testo); return; }
-    try {
+    /* Il server va avvisato comunque, anche quando il testo c'e' gia':
+       e' quella chiamata a segnare che questo telefono la notifica l'ha
+       mostrata (push_iscrizioni.vista, push_appuntamenti.mostrato). Da
+       quando il testo viaggia dentro la notifica non la faceva piu'
+       nessuno, e "mostrato" restava vuoto per tutti: non c'era modo di
+       distinguere chi l'aveva vista da chi no. Prima si mostra, poi si
+       avvisa: se la rete manca, la notifica c'e' lo stesso. */
+    const chiedi = async () => {
       const sub = await self.registration.pushManager.getSubscription();
-      if (sub) {
-        const r = await fetch('/api/push/messaggio', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint })
-        });
-        if (r.ok) testo = (await r.json()).testo || null;
-      }
-    } catch (err) {
-      console.warn('[SW] testo della notifica non recuperato:', err);
+      if (!sub) return null;
+      const r = await fetch('/api/push/messaggio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint })
+      });
+      return r.ok ? ((await r.json()).testo || null) : null;
+    };
+    if (testo) {
+      await mostra(testo);
+      try { await chiedi(); } catch (_) {}
+      return;
     }
+    try { testo = await chiedi(); }
+    catch (err) { console.warn('[SW] testo della notifica non recuperato:', err); }
     await mostra(testo || GENERICA);
   })());
 });

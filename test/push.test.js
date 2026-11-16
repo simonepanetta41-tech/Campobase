@@ -167,6 +167,7 @@ ok('gli appuntamenti si registrano comunque',
 console.log('\n── il service worker che riceve il testo cifrato ──');
 // La strada normale: il testo e' dentro la notifica, decifrato dal sistema
 // operativo prima di arrivare qui.
+chiesti.length = 0;
 const swPieno = await p.evaluate(async()=>{
   const sorgente = await (await fetch('/sw.js')).text();
   const mostrate = [];
@@ -181,8 +182,27 @@ const swPieno = await p.evaluate(async()=>{
   return mostrate;
 });
 ok('titolo e sottotitolo separati', swPieno, [{titolo:'Nuovo ordine del giorno!', corpo:'MSG - ODG 23 del 12.11.2026'}]);
+/* Il testo ce l'ha gia', ma il server va avvisato lo stesso: e' cosi' che
+   si sa chi la notifica l'ha vista davvero. Senza, "mostrato" restava
+   vuoto per tutta la troupe. */
+ok('⚠ e avvisa il server che l\'ha mostrata, una volta', chiesti.filter(c=>c.url==='/api/push/messaggio').map(c=>c.corpo.endpoint), ['x']);
+messaggioRompi = true;
+const swSenzaRete = await p.evaluate(async()=>{
+  const sorgente = await (await fetch('/sw.js')).text();
+  const mostrate = [];
+  const self = { addEventListener(t,f){ (self._h=self._h||{})[t]=f; },
+    registration:{ pushManager:{getSubscription:async()=>{ throw new Error('rotto'); }},
+      showNotification: async (t,o)=>{ mostrate.push(t); } },
+    clients:{matchAll:async()=>[],openWindow:async()=>null}, skipWaiting(){} };
+  new Function('self','caches','fetch', sorgente)(self, {open:async()=>({put:async()=>{},add:async()=>{}}),keys:async()=>[],match:async()=>null,delete:async()=>{}}, window.fetch.bind(window));
+  const atteso=[];
+  await self._h.push({ data:{ json:()=>({testo:'OdG 26'}) }, waitUntil:pr=>atteso.push(pr) });
+  await Promise.all(atteso);
+  return mostrate;
+});
+messaggioRompi = false;
+ok('⚠ se l\'avviso non riesce, la notifica c\'è lo stesso', swSenzaRete, ['OdG 26']);
 chiesti.length = 0;
-ok('e non va a chiedere niente', chiesti.length, 0);
 
 console.log('\n── il service worker che riceve la notifica vuota (riserva) ──');
 // Il gestore del push si prova nel suo ambiente: si carica sw.js in una
