@@ -81,7 +81,9 @@ ok('i numeri', await p.evaluate(()=>[...document.querySelectorAll('#pdlStatsRow 
    ['37','3','6','1']);
 ok('due barre', await p.evaluate(()=>document.querySelectorAll('.pdl-barra').length), 2);
 ok('con i conti giusti', await p.evaluate(()=>[...document.querySelectorAll('.pdl-barra b')].map(e=>e.textContent)),
-   ['6/18 · 33%','3/37 · 8%']);
+   /* Diciassette, non diciotto: nel piano una scena compare due volte, a
+      pezzi ("...Pt" un giorno, "...End" un altro), ed e' una scena sola. */
+   ['6/17 · 35%','3/37 · 8%']);
 
 console.log('\n── i giorni si contano, non si leggono ──');
 // Com'e' fatto un piano dopo l'unione con un PDL aggiornato: le settimane

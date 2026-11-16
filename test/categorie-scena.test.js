@@ -51,7 +51,7 @@ await p.waitForTimeout(800);
 console.log('\n── il numero nudo di una scena ──');
 const num = s => p.evaluate(x=>catNumero(x), s);
 ok('"SC.21 - EST. ACCAMPAMENTO"', await num('SC.21 - EST. ACCAMPAMENTO - GIORNO (p.14)'), '21');
-ok('"Sc. 32END - INT."',          await num('Sc. 32END - INT. CASA'), '32END');
+ok('"Sc. 32END - INT."',          await num('Sc. 32END - INT. CASA'), '32');
 ok('"65C"',                       await num('65C'), '65C');
 
 /* "PT" vuol dire parte: una scena che non si e' chiusa in giornata torna
@@ -65,6 +65,16 @@ ok('"SC. 36PT"',                  await num('SC. 36PT'), '36');
 ok('"36 1aPT"',                   await num('36 1aPT'), '36');
 /* Ma una lettera non e' una parte: 36A e' un'altra scena, scritta a
    parte sulla sceneggiatura, e non eredita niente dalla 36. */
+/* E non c'e' solo "PT": la fine di una scena e' "END", le parti hanno un
+   numero, e ci sono le riprese a parte (drone, plate). Sono tutti pezzi
+   della stessa scena della sceneggiatura. Finche' qui si toglieva solo
+   "PT", una scena chiusa come 58END non risultava mai girata nello
+   spoglio. I numeri sono quelli veri dei fogli di Missione San Gennaro. */
+for (const [scritto, scena] of [['58END','58'],['58Pt','58'],['16End','16'],['61end','61'],['3Pt1','3'],['3Pt3','3'],
+     ['71End2','71'],['72Pt2A','72'],['12DRONE','12'],['12dron','12'],['38PLATE','38'],
+     ['3Apt','3A'],['3AEnd','3A'],['35APT','35A'],['35Aend','35A']])
+  ok(`"${scritto}" è la ${scena}`, await num(scritto), scena);
+ok('una parola che finisce per END non è una scena', await num('ENDGAME'), '');
 ok('"36A" resta la 36A',          await num('36A'), '36A');
 ok('"25A" resta la 25A',          await num('25A'), '25A');
 ok('"  21 "',                     await num('  21 '), '21');

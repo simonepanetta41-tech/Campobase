@@ -5063,7 +5063,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.151';
+const CB_VERSIONE = '1.152';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -9481,7 +9481,14 @@ function catNumero(s) {
   const tutto = m[1].toUpperCase();
   // L'ordinale deve portare la sua lettera — "1A PT", "2ª PT" — se no il
   // numero della scena verrebbe scambiato per l'ordinale e sparirebbe.
-  const senza = tutto.replace(/(?:\d+[AÂª°])?(?:PARTE|PTE|PT)$/, '');
+  /* E non c'e' solo "PT". Sui fogli veri la stessa scena torna come 58PT e
+     58END, 3PT1 3PT2 3PT3, 71END2, 72PT2A, 12DRONE, 38PLATE: sono tutti
+     pezzi della 58, della 3, della 12. Qui si toglieva solo "PT", e una
+     scena chiusa come 58END non risultava mai girata nello spoglio. */
+  const CODA = /(?:PARTE|PTE|PT|END|FINE|INIZIO|DRONE|DRON|PLATE)(?:\d+[A-Z]?)?$/;
+  // Prima la coda e basta: "3APT" e' la 3A, "35AEND" la 35A.
+  let senza = tutto.replace(CODA, '');
+  if (!/\d/.test(senza)) senza = tutto.replace(new RegExp('(?:\\d+[AÂª°])?' + CODA.source), '');
   // E se togliendo non resta un numero, non era una parte: era il nome.
   return /\d/.test(senza) ? senza : tutto;
 }
@@ -11227,6 +11234,19 @@ function sceneFatte(adesso){
     metti(g.data, (g.scene || []).map(s => s && s.numero));
   }
   for (const k of daFare) fatte.delete(k);
+  /* E quello che si segna a mano nel piano vale piu' di ogni conto: una
+     scena segnata come girata lo e', anche se nessun foglio lo dice (un
+     recupero, una scena aggiunta sul momento); una messa in attesa non lo
+     e', anche se il suo giorno e' passato. Prima le scene segnate a mano
+     contavano solo nella barra del piano, e nello spoglio no. */
+  try {
+    for (const g of Object.values(pdlShootingData || {}))
+      for (const [n, stato] of Object.entries((g && g.scenes) || {})) {
+        const k = num(n); if (!k) continue;
+        if (stato === 'done') fatte.add(k);
+        else if (stato === 'standby') fatte.delete(k);
+      }
+  } catch (_) {}
   return fatte;
 }
 

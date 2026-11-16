@@ -150,6 +150,29 @@ ok('con l\'OdG di oggi che riapre la 36',
 ok('una segnata a mano si aggiunge',
    await barra({piano:PIANO, mano:{22:{scenes:{'70':'done'}}}}), '6/8 · 75%');
 
+console.log('\n── ⚠ le scene chiuse come "END" e quelle segnate a mano ──');
+/* Visto davvero: alcune scene girate non si spegnevano nello spoglio. La
+   58 era stata chiusa come "58END", e solo "PT" veniva letto come un
+   pezzo della scena. */
+const caso = (m) => p.evaluate(m=>{
+  pdlData = {settimane:[{giorni:m.piano||[]}]}; odgPassati = m.odg||[]; odgCorrente = null;
+  pdlShootingData = m.mano||{};
+  const r=[...sceneFatte(new Date(2026,10,12,10,0))].sort(); pdlShootingData={}; return r;
+}, m);
+const g=(n,data,scene)=>({numero_giorno:n,data,scene:scene.map(x=>({numero:x}))});
+ok('⚠ una scena chiusa come 58END è la 58, girata',
+   await caso({odg:[{data:'2026-11-10',scene:['58END','12DRONE','3Pt2']}]}), ['12','3','58']);
+ok('una parte oggi e la fine domani: non è ancora girata',
+   await caso({piano:[g(1,'2026-11-10',['58Pt']), g(2,'2026-11-13',['58End'])]}), []);
+ok('la 35A chiusa come 35Aend non spegne la 35',
+   await caso({piano:[g(1,'2026-11-10',['35Aend'])]}), ['35A']);
+ok('⚠ una scena segnata a mano come girata lo è, anche senza fogli',
+   await caso({mano:{3:{scenes:{'70':'done','71End':'done'}}}}), ['70','71']);
+ok('⚠ anche se il piano la rimette più avanti',
+   await caso({piano:[g(9,'2026-11-20',['70'])], mano:{3:{scenes:{'70':'done'}}}}), ['70']);
+ok('⚠ una messa in attesa non è girata, anche se il suo giorno è passato',
+   await caso({piano:[g(1,'2026-11-10',['44','45'])], mano:{1:{scenes:{'45':'standby'}}}}), ['44']);
+
 ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();
