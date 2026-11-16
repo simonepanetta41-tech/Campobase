@@ -1611,13 +1611,15 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       <div class="settings-section">
         <div class="settings-title">Account</div>
         <div class="settings-row" id="profRigaBox" onclick="profiloApri()" style="cursor:pointer">
-          <div class="settings-row-info" id="profRiga"></div>
+          <div class="settings-row-info">
+            <div id="profRiga"></div>
+            <div class="settings-row-desc" id="settingsEmail" style="margin-top:3px;word-break:break-all"></div>
+          </div>
           <span style="color:var(--muted);font-size:16px">›</span>
         </div>
         <div id="profForm" style="display:none;margin-top:10px"></div>
-        <div class="settings-row" style="margin-top:10px;flex-direction:column;align-items:center;gap:14px;text-align:center">
-          <div class="settings-row-label" id="settingsEmail" style="margin:0;word-break:break-all"></div>
-          <button class="btn-danger" onclick="logout()">Esci dall'account</button>
+        <div style="display:flex;justify-content:center;margin-top:16px">
+          <button class="btn-danger" onclick="logoutChiedi()">Esci dall'account</button>
         </div>
       </div>
       <div class="settings-section">
@@ -2839,6 +2841,11 @@ async function loginWithGoogle() {
   });
 }
 
+/* Uscire per sbaglio costa: bisogna rifare l'accesso, e il film in memoria
+   si chiude. Dal tasto delle impostazioni lo si chiede prima. */
+async function logoutChiedi() {
+  if (await askConfirm('Uscire dall\'account?', { conferma: 'Esci' })) await logout();
+}
 async function logout() {
   filmDimentica();
   await sb.auth.signOut();
@@ -5117,7 +5124,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.163';
+const CB_VERSIONE = '1.164';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

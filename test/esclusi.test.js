@@ -104,6 +104,20 @@ ok('l\'ingresso è rifiutato', [await p.evaluate(()=>filmEntra('A1B2C3D4')), awa
 await p.evaluate(()=>{ DB.ingresso=null; });
 ok('un codice sbagliato resta un codice sbagliato', [await p.evaluate(()=>filmEntra('ZZZZZZZZ')), await p.evaluate(()=>filmEntraEscluso)], [null,false]);
 
+console.log('\n── ⚠ uscire dall\'account chiede conferma ──');
+{ const r=await p.evaluate(async()=>{
+    let usciti=0; const vero=logout; logout=async()=>{ usciti++; };
+    const prova=async(risposta)=>{ const pr=logoutChiedi(); await new Promise(r=>setTimeout(r,40));
+      const testo=document.querySelector('button[data-act="si"]')?.textContent; document.querySelector('button[data-act="'+risposta+'"]').click(); await pr; return testo; };
+    const tasto=await prova('no'); const dopoNo=usciti; await prova('si'); const dopoSi=usciti; logout=vero;
+    return {tasto, dopoNo, dopoSi, bottone:document.querySelector('#settingsPage .btn-danger').getAttribute('onclick'),
+            mail:!!document.querySelector('#profRigaBox #settingsEmail')}; });
+  ok('il tasto delle impostazioni passa dalla domanda', r.bottone, 'logoutChiedi()');
+  ok('⚠ detto di no, si resta dentro', [r.tasto, r.dopoNo], ['Esci', 0]);
+  ok('detto di sì, si esce', r.dopoSi, 1);
+  ok('la mail sta nel riquadro del nome', r.mail, true);
+}
+
 ok('nessun errore di pagina', errori, []);
 await b.close();
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
