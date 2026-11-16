@@ -408,6 +408,9 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-pick .pick-altre{padding:10px 16px 12px;border-top:1px solid var(--border);
   font-size:11px;line-height:1.55;color:var(--orange)}
 .odg-osp{margin-top:9px}
+.odg-avvisi{padding:14px 16px}
+.odg-avvisi p{margin:0;font-size:14px;line-height:1.5;color:var(--white-dim)}
+.odg-avvisi p + p{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
 /* Il passaggio e la scena */
 .odg-pick .r{display:flex;align-items:center;justify-content:space-between;
   padding:12px 16px;border-bottom:1px solid var(--border)}
@@ -5110,7 +5113,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.160';
+const CB_VERSIONE = '1.161';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13644,6 +13647,9 @@ function odgPienoHtml(d) {
     <span class="t">${esc(d.domani.etichetta || '')}</span>
     ${(d.domani.scene || []).length ? `<span class="s">Scene ${d.domani.scene.map(s => esc(s.n)).join(', ')}</span>` : ''}
   </div></div>` : ''}
+
+  ${(d.avvisi || []).length ? `<div class="odg-sez">DALLA PRODUZIONE</div>
+  <div class="card odg-avvisi">${d.avvisi.map(a => `<p>${esc(a)}</p>`).join('')}</div>` : ''}
 
   <div class="odg-sez">FILE</div>
   <div class="card">

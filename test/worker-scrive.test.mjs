@@ -77,6 +77,34 @@ ok('"7/8"', pagineNumero('7/8'), 0.875);
 ok('"3"', pagineNumero('3'), 3);
 ok('una scritta non è un numero', pagineNumero('tante'), null);
 
+console.log('\n── ⚠ gli avvisi della produzione, dal testo della mail ──');
+{ const { avvisiDallaMail } = await import(RADICE + '/worker/scrive.js');
+  const MAIL = `Cari tutti,
+Inviamo in allegato
+- ODG #26 del 17.11.2026
+- Giri Auto
+
+NB:
+Ricordiamo che il Seminario Arcivescovile Ascalesi è una struttura religiosa.
+Vi chiediamo pertanto di mantenere un comportamento rispettoso e un tono di voce adeguato durante tutta la
+permanenza in location, prestando particolare attenzione agli ambienti e agli spazi comuni.
+Grazie
+Alessia Ida
+Mob. +39 3397564743`;
+  const VERO1 = 'Ricordiamo che il Seminario Arcivescovile Ascalesi è una struttura religiosa.';
+  const VERO2 = 'Vi chiediamo pertanto di mantenere un comportamento rispettoso e un tono di voce adeguato durante tutta la permanenza in location, prestando particolare attenzione agli ambienti e agli spazi comuni.';
+  ok('copiati parola per parola: restano', avvisiDallaMail([VERO1, VERO2], MAIL), [VERO1, VERO2]);
+  ok('⚠ uno riassunto o inventato: via', avvisiDallaMail([VERO1, 'La location è una chiesa: fate silenzio e vestitevi in modo adeguato.'], MAIL), [VERO1]);
+  ok('gli a capo della mail non contano', avvisiDallaMail(['adeguato durante tutta la permanenza in location'], MAIL).length, 1);
+  ok('in una mail inoltrata, coi ">" davanti', avvisiDallaMail([VERO1], MAIL.split('\n').map(r => '> ' + r).join('\n')), [VERO1]);
+  ok('un pezzetto ("Grazie") non è un avviso', avvisiDallaMail(['Grazie'], MAIL), []);
+  ok('lo stesso due volte, una', avvisiDallaMail([VERO1, VERO1], MAIL), [VERO1]);
+  ok('senza testo della mail, nessun avviso', [avvisiDallaMail([VERO1], ''), avvisiDallaMail([VERO1], null), avvisiDallaMail(null, MAIL)], [[], [], []]);
+  const conAvvisi = datiPerApp({ ...LETTO, avvisi: [VERO1, 'inventato di sana pianta dal modello'] }, { ...RIGA0, testo: MAIL });
+  ok('⚠ nell\'ordine del giorno finiscono solo quelli veri', conAvvisi.avvisi, [VERO1]);
+  ok('e senza mail la voce c\'è, vuota', d.avvisi, []);
+}
+
 console.log('\n── ⚠ quando non basta per mostrarlo ──');
 ok('letto bene', leggibile(d), null);
 ok('senza data', leggibile(datiPerApp({ ...LETTO, data: '14/11' }, RIGA0)), 'manca la data');
@@ -248,7 +276,9 @@ console.log('\n── ⚠ i giri auto, comunque si chiamino ──');
 /* Visto davvero: "IS_TL_16.04.2026.pdf" e' una transport list. Dal nome
    non si riconosceva, il server leggeva solo l'ordine del giorno e
    l'ordine del giorno arrivava a tutti senza pick-up. */
-const letti = async (nomi) => { mondo(); documenti = null; await posta.riceviPosta(mail(nomi), ACCESO, {}); await leggiInOmbra(ACCESO); return documenti; };
+const lettiTutto = async (nomi) => { mondo(); documenti = null; await posta.riceviPosta(mail(nomi), ACCESO, {}); await leggiInOmbra(ACCESO); return documenti; };
+const letti = async (nomi) => (await lettiTutto(nomi)).filter(x => !/^TESTO DELLA MAIL/.test(x));
+ok('⚠ al modello va anche il testo della mail, in fondo', (await lettiTutto([ODG, GIRI])).map(x => x.split(':')[0]), ['ORDINE DEL GIORNO', 'GIRI AUTO', 'TESTO DELLA MAIL']);
 ok('"GIRI AUTO" nel nome', await letti([ODG, GIRI]), ['ORDINE DEL GIORNO', 'GIRI AUTO']);
 ok('⚠ "TL" nel nome: è la transport list', await letti([ODG, 'IS_TL_16.04.2026.pdf']), ['ORDINE DEL GIORNO', 'GIRI AUTO']);
 ok('⚠ un nome qualunque: al modello, col dubbio', await letti([ODG, 'Movimenti 16.04.pdf']), ['ORDINE DEL GIORNO', 'ALTRO ALLEGATO']);

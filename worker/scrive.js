@@ -122,6 +122,7 @@ export function datiPerApp(letto, riga, adesso) {
       .map(l => ({ nome: testo(l && l.nome), url: /^https?:\/\//.test(testo(l && l.url)) ? testo(l.url) : '',
                    indirizzo: testo(l && l.indirizzo) }))
       .filter(l => l.nome && (l.url || l.indirizzo)),
+    avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo),
     contatti: (Array.isArray(L.contatti) ? L.contatti : [])
       .map(c => ({ nome: testo(c && c.nome), ruolo: testo(c && c.ruolo), tel: testo(c && c.tel).replace(/[^\d+]/g, '') }))
       .filter(c => c.nome && c.tel),
@@ -220,6 +221,30 @@ export function notificaOdg(d, membro, pickup) {
 /* Tutto quello che succede quando la lettura e' riuscita.
    Torna un riepilogo; lancia se non riesce a scrivere l'ordine del
    giorno — e allora chi chiama rilascia. */
+/* Gli avvisi della produzione, dal testo della mail.
+ *
+ * Il modello li copia, e qui si controlla che li abbia copiati davvero:
+ * un avviso resta solo se sta, parola per parola, nel testo della mail.
+ * Un avviso inventato o riassunto, messo sotto il titolo "Dalla
+ * produzione", sarebbe una frase che la produzione non ha mai scritto.
+ * Si confronta a spazi e a capo pareggiati, e senza i ">" delle mail
+ * inoltrate.
+ */
+export function avvisiDallaMail(avvisi, corpo) {
+  const piatto = s => String(s || '').replace(/^[ \t]*>+ ?/gm, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const mail = piatto(corpo);
+  if (!mail || !Array.isArray(avvisi)) return [];
+  const out = [];
+  for (const a of avvisi) {
+    const t = String(a || '').replace(/\s+/g, ' ').trim();
+    if (t.length < 12 || t.length > 700) continue;
+    if (!mail.includes(piatto(t))) continue;
+    if (!out.includes(t)) out.push(t);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
 export async function scriviTutto(env, riga, letto, opz = {}) {
   const adesso = opz.adesso || Date.now();
   const d = datiPerApp(letto, riga, adesso);
