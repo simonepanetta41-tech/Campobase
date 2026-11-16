@@ -663,6 +663,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 #pageModal{z-index:1100}
 .tr-segna{margin-left:auto;padding:6px 12px;border-radius:99px;border:1px solid var(--border-l);background:none;
   color:var(--white-dim);font-size:12px;cursor:pointer;white-space:nowrap}
+.tr-fuori{margin-left:8px;width:30px;height:30px;flex:none;border-radius:50%;border:1px solid var(--border-l);background:none;
+  color:var(--muted);font-size:12px;line-height:1;cursor:pointer}
 .tr-segna.on{border-color:rgba(110,231,183,.6);color:rgb(110,231,183);background:rgba(110,231,183,.1)}
 .sp-riga{display:flex;align-items:baseline;gap:12px;padding:11px 14px;border-top:1px solid var(--border)}
 .sp-riga .k{flex:0 0 112px;font-size:12.5px;color:var(--muted);line-height:1.4}
@@ -2874,6 +2876,7 @@ async function showApp() {
   // c'e', il film e' quello e l'ordine del giorno va riletto dal suo.
   profiloRiallinea();
   filmDallIndirizzo()
+    .then(filmAncoraDentro)                   // escluso nel frattempo? il film si chiude
     .then(filmDaMembro)                       // entrato altrove? il film lo si ritrova
     .finally(() => odgRipristina().finally(postaControlla));
 }
@@ -3536,7 +3539,7 @@ async function codiceEntra() {
   if (b) { b.disabled = true; b.textContent = '…'; }
   const f = await filmEntra(c);
   if (b) { b.disabled = false; b.textContent = 'Entra'; }
-  if (!f) { showToast('Codice non valido. Controlla con chi te l\'ha dato.', 'red', 5000); return; }
+  if (!f) { showToast(filmEntraEscluso ? 'Non puoi entrare in questo film.' : 'Codice non valido. Controlla con chi te l\'ha dato.', 'red', 5000); return; }
   el.value = '';
   // Anche lo spazio lasciato sotto: se resta, la home si apre con mezzo
   // schermo di vuoto in fondo.
@@ -5091,7 +5094,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.156';
+const CB_VERSIONE = '1.157';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -10937,10 +10940,13 @@ function filmLink(codice){
 
 /* Si entra solo col codice: il database non lascia aggiungere nessuno a
    un film per altre vie, nemmeno se se ne conosce l'identificativo. */
+let filmEntraEscluso = false;     // l'ultimo ingresso e' stato rifiutato perche' escluso
 async function filmEntra(codice){
   if (!currentUser) return null;
+  filmEntraEscluso = false;
   try {
     const { data, error } = await sb.rpc('entra_nel_film', { codice_invito: codice });
+    if (error && /esclus/i.test(error.message || '')) filmEntraEscluso = true;
     if (error) throw new Error(error.message);
     const f = Array.isArray(data) ? data[0] : data;
     if (!f) return null;
@@ -11015,8 +11021,27 @@ async function filmDallIndirizzo(){
     showToast('Sei dentro: ' + f.titolo);
     await odgRipristina();
   } else {
-    showToast('Codice non valido o scaduto.');
+    showToast(filmEntraEscluso ? 'Non puoi entrare in questo film.' : 'Codice non valido o scaduto.');
   }
+}
+
+/* Escluso mentre l'app era chiusa: il film resta in memoria sul telefono,
+   e con lui l'ultimo ordine del giorno. Alla prima apertura lo si chiede
+   al database, e se la risposta e' un no netto il film si chiude. Solo un
+   no netto: senza rete, o senza risposta, resta tutto com'e'. */
+async function filmAncoraDentro(){
+  const f = filmCorrente();
+  if (!f || !f.id || f.mio || !currentUser) return true;
+  try {
+    const { data, error } = await sb.rpc('sono_nel_film', { p_film: f.id });
+    if (error || data !== false) return true;
+  } catch (_) { return true; }
+  try { localStorage.removeItem(ODG_LOCALE); localStorage.removeItem(ODG_LOCALE_FILM); } catch (_) {}
+  try { odgCorrente = null; odgPassati = []; } catch (_) {}
+  filmDimentica();
+  try { resetApp(); } catch (_) {}
+  showToast('Non fai più parte di ' + (f.titolo || 'questo film') + '.', 'default', 6000);
+  return false;
 }
 
 async function troupeMembri(){
@@ -11091,12 +11116,55 @@ async function troupeRender(){
   const segna = x => x.ruolo === 'capo' ? '<span class="cast-m">ha aperto il film</span>'
     : f.mio ? `<button class="tr-segna${segnaChi[x.user_id] ? ' on' : ''}" onclick="troupeSegna('${esc(x.user_id)}', ${segnaChi[x.user_id] ? 'false' : 'true'})">${segnaChi[x.user_id] ? '✓ Segna le scene' : 'Segna le scene'}</button>`
     : '';
+  const nomeDi = x => [x.nome, x.cognome].filter(Boolean).join(' ') || 'Senza nome';
+  troupeNomi = {}; for (const x of m) troupeNomi[x.user_id] = nomeDi(x);
+  /* E, sempre solo lui, puo' escludere una persona dal film. */
+  const fuori = x => f.mio && x.ruolo !== 'capo'
+    ? `<button class="tr-fuori" aria-label="Escludi dal film" onclick="troupeEscludi('${esc(x.user_id)}')">✕</button>` : '';
   el.innerHTML = m.length ? m.map(x => `<div class="odg-att">
-      <span class="c"><span class="t">${esc([x.nome, x.cognome].filter(Boolean).join(' ') || 'Senza nome')}</span>
+      <span class="c"><span class="t">${esc(nomeDi(x))}</span>
       ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
-      ${segna(x)}
+      ${segna(x)}${fuori(x)}
     </div>`).join('')
     : `<div class="sp-vuoto" style="padding:18px">Per ora ci sei solo tu.</div>`;
+  if (!f.mio) return;
+  /* Gli esclusi stanno sotto, e si vedono solo se ce ne sono. */
+  let esclusi = [];
+  try {
+    const { data, error } = await sb.rpc('esclusi_del_film', { p_film: f.id });
+    if (!error && Array.isArray(data)) esclusi = data;
+  } catch (_) {}
+  document.getElementById('troupeEsclusi')?.remove();
+  if (!esclusi.length || !document.getElementById('troupeElenco')) return;
+  el.insertAdjacentHTML('afterend', `<div id="troupeEsclusi">
+    <div class="odg-sez" style="margin-top:22px">ESCLUSI</div>
+    <div class="card" style="margin-top:9px">${esclusi.map(x => `<div class="odg-att">
+      <span class="c"><span class="t">${esc(nomeDi(x))}</span>
+      ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
+      <button class="tr-segna" onclick="troupeRiammetti('${esc(x.user_id)}')">Riammetti</button>
+    </div>`).join('')}</div></div>`);
+}
+
+let troupeNomi = {};
+async function troupeEscludi(utente){
+  const f = filmCorrente();
+  if (!f || !f.mio) return;
+  if (!(await askConfirm('Escludere ' + (troupeNomi[utente] || 'questa persona') + ' dal film? Non potrà rientrare col codice.',
+                         { conferma: 'Escludi' }))) return;
+  try {
+    const { error } = await sb.rpc('escludi_dal_film', { p_film: f.id, p_utente: utente });
+    if (error) throw new Error(error.message);
+  } catch (e) { showToast('Non escluso: riprova', 'default', 3000); console.log('[troupe] esclusione:', e.message); }
+  troupeRender();
+}
+async function troupeRiammetti(utente){
+  const f = filmCorrente();
+  if (!f || !f.mio) return;
+  try {
+    const { error } = await sb.rpc('riammetti_nel_film', { p_film: f.id, p_utente: utente });
+    if (error) throw new Error(error.message);
+  } catch (e) { showToast('Non riammesso: riprova', 'default', 3000); console.log('[troupe] riammissione:', e.message); }
+  troupeRender();
 }
 
 async function troupeSegna(utente, vale){
