@@ -78,7 +78,7 @@ globalThis.fetch = async (url, opz = {}) => {
       if (smista === null) return new Response('{"error":"overloaded"}', { status: 529 });
       return new Response(JSON.stringify({ usage: {}, content: [{ type: 'text', text: JSON.stringify(smista.map((tipo, i) => ({ n: i + 1, tipo }))) }] }), { status: 200 });
     }
-    documenti = corpo.messages[0].content.filter(c => c.type === 'text').map(c => c.text.split(' (')[0] + (/\(([^)]*)\)/.exec(c.text) ? ' ' + /\(([^)]*)\)/.exec(c.text)[1] : ''));
+    documenti = corpo.messages[0].content.filter(c => c.type === 'text' && !/^TESTO DELLA MAIL/.test(c.text)).map(c => c.text.split(' (')[0] + (/\(([^)]*)\)/.exec(c.text) ? ' ' + /\(([^)]*)\)/.exec(c.text)[1] : ''));
     return modello();
   }
   if (u.pathname.startsWith('/storage/v1/object/sign/')) return R({ signedURL: '/object/sign/x?token=t' });
