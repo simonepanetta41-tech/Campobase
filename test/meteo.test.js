@@ -206,6 +206,10 @@ await p.evaluate(()=>{
 await p.waitForTimeout(300);
 const testo=await p.evaluate(()=>document.getElementById('odgCorpo').textContent);
 ok('le temperature ci sono',/10/.test(testo) && /15/.test(testo), true);
+ok('⚠ minima e massima uguali: un numero solo', await p.evaluate(()=>{
+  const v=odgCorrente.previsione, tieni=[v.min,v.max]; v.min=19; v.max=19; odgRender();
+  const t=[...document.querySelectorAll('#odgCorpo .k')].find(k=>k.textContent==='temp').nextElementSibling.textContent;
+  [v.min,v.max]=tieni; odgRender(); return t; }), '19°');
 /* Il nome del posto non sta piu' sulla scheda — era una riga in piu' su
    una pagina che si legge di corsa — ma non si puo' perdere: e' l'unico
    modo per accorgersi che il meteo sta guardando il comune sbagliato,
