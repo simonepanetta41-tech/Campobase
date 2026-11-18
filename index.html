@@ -2067,6 +2067,11 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
 
           <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:12px;padding:22px;width:360px;max-width:92vw">
             <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;margin-bottom:14px">Export PDF</div>
+            <label for="tt-nomeFile" style="display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Nome del file</label>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px">
+              <input id="tt-nomeFile" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--white);font-family:'DM Mono',monospace;font-size:12px">
+              <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">.pdf</span>
+            </div>
             <div onclick="ttDoExport('unico')" style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">
               <div style="font-size:12px;font-weight:500;margin-bottom:2px">PDF unico</div>
               <div style="font-size:10px;color:var(--muted)">Tutte le tabelle in un solo file</div>
@@ -5258,7 +5263,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.170';
+const CB_VERSIONE = '1.171';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -16315,9 +16320,59 @@ async function ttDelS(si){
   if(error){console.log('[ttDelS] error:',error.message);showToast('Errore eliminazione: '+error.message);return;}
   ttRenderStorico();
 }
-function ttExportModal(){document.getElementById('tt-exportOv').style.display='flex';}
+/* ── Il nome del file esportato ───────────────────────────────────────
+ *
+ *   MSG_Suono_Sett4_09-14nov.pdf
+ *
+ * Sigla del film, reparto, settimana, date: e' cosi' che il foglio ore
+ * viene mandato alla produzione, e "timetable_sett4_MissioneSanGennaro"
+ * andava rinominato a mano ogni volta. Nella finestra lo si puo'
+ * ritoccare prima di salvare. Con un file per tabella, in coda vanno i
+ * cognomi di chi c'e' in quella tabella.
+ */
+function ttPulisciNome(x){
+  return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^A-Za-z0-9._-]+/g,'').slice(0,60);
+}
+function ttSiglaFilm(titolo){
+  const p=String(titolo||'').trim().split(/\s+/).filter(Boolean);
+  if(!p.length)return '';
+  return ttPulisciNome(p.length===1?p[0].slice(0,3):p.map(x=>x[0]).join('').slice(0,5)).toUpperCase();
+}
+function ttDateNome(dal,al){
+  const M=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const d=x=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(x||''));return m?{g:m[3],m:M[+m[2]-1]}:null;};
+  const a=d(dal),b=d(al);
+  if(a&&b)return a.m===b.m?`${a.g}-${b.g}${b.m}`:`${a.g}${a.m}-${b.g}${b.m}`;
+  return a?a.g+a.m:b?b.g+b.m:'';
+}
+function ttNomeProposto(){
+  const v=id=>document.getElementById(id)?.value||'';
+  const film=v('tt-film'), sett=v('tt-settimana');
+  const nome=[ttSiglaFilm(film), ttPulisciNome(v('tt-reparto').replace(/\s+/g,'')),
+              sett?'Sett'+ttPulisciNome(sett):'', ttDateNome(v('tt-dal'),v('tt-al'))].filter(Boolean).join('_');
+  return nome||'Ore';
+}
+/* "Denny De Angelis" -> "DeAngelis": il cognome e' tutto quello che viene
+   dopo il nome. Uno scritto con una parola sola resta quella. */
+function ttCognomi(workers){
+  return (workers||[]).map(w=>{
+    const p=String(w||'').trim().split(/\s+/).filter(Boolean);
+    return ttPulisciNome((p.length>1?p.slice(1):p).join(''));
+  }).filter(Boolean).join('-').slice(0,60);
+}
+function ttNomeScelto(){
+  const scritto=ttPulisciNome(String(document.getElementById('tt-nomeFile')?.value||'').trim().replace(/\.pdf$/i,'').replace(/\s+/g,'_'))
+    .replace(/^[._-]+|[._-]+$/g,'');
+  return scritto||ttNomeProposto();
+}
+function ttExportModal(){
+  const c=document.getElementById('tt-nomeFile'); if(c)c.value=ttNomeProposto();
+  document.getElementById('tt-exportOv').style.display='flex';
+}
 
 async function ttDoExport(tipo){
+  const nomeBase=ttNomeScelto();
   document.getElementById('tt-exportOv').style.display='none';
   showToast('Generazione PDF...');
 
@@ -16341,8 +16396,7 @@ async function ttDoExport(tipo){
     for(let i=0;i<ttTabelle.length;i++){
       const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
       ttBuildPdfPage(doc, ttTabelle[i], produzione, film, reparto, settimana, dal, al, note);
-      const workers=ttTabelle[i].workers.join('_').replace(/\s/g,'').slice(0,30)||'tabella'+(i+1);
-      doc.save(`timetable_sett${settimana||i+1}_${workers}.pdf`);
+      doc.save(`${nomeBase}_${ttCognomi(ttTabelle[i].workers)||'tabella'+(i+1)}.pdf`);
       await new Promise(r=>setTimeout(r,300));
     }
     showToast(`${ttTabelle.length} PDF generati!`);
@@ -16353,8 +16407,7 @@ async function ttDoExport(tipo){
       if(i>0) doc.addPage();
       ttBuildPdfPage(doc, tab, produzione, film, reparto, settimana, dal, al, note);
     });
-    const fname=`timetable_sett${settimana||''}_${film.replace(/\s/g,'').slice(0,20)||'orari'}.pdf`;
-    doc.save(fname);
+    doc.save(nomeBase+'.pdf');
     showToast('PDF generato!');
   }
 }

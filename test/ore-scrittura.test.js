@@ -125,6 +125,41 @@ for(const [larghezza, etichetta] of [[390,'iPhone'],[768,'schermo largo']]){
     await p.keyboard.type('0');
   }
 
+  /* Il nome del file esportato: sigla, reparto, settimana, date. */
+  { const r=await p.evaluate(()=>{
+      const metti=(id,v)=>{ document.getElementById(id).value=v; };
+      metti('tt-film','Missione San Gennaro'); metti('tt-reparto','Suono'); metti('tt-settimana','4');
+      metti('tt-dal','2026-11-09'); metti('tt-al','2026-11-14');
+      ttExportModal(); const proposto=document.getElementById('tt-nomeFile').value, aperta=document.getElementById('tt-exportOv').style.display;
+      document.getElementById('tt-nomeFile').value='ore sett 4 / suono.pdf'; const mio=ttNomeScelto();
+      document.getElementById('tt-nomeFile').value='   '; const vuoto=ttNomeScelto();
+      metti('tt-dal','2026-11-30'); metti('tt-al','2026-12-05'); const cavallo=ttNomeProposto();
+      metti('tt-film','Separazioni'); metti('tt-reparto',''); metti('tt-settimana',''); metti('tt-dal',''); metti('tt-al',''); const poco=ttNomeProposto();
+      metti('tt-film',''); const niente=ttNomeProposto();
+      document.getElementById('tt-exportOv').style.display='none';
+      return {proposto,aperta,mio,vuoto,cavallo,poco,niente,
+              cognomi:[ttCognomi(['Denny De Angelis','Simone Panetta','Alessandro Rizzo']), ttCognomi(['Lorenzo']), ttCognomi([])]}; });
+    ok('⚠ il nome proposto', [r.proposto, r.aperta], ['MSG_Suono_Sett4_09-14nov','flex']);
+    ok('si può riscrivere: spazi e segni strani spariscono', r.mio, 'ore_sett_4__suono');
+    ok('lasciato vuoto, torna quello proposto', r.vuoto, 'MSG_Suono_Sett4_09-14nov');
+    ok('una settimana a cavallo di due mesi', r.cavallo, 'MSG_Suono_Sett4_30nov-05dic');
+    ok('con poco: quello che c\'è', [r.poco, r.niente], ['SEP','Ore']);
+    ok('⚠ i cognomi, per un file a tabella', r.cognomi, ['DeAngelis-Panetta-Rizzo','Lorenzo','']);
+    // E i file escono davvero con quei nomi.
+    const salvati=await p.evaluate(async()=>{
+      const metti=(id,v)=>{ document.getElementById(id).value=v; };
+      metti('tt-film','Missione San Gennaro'); metti('tt-reparto','Suono'); metti('tt-settimana','4'); metti('tt-dal','2026-11-09'); metti('tt-al','2026-11-14');
+      const nomi=[]; const doc=()=>({ save:n=>nomi.push(n), addPage(){} });
+      window.jspdf={ jsPDF:function(){ return doc(); } }; ttLoadScript=async()=>{}; ttBuildPdfPage=()=>{};
+      ttTabelle[0].workers=['Denny De Angelis','Simone Panetta'];
+      ttExportModal(); await ttDoExport('unico');
+      ttTabelle.push({ ...ttTabelle[0], id:ttTabelle[0].id+1, workers:['Alessandro Rizzo'] });
+      ttExportModal(); await ttDoExport('separati');
+      ttTabelle.pop(); return nomi; });
+    ok('⚠ un file solo, e uno per tabella coi cognomi', salvati,
+       ['MSG_Suono_Sett4_09-14nov.pdf','MSG_Suono_Sett4_09-14nov_DeAngelis-Panetta.pdf','MSG_Suono_Sett4_09-14nov_Rizzo.pdf']);
+  }
+
   ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
   await p.close();
 }
