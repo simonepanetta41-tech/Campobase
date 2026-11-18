@@ -217,7 +217,13 @@ async function bussa(isc, testo, env, opz = {}) {
     /* Con il testo viaggia il numero dell'appuntamento: il telefono lo
        rimanda indietro quando la mostra, e la conferma va alla notifica
        giusta anche se arriva ore dopo. */
-    corpo = await cifra(JSON.stringify(opz.id ? { testo, id: opz.id } : { testo }), isc.p256dh, isc.auth);
+    /* E il film e la sezione: toccandola si arriva li', non alla lista
+       dei film. Chi ha due film aperti non deve indovinare di quale parla. */
+    const dentro = { testo };
+    if (opz.id) dentro.id = opz.id;
+    if (opz.film) dentro.film = opz.film;
+    if (opz.vai) dentro.vai = opz.vai;
+    corpo = await cifra(JSON.stringify(dentro), isc.p256dh, isc.auth);
     capo['Content-Encoding'] = 'aes128gcm';
     capo['Content-Type'] = 'application/octet-stream';
   }
@@ -269,6 +275,15 @@ async function mandaAUtente(userId, testo, env, opz = {}) {
 
 // ── Il cron ─────────────────────────────────────────────────────────────────
 
+/* Dove porta una notifica, toccandola: il pick-up al proprio passaggio,
+   un piano nuovo al piano, tutto il resto all'ordine del giorno. */
+export function doveVa(a) {
+  if (!a || a.genere === 'prova') return null;
+  if (a.genere === 'pickup') return 'passaggio';
+  if (a.genere === 'posta' && /piano di lavorazione/i.test(String(a.testo || '').split('\n')[0])) return 'piano';
+  return 'odg';
+}
+
 /* Passa ogni minuto. Non gli interessa chi ha scritto l'appuntamento: ne
    scrive l'app, per il pick-up e il catering, e il Worker per la posta. */
 export async function mandaScadute(env) {
@@ -277,11 +292,12 @@ export async function mandaScadute(env) {
   const limite = new Date(ora - SCADENZA * 60000).toISOString();
 
   const dovute = await db(env, 'push_appuntamenti' +
-    `?select=id,user_id,testo,quando,genere&mandato=is.null` +
+    `?select=id,user_id,project_id,testo,quando,genere&mandato=is.null` +
     `&quando=lte.${adesso}&quando=gte.${limite}&order=quando.asc&limit=100`);
 
   for (const a of dovute || []) {
-    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env, { id: a.id, genere: a.genere });
+    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env,
+      { id: a.id, genere: a.genere, film: a.project_id || null, vai: doveVa(a) });
     await db(env, `push_appuntamenti?id=eq.${a.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ mandato: adesso, dispositivi: partite, scartati })

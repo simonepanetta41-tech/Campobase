@@ -115,7 +115,7 @@ const fabbrica = new Function('UTENTE', 'CORPO',
      const readJson = async () => ({ body: CORPO() });
      const requireUser = async () => (UTENTE() ? { user: UTENTE() } : { error: json({ error: 'no' }, 401) });`)
     .replace(/^\s*export /gm, '')
-  + '\nreturn {mandaScadute, handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, avvisaPosta};');
+  + '\nreturn {mandaScadute, handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, avvisaPosta, doveVa};');
 const push = fabbrica(() => utenteFinto, () => corpoFinto);
 
 let ko = 0;
@@ -337,6 +337,13 @@ ok('⚠ quella di un altro non si conferma', visti(), [N1]);
 corpoFinto = { endpoint: 'https://web.push.apple.com/t1', id: 'non-un-numero' };
 await push.handleMessaggio({}, ENV);
 ok('un numero che non è un numero: come senza (la più vecchia ancora valida)', visti(), [N1, N2]);
+
+console.log('\n── ⚠ dove porta una notifica, toccandola ──');
+ok('il pick-up al proprio passaggio', push.doveVa({ genere: 'pickup', testo: 'Lorenzo è lì fra 10 minuti' }), 'passaggio');
+ok('il catering all\'ordine del giorno', push.doveVa({ genere: 'catering', testo: 'Catering pronto' }), 'odg');
+ok('un ordine del giorno nuovo, lì', push.doveVa({ genere: 'posta', testo: 'OdG 26 · martedì 17 novembre\nPick-up 15.35' }), 'odg');
+ok('⚠ un piano nuovo al piano', push.doveVa({ genere: 'posta', testo: 'Nuovo piano di lavorazione!\nPdL 7 · fino al 12 dicembre' }), 'piano');
+ok('la prova da nessuna parte', push.doveVa({ genere: 'prova', testo: 'Funziona!' }), null);
 
 console.log('\n── un indirizzo che non conosciamo non ottiene niente ──');
 corpoFinto = { endpoint: 'https://web.push.apple.com/non-mio' };

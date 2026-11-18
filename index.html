@@ -655,7 +655,9 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:1px solid var(--border-l);border-radius:12px;color:var(--white);
   font-family:'Space Grotesk',sans-serif;font-size:14.5px;cursor:pointer}
 .sp-vai .p{font-family:'DM Mono',monospace;font-size:13px;color:var(--yellow);white-space:nowrap}
-.sp-girata-riga{display:flex;justify-content:center;margin:22px 0 8px}
+.sp-girata-riga{display:flex;flex-direction:column;align-items:center;gap:9px;margin:22px 0 8px}
+.sp-girata-chi{font-size:12px;color:var(--muted)}
+.sp-girata-chi:empty{display:none}
 .sp-girata-riga:empty{display:none}
 .sp-pillola{display:inline-flex;align-items:center;gap:9px;padding:13px 30px;border-radius:99px;border:none;cursor:pointer;
   font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;background:var(--yellow);color:#111}
@@ -1459,7 +1461,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
          cambia. Il titolo riporta alla scelta del progetto, l'ingranaggio
          alle impostazioni. -->
     <header class="cb-testa">
-      <button class="cb-ident" onclick="showPage('home')" title="Cambia progetto">
+      <button class="cb-ident" onclick="cbEsciDalFilm()" title="Cambia progetto">
         <!-- La freccetta verso il basso diceva "qui si apre qualcosa", e
              qui invece si torna indietro. Il segno di indietro sta dove lo
              cerca la mano, tutto a sinistra, prima del nome del film. -->
@@ -2847,7 +2849,7 @@ async function logoutChiedi() {
   if (await askConfirm('Uscire dall\'account?', { conferma: 'Esci' })) await logout();
 }
 async function logout() {
-  filmDimentica();
+  filmDimentica(); ultimoDimentica();
   await sb.auth.signOut();
 }
 
@@ -2894,7 +2896,7 @@ async function showApp() {
   filmDallIndirizzo()
     .then(filmAncoraDentro)                   // escluso nel frattempo? il film si chiude
     .then(filmDaMembro)                       // entrato altrove? il film lo si ritrova
-    .finally(() => odgRipristina().finally(postaControlla));
+    .finally(() => odgRipristina().finally(() => { postaControlla(); avvioApri(); }));
 }
 
 /* Niente zoom con due dita.
@@ -2992,7 +2994,7 @@ document.addEventListener('touchend', e => {
   const dx = t.clientX - cbTx, dy = t.clientY - cbTy;
   // Abbondante e chiaramente orizzontale: uno scorrimento in verticale
   // che sbanda non deve far cambiare schermata.
-  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) showPage('home');
+  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) cbEsciDalFilm();
 }, { passive: true });
 
 /*
@@ -3579,7 +3581,121 @@ async function codiceEntra() {
 
 /* Aprire un film di cui si e' solo membri: non c'e' un'analisi da
    caricare, c'e' l'ordine del giorno della giornata. */
+/* ── Tornare dove si era ───────────────────────────────────────────────
+ *
+ * L'app si apre dieci volte al giorno per guardare la stessa cosa, e ogni
+ * volta ripartiva dalla lista dei film: un tocco in piu' per arrivare
+ * all'ordine del giorno. Si ricorda allora l'ultimo film aperto e alla
+ * riapertura ci si torna dentro. Chi esce apposta con la freccia resta
+ * sulla lista: l'ha chiesto lui.
+ *
+ * E una notifica toccata porta al suo film e alla sua sezione, anche se
+ * l'ultimo aperto era un altro.
+ */
+const CB_ULTIMO = 'cb_ultimo_aperto';
+function ultimoRicorda(x){ try { localStorage.setItem(CB_ULTIMO, JSON.stringify(x)); } catch (_) {} }
+function ultimoDimentica(){ try { localStorage.removeItem(CB_ULTIMO); } catch (_) {} }
+function ultimoLeggi(){ try { return JSON.parse(localStorage.getItem(CB_ULTIMO) || 'null'); } catch (_) { return null; } }
+/* La freccia in alto e lo scorrimento: si esce dal film apposta. */
+function cbEsciDalFilm(){ ultimoDimentica(); showPage('home'); }
+
+/* Portare a una sezione, dentro il film gia' aperto. */
+function sezioneVai(vai){
+  if (vai === 'piano') { try { switchResultTab('piano'); } catch (_) {} return; }
+  try { switchResultTab('odg'); } catch (_) {}
+  if (vai !== 'passaggio') return;
+  // Il proprio passaggio sta a meta' pagina: lo si porta in vista.
+  let giri = 0;
+  const cerca = () => {
+    const t = [...document.querySelectorAll('#odgCorpo .odg-sez')].find(x => /IL TUO PASSAGGIO/i.test(x.textContent));
+    if (t) { t.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+    if (++giri < 12) setTimeout(cerca, 250);
+  };
+  cerca();
+}
+
+/* Aprire un film dal suo numero: chi l'ha aperto passa dalla sua analisi,
+   gli altri dal film. Solo se ci si e' dentro: una notifica vecchia di un
+   film da cui si e' usciti non deve aprire una pagina vuota. */
+async function filmApriDa(filmId, vai){
+  if (!currentUser || !filmId) return false;
+  const dentro = document.getElementById('resultsPage')?.classList.contains('on')
+              && document.getElementById('homePage')?.style.display === 'none';
+  if (dentro && filmCorrente() && filmCorrente().id === filmId) {
+    sezioneVai(vai);
+    try { odgRipristina().finally(postaControlla); } catch (_) {}
+    return true;
+  }
+  try {
+    const { data: m } = await sb.from('film_membri').select('project_id')
+      .eq('project_id', filmId).eq('user_id', currentUser.id).limit(1);
+    if (!m || !m.length) return false;
+    const { data: a } = await sb.from('analyses').select('id')
+      .eq('project_id', filmId).eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false }).limit(1);
+    try { showPage('home'); } catch (_) {}
+    if (a && a.length) await loadFromHistory(a[0].id); else await apriFilm(filmId);
+    sezioneVai(vai);
+    return true;
+  } catch (e) { console.log('[apri] film non aperto:', e && e.message); return false; }
+}
+
+/* Il biglietto lasciato dalla notifica toccata: nell'indirizzo, se l'app
+   e' stata aperta da li', o in memoria, dove lo lascia il service worker.
+   Vale per due minuti: dopo e' una notifica vecchia, non un'intenzione. */
+async function apriBiglietto(){
+  let b = null;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('apri')) {
+      b = { film: q.get('apri'), vai: q.get('vai') || '' };
+      q.delete('apri'); q.delete('vai');
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    }
+  } catch (_) {}
+  try {
+    if (window.caches) {
+      const c = await caches.open('campobase-apri');
+      const r = await c.match('/apri');
+      if (r) {
+        const x = await r.json(); await c.delete('/apri');
+        if (!b && x && x.film && Date.now() - (x.quando || 0) < 120000) b = { film: x.film, vai: x.vai || '' };
+      }
+    }
+  } catch (_) {}
+  return b;
+}
+async function apriDaNotifica(){
+  const b = await apriBiglietto();
+  if (!b || !currentUser) return false;
+  return filmApriDa(b.film, b.vai);
+}
+/* All'avvio: prima la notifica toccata, poi l'ultimo film aperto. */
+async function avvioApri(){
+  if (!currentUser) return;
+  if (await apriDaNotifica()) return;
+  const dentro = document.getElementById('resultsPage')?.classList.contains('on');
+  const u = ultimoLeggi();
+  if (dentro || !u) return;
+  if (u.f) { if (!(await filmApriDa(u.f, 'odg'))) ultimoDimentica(); }
+  else if (u.a) {
+    try {
+      const { data } = await sb.from('analyses').select('id').eq('id', u.a).eq('user_id', currentUser.id).limit(1);
+      if (data && data.length) await loadFromHistory(u.a); else ultimoDimentica();
+    } catch (_) {}
+  }
+}
+// L'app gia' aperta: il messaggio del service worker, o il ritorno davanti.
+try {
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', e => {
+    const d = e.data || {};
+    if (d.campobase === 'apri' && d.film) apriBiglietto().finally(() => filmApriDa(d.film, d.vai || ''));
+  });
+} catch (_) {}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) apriDaNotifica(); });
+
 async function apriFilm(id) {
+  ultimoRicorda({ f: id });
   await filmCarica(id);
   hideHomeShowResults();
   /* Accendere la pagina, non solo spegnere la home.
@@ -3692,6 +3808,7 @@ async function loadFromHistory(id) {
   /* E l'ordine del giorno va ripreso per QUESTO film. Da qui non lo si
      faceva: chi apriva il suo film dalla scheda dell'analisi si teneva a
      schermo l'ordine del giorno del film aperto prima. */
+  ultimoRicorda(data.project_id ? { f: data.project_id } : { a: id });
   if (data.project_id) filmCarica(data.project_id).then(() => odgRipristina()).then(() => postaControlla())
     .catch(e => console.log('[film] ordine del giorno non ripreso:', e && e.message));
   pdfB64Array = []; modalPdfDoc = null;
@@ -4822,9 +4939,11 @@ function spoglioGirataBottone(k){
   const box = document.getElementById('spGirata');
   if (!box || box.dataset.n !== k) return;
   const fatta = sceneFatte().has(k), posso = possoSegnare();
-  if (!posso) { box.innerHTML = fatta ? '<span class="sp-pillola on ferma"><i>✓</i>Girata</span>' : ''; return; }
-  box.innerHTML = `<button class="sp-pillola${fatta ? ' on' : ''}" onclick="scenaSegna('${esc(k)}')">
-    <i>✓</i>${fatta ? 'Girata' : 'Segna come girata'}</button>`;
+  const chi = `<div class="sp-girata-chi" id="spGirataChi" data-n="${esc(k)}"></div>`;
+  if (!posso) box.innerHTML = fatta ? '<span class="sp-pillola on ferma"><i>✓</i>Girata</span>' + chi : '';
+  else box.innerHTML = `<button class="sp-pillola${fatta ? ' on' : ''}" onclick="scenaSegna('${esc(k)}')">
+    <i>✓</i>${fatta ? 'Girata' : 'Segna come girata'}</button>${chi}`;
+  spoglioGirataChi(k);
 }
 
 function spoglioChiudiScena(){
@@ -5124,7 +5243,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.166';
+const CB_VERSIONE = '1.167';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11068,7 +11187,7 @@ async function filmAncoraDentro(){
   } catch (_) { return true; }
   try { localStorage.removeItem(ODG_LOCALE); localStorage.removeItem(ODG_LOCALE_FILM); } catch (_) {}
   try { odgCorrente = null; odgPassati = []; } catch (_) {}
-  filmDimentica();
+  filmDimentica(); ultimoDimentica();
   try { resetApp(); } catch (_) {}
   showToast('Non fai più parte di ' + (f.titolo || 'questo film') + '.', 'default', 6000);
   return false;
@@ -11395,17 +11514,57 @@ async function segnaChiCarica(){
   } catch (e) { console.log('[scene segnate] permessi non letti:', e.message); }
 }
 
+/* Chi ha segnato ogni scena, e quando. Con piu' persone che possono
+   segnare, quando due non sono d'accordo serve sapere a chi chiedere. */
+let sceneSegnateChi = {};        // { scena: { chi: user_id, quando: iso } }
+let segnaNomi = null, segnaNomiFilm = null;
+async function segnaNomiCarica(){
+  const f = filmCorrente();
+  if (!f || !f.id) return {};
+  if (segnaNomi && segnaNomiFilm === f.id) return segnaNomi;
+  const n = {};
+  try { for (const m of await troupeMembri()) n[m.user_id] = [m.nome, m.cognome].filter(Boolean).join(' '); } catch (_) {}
+  segnaNomi = n; segnaNomiFilm = f.id;
+  return n;
+}
+function segnaQuando(iso, adesso){
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const ora = String(d.getHours()).padStart(2, '0') + '.' + String(d.getMinutes()).padStart(2, '0');
+  const giorno = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((giorno(adesso || new Date()) - giorno(d)) / 86400000);
+  if (diff === 0) return 'oggi ' + ora;
+  if (diff === 1) return 'ieri ' + ora;
+  return d.getDate() + '/' + (d.getMonth() + 1) + ' ' + ora;
+}
+/* La riga sotto la pillola: "Segnata da Anna Riva · ieri 18.40". Solo
+   quando la scena e' segnata a mano: se la danno per fatta i fogli, non
+   l'ha segnata nessuno. */
+async function spoglioGirataChi(k){
+  const riga = document.getElementById('spGirataChi');
+  if (!riga || riga.dataset.n !== k) return;
+  const stato = sceneSegnate[k], c = sceneSegnateChi[k];
+  if (!stato || !c || !c.chi) { riga.textContent = ''; return; }
+  const nomi = await segnaNomiCarica();
+  if (riga.dataset.n !== k) return;
+  const nome = currentUser && c.chi === currentUser.id ? 'te' : (nomi[c.chi] || '');
+  riga.textContent = [(stato === 'girata' ? 'Segnata' : 'Riaccesa') + (nome ? ' da ' + nome : ''), segnaQuando(c.quando)]
+    .filter(Boolean).join(' · ');
+}
+
 async function sceneSegnateCarica(){
   try { sceneSegnate = JSON.parse(localStorage.getItem(segnateChiave()) || '{}') || {}; } catch (_) { sceneSegnate = {}; }
   const f = filmCorrente();
   await segnaChiCarica();
   if (currentUser && f && f.id) {
     try {
-      const { data, error } = await sb.from('scene_segnate').select('scena,stato').eq('project_id', f.id).limit(2000);
+      const { data, error } = await sb.from('scene_segnate').select('scena,stato,user_id,aggiornato').eq('project_id', f.id).limit(2000);
       if (error) throw new Error(error.message);
-      const dalCloud = {};
-      for (const r of data || []) if (r && r.scena && (r.stato === 'girata' || r.stato === 'da_girare')) dalCloud[r.scena] = r.stato;
-      sceneSegnate = dalCloud;
+      const dalCloud = {}, chi = {};
+      for (const r of data || []) if (r && r.scena && (r.stato === 'girata' || r.stato === 'da_girare')) {
+        dalCloud[r.scena] = r.stato;
+        chi[r.scena] = { chi: r.user_id || null, quando: r.aggiornato || null };
+      }
+      sceneSegnate = dalCloud; sceneSegnateChi = chi;
       segnateTieni();
     } catch (e) { console.log('[scene segnate] cloud non letto, restano quelle sul telefono:', e.message); }
   }
@@ -11432,8 +11591,11 @@ async function scenaSegna(n){
   const voglio = !adesso;
   const daSola = sceneFatteDaiDocumenti().has(k);
   const f = filmCorrente();
-  if (daSola === voglio) delete sceneSegnate[k];
-  else sceneSegnate[k] = voglio ? 'girata' : 'da_girare';
+  if (daSola === voglio) { delete sceneSegnate[k]; delete sceneSegnateChi[k]; }
+  else {
+    sceneSegnate[k] = voglio ? 'girata' : 'da_girare';
+    sceneSegnateChi[k] = { chi: currentUser ? currentUser.id : null, quando: new Date().toISOString() };
+  }
   segnateTieni();
   segnateRidisegna();
   spoglioGirataBottone(k);

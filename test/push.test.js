@@ -190,6 +190,38 @@ console.log('\n── ⚠ gli interruttori delle notifiche ──');
   ok('se la prova non parte, torna subito spenta', r.fallita, false);
 }
 
+console.log('\n── ⚠ la notifica toccata porta al suo film e alla sua sezione ──');
+{ const r = await p.evaluate(async()=>{
+    const sorgente = await (await fetch('/sw.js')).text();
+    const mostrate = [], biglietti = {}, messaggi = [], aperte = [];
+    const finestra = { focus: async()=>'davanti', postMessage: m=>messaggi.push(m) };
+    let finestre = [];
+    const self = { addEventListener(t,f){ (self._h=self._h||{})[t]=f; },
+      registration:{ pushManager:{getSubscription:async()=>null}, showNotification: async (t,o)=>{ mostrate.push(o.data); } },
+      clients:{ matchAll:async()=>finestre, openWindow:async(u)=>{ aperte.push(u); } }, skipWaiting(){} };
+    const cachesFinte = { open:async(n)=>({ put:async(k,resp)=>{ biglietti[n+k]=await resp.json(); }, add:async()=>{} }), keys:async()=>[], match:async()=>null, delete:async()=>{} };
+    new Function('self','caches','fetch', sorgente)(self, cachesFinte, window.fetch.bind(window));
+    const spingi = async(d)=>{ const at=[]; await self._h.push({ data:{ json:()=>d }, waitUntil:pr=>at.push(pr) }); await Promise.all(at); };
+    const tocca = async(d)=>{ const at=[]; self._h.notificationclick({ notification:{ close(){}, data:d }, waitUntil:pr=>at.push(pr) }); await Promise.all(at); };
+    await spingi({ testo:'OdG 27', id:'n1', film:'film-A', vai:'odg' });
+    await spingi({ testo:'Funziona!' });
+    // app chiusa: la si apre all'indirizzo giusto, e il biglietto resta in memoria
+    await tocca(mostrate[0]); const chiusa = { aperte: aperte.slice(), biglietto: biglietti['campobase-apri/apri'] };
+    // app aperta: le si dice dove andare e la si porta davanti
+    finestre = [finestra]; aperte.length = 0;
+    await tocca({ apri:'/?apri=film-B&vai=piano', film:'film-B', vai:'piano' });
+    const aperta = { aperte: aperte.slice(), messaggi: messaggi.slice() };
+    // una notifica senza film (la prova): si apre l'app e basta
+    finestre = []; messaggi.length = 0; delete biglietti['campobase-apri/apri'];
+    await tocca(mostrate[1]); const senza = { aperte: aperte.slice(), biglietto: biglietti['campobase-apri/apri'] || null };
+    return { mostrate, chiusa: { aperte: chiusa.aperte, film: chiusa.biglietto.film, vai: chiusa.biglietto.vai, fresco: Date.now()-chiusa.biglietto.quando < 5000 }, aperta, senza };
+  });
+  ok('la notifica si porta dietro film e sezione', r.mostrate[0], { apri:'/?apri=film-A&vai=odg', film:'film-A', vai:'odg' });
+  ok('⚠ app chiusa: si apre su quel film', r.chiusa, { aperte:['/?apri=film-A&vai=odg'], film:'film-A', vai:'odg', fresco:true });
+  ok('⚠ app aperta: un messaggio, e nessuna finestra nuova', r.aperta, { aperte:[], messaggi:[{ campobase:'apri', film:'film-B', vai:'piano' }] });
+  ok('senza film (la prova) si apre l\'app e basta', [r.mostrate[1], r.senza], [{ apri:'/', film:'', vai:'' }, { aperte:['/'], biglietto:null }]);
+}
+
 console.log('\n── il service worker che riceve il testo cifrato ──');
 // La strada normale: il testo e' dentro la notifica, decifrato dal sistema
 // operativo prima di arrivare qui.

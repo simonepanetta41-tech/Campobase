@@ -168,6 +168,28 @@ ok('senza rete vale l\'ultimo permesso avuto', r.senzaRete, true);
 ok('chi ha aperto il film può sempre', r.capo, true);
 ok('un\'analisi senza film è solo mia', r.solo, true);
 
+console.log('\n── ⚠ chi l\'ha segnata, e quando ──');
+await entra();
+r=await p.evaluate(async(finto)=>{
+  (new Function('return '+finto)())();
+  CLOUD.troupe=[{user_id:'u1',ruolo:'capo',nome:'Simone',cognome:'P'},{user_id:'u2',ruolo:'membro',nome:'Anna',cognome:'R'}];
+  const ieri=new Date(Date.now()-86400000); ieri.setHours(18,40,0,0);
+  CLOUD.righe=[{project_id:'f1',scena:'70',stato:'girata',user_id:'u2',aggiornato:ieri.toISOString()},
+               {project_id:'f1',scena:'44',stato:'da_girare',user_id:'u2',aggiornato:ieri.toISOString()}];
+  segnaNomi=null; await sceneSegnateCarica();
+  const riga=async(n)=>{ spoglioApriScena(n); await new Promise(r=>setTimeout(r,80)); const e=document.getElementById('spGirataChi'); return e?e.textContent:null; };
+  const altra=await riga('70'), riaccesa=await riga('44'), fogli=await riga('45'), niente=await riga('71');
+  await scenaSegna('71'); await new Promise(r=>setTimeout(r,80)); const mia=document.getElementById('spGirataChi').textContent;
+  const q=[segnaQuando(new Date(2026,10,10,9,5).toISOString(), new Date(2026,10,18,12,0))];
+  spoglioChiudiScena();
+  return {altra,riaccesa,fogli,niente,mia:mia.replace(/\d\d\.\d\d$/,'ORA'),q};
+}, SPOGLIO_FINTO.toString());
+ok('segnata da una collega, ieri', r.altra, 'Segnata da Anna R · ieri 18.40');
+ok('una riaccesa lo dice', r.riaccesa, 'Riaccesa da Anna R · ieri 18.40');
+ok('⚠ fatta secondo i fogli: non l\'ha segnata nessuno', [r.fogli, r.niente], ['','']);
+ok('appena segnata da me', r.mia, 'Segnata da te · oggi ORA');
+ok('più indietro, la data', r.q, ['10/11 09.05']);
+
 console.log('\n── ⚠ il permesso si dà dalla troupe ──');
 await entra();
 r=await p.evaluate(async()=>{

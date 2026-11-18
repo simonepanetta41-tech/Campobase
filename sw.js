@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v166';
+const CACHE = 'campobase-v167';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -37,7 +37,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && k !== 'campobase-apri').map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -122,8 +122,11 @@ const GENERICA = 'C\'è un aggiornamento';
  * Campobase" e perdere una riga su due di quelle che si vedono a schermo
  * bloccato. Il titolo e' quindi la cosa da sapere — "Stefano e' li' fra 10
  * minuti per il pick up!" — e la seconda riga il dettaglio. */
-async function mostra(testo) {
+async function mostra(testo, dove) {
   const righe = String(testo).split('\n');
+  /* Dove porta, toccandola: il film da cui viene e la sezione. */
+  const film = dove && dove.film || '', vai = dove && dove.vai || '';
+  const apri = film ? '/?apri=' + encodeURIComponent(film) + (vai ? '&vai=' + encodeURIComponent(vai) : '') : '/';
   await self.registration.showNotification(righe[0], {
     body: righe.slice(1).join('\n'),
     icon: '/icon-192.png',
@@ -131,7 +134,7 @@ async function mostra(testo) {
     // Niente raggruppamento: due notifiche nello stesso minuto — la posta
     // e il catering — sono due cose diverse e si devono leggere entrambe.
     tag: 'campobase-' + Date.now(),
-    data: { apri: '/' }
+    data: { apri, film, vai }
   });
 }
 
@@ -140,7 +143,9 @@ self.addEventListener('push', e => {
     let testo = null, numero = null;
     // Di solito il testo e' dentro la notifica, cifrato: si legge e basta.
     // Con lui c'e' il numero dell'appuntamento, da rimandare come conferma.
-    try { const d = e.data && e.data.json() || {}; testo = d.testo || null; numero = d.id || null; } catch (_) {}
+    let dove = null;
+    try { const d = e.data && e.data.json() || {}; testo = d.testo || null; numero = d.id || null;
+          if (d.film) dove = { film: d.film, vai: d.vai || '' }; } catch (_) {}
     /* Il server va avvisato comunque, anche quando il testo c'e' gia':
        e' quella chiamata a segnare che questo telefono la notifica l'ha
        mostrata (push_iscrizioni.vista, push_appuntamenti.mostrato). Da
@@ -159,7 +164,7 @@ self.addEventListener('push', e => {
       return r.ok ? ((await r.json()).testo || null) : null;
     };
     if (testo) {
-      await mostra(testo);
+      await mostra(testo, dove);
       try { await chiedi(); } catch (_) {}
       return;
     }
@@ -172,8 +177,22 @@ self.addEventListener('push', e => {
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil((async () => {
+    const d = e.notification.data || {};
+    /* Tre strade per dire all'app dove andare, perche' nessuna da sola
+       funziona dappertutto: un biglietto lasciato in memoria, che l'app
+       legge appena torna davanti (su iPhone e' l'unica sicura); un
+       messaggio alla finestra gia' aperta; l'indirizzo, se va aperta. */
+    if (d.film) {
+      try {
+        const c = await caches.open('campobase-apri');
+        await c.put('/apri', new Response(JSON.stringify({ film: d.film, vai: d.vai || '', quando: Date.now() })));
+      } catch (_) {}
+    }
     const aperte = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of aperte) if ('focus' in c) return c.focus();
-    return self.clients.openWindow('/');
+    for (const c of aperte) if ('focus' in c) {
+      if (d.film) { try { c.postMessage({ campobase: 'apri', film: d.film, vai: d.vai || '' }); } catch (_) {} }
+      return c.focus();
+    }
+    return self.clients.openWindow(d.apri || '/');
   })());
 });
