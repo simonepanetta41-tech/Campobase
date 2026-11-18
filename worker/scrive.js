@@ -107,6 +107,7 @@ export function datiPerApp(letto, riga, adesso) {
   const odg = allegati.find(a => a.tipo === 'odg');
   const d = {
     daServer: true,
+    mail: riga && riga.id || null,          // da quale mail viene: serve a riconoscere un'errata
     numero: testo(L.numero), data: testo(L.data),
     convocazione: ora2(L.convocazione), prontiAGirare: ora2(L.prontiAGirare),
     pausa: testo(L.pausa), catering: ora2(L.catering), cestini: testo(L.cestini),
@@ -245,6 +246,114 @@ export function avvisiDallaMail(avvisi, corpo) {
   return out;
 }
 
+/* ── L'errata corrige ────────────────────────────────────────────────────
+ *
+ * Di rado la produzione rimanda l'ordine del giorno corretto, con
+ * "errata corrige" nell'oggetto o nel testo e una o due righe che dicono
+ * cosa cambia. Il foglio nuovo c'e' sempre, quindi orari e avvisi sono
+ * comunque quelli giusti; quello che mancava era dirlo: la notifica era
+ * identica alla prima e nessuno capiva che qualcosa era cambiato.
+ */
+const piatto = s => String(s || '').replace(/^[ \t]*>+ ?/gm, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+/* E' un'errata? Lo dice la produzione, oppure e' un secondo foglio per un
+   giorno che ne ha gia' uno, arrivato con un'altra mail. La stessa mail
+   riletta (un secondo tentativo del server) non lo e'. */
+export function tipoErrata(riga, vecchio, adesso) {
+  const scritto = [riga && riga.oggetto, riga && riga.testo]
+    .concat((riga && riga.allegati || []).map(a => a && a.nome)).join(' ');
+  if (/errata[\s_-]*corrige/i.test(scritto)) return 'errata';
+  if (!vecchio) return null;
+  if (vecchio.mail) return vecchio.mail !== (riga && riga.id) ? 'aggiornato' : null;
+  // Un foglio scritto prima che si tenesse il numero della mail: vale l'eta'.
+  const eta = (adesso || Date.now()) - new Date(vecchio.caricatoIl || 0).getTime();
+  return eta > 15 * 60000 ? 'aggiornato' : null;
+}
+
+/* Le righe che dicono cosa cambia.
+ *
+ * Il modello le copia; qui restano solo quelle che stanno davvero nel
+ * testo dell'errata e che NON c'erano nelle mail di prima: l'errata ripete
+ * quasi tutta la mail normale (il set, le colazioni), e quella parte non
+ * e' una correzione. Se il modello non ne da' nessuna buona, si prendono
+ * dal testo: la riga che dice "errata corrige" e quelle subito sotto,
+ * finche' non ricomincia la parte gia' vista.
+ */
+export function righeErrata(dalModello, corpo, corpiPrima) {
+  const mail = piatto(corpo), prima = piatto((corpiPrima || []).join('\n'));
+  if (!mail) return [];
+  const pulita = r => String(r || '').replace(/\s+/g, ' ').replace(/^[-–•*]\s*/, '').trim();
+  const nuova = r => { const p = piatto(r); return p.length >= 8 && mail.includes(p) && !(prima && prima.includes(p)); };
+  let out = [];
+  for (const r of Array.isArray(dalModello) ? dalModello : []) {
+    const t = pulita(r);
+    if (t.length <= 400 && nuova(t) && !out.includes(t)) out.push(t);
+  }
+  if (!out.length) {
+    const righe = String(corpo || '').replace(/^[ \t]*>+ ?/gm, '').split(/\r?\n/).map(x => x.trim());
+    const i = righe.findIndex(x => /errata\s*corrige/i.test(x));
+    if (i >= 0) {
+      for (let k = i; k < righe.length && out.length < 6; k++) {
+        if (!righe[k]) { if (k > i) break; continue; }
+        const t = pulita(righe[k]);
+        if (k > i && (!nuova(t) || /^(grazie|a domani|a presto|un saluto|saluti|cordial|buon lavoro|buona serata|--)/i.test(t))) break;
+        if (t.length <= 400) out.push(t);
+      }
+      // "inviamo in allegato l'ODG #7 – ERRATA CORRIGE:" annuncia, non dice
+      // cosa cambia: se sotto c'e' altro, si lascia fuori.
+      if (out.length > 1 && /errata\s*corrige\s*:?$/i.test(out[0])) out.shift();
+    }
+  }
+  return out.slice(0, 6);
+}
+
+/* Cosa cambia per ognuno, calcolato qui e non letto da nessuna parte: gli
+   orari di tutti, e la convocazione e il pick-up di quella persona. */
+export function cambiPer(vecchio, nuovo, membri, adesso) {
+  if (!vecchio) return {};
+  const pick = d => new Map(avvisiPer({ data: d.data, catering: d.catering, cestini: d.cestini,
+      tratte: (d.tratte || []).map(t => ({ ...t, passeggeri: t.nomi || t.passeggeri || [] })) }, membri, adesso)
+    .chi.map(c => [c.user_id, c.pickup || '']));
+  const pv = pick(vecchio), pn = pick(nuovo), out = {};
+  const comuni = [['Pronti a girare', 'prontiAGirare'], ['Catering', 'catering'],
+                  ['Fine riprese', 'fineRiprese'], ['Fine lavorazione', 'fineLavorazione']]
+    .map(([nome, k]) => [nome, testo(vecchio[k]), testo(nuovo[k])]).filter(x => x[1] !== x[2]);
+  for (const m of membri) {
+    const righe = [];
+    const cv = convocazioneDi(vecchio, m), cn = convocazioneDi(nuovo, m);
+    if (cv !== cn) righe.push(['Convocazione', cv, cn]);
+    const a = pv.get(m.user_id) || '', b = pn.get(m.user_id) || '';
+    if (a !== b) righe.push(['Pick-up', a, b]);
+    righe.push(...comuni);
+    if (righe.length) out[m.user_id] = righe.map(([n, x, y]) => [n, x || '—', y || '—']);
+  }
+  return out;
+}
+
+/* La notifica dell'errata: il titolo lo dice, poi cosa cambia, poi gli
+   orari della persona come sempre. */
+export function notificaErrata(d, membro, pickup, tipo, righe) {
+  const base = notificaOdg(d, membro, pickup).split('\n');
+  base[0] = (tipo === 'errata' ? 'Errata corrige - ' : 'Aggiornato - ')
+    + `OdG ${d.numero || '—'} - ${dataEstesa(d.data)}`.replace(/ - $/, '');
+  const cosa = righe && righe[0] ? (righe[0].length > 90 ? righe[0].slice(0, 89).trim() + '…' : righe[0]) : '';
+  return [base[0], cosa, ...base.slice(1)].filter(Boolean).join('\n');
+}
+
+/* La sigla del film, com'e' scritta davanti ai file e nell'oggetto:
+   "MSG - ODG 26 del 17.11.2026", "MSG_PDL7_03.11.pdf", "I: IS_ODG 12". */
+export function siglaDa(riga) {
+  const voci = [riga && riga.oggetto].concat((riga && riga.allegati || []).map(a => a && a.nome));
+  for (const v of voci) {
+    const t = String(v || '').replace(/^(\s*(i|r|re|fw|fwd|inoltra)\s*:\s*)+/i, '').replace(/_/g, ' ').trim();
+    const m = /^([A-Za-z][A-Za-z0-9]{1,5})\s*[-–\s]\s*(?:errata\s+corrige\s*[-–\s]*)?(?:o\.?d\.?g|pdl|p\.d\.l)(?![a-z])/i.exec(t);
+    if (!m) continue;
+    const s = m[1].toUpperCase();
+    if (!/^(ODG|PDL|ERRATA|NUOVO|BOZZA|DAY|DEL|IL|LA)$/.test(s)) return s;
+  }
+  return null;
+}
+
 export async function scriviTutto(env, riga, letto, opz = {}) {
   const adesso = opz.adesso || Date.now();
   const d = datiPerApp(letto, riga, adesso);
@@ -255,6 +364,51 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
 
   const film = (await db(env, `projects?select=user_id,titolo&id=eq.${riga.project_id}&limit=1`) || [])[0];
   if (!film || !film.user_id) throw new Error('film senza proprietario');
+
+  /* E' un'errata? Si guarda il foglio che c'e' gia' per quel giorno, prima
+     di scriverci sopra. Niente di questo deve fermare la scrittura. */
+  let vecchio = null, tipo = null, righeE = [];
+  try {
+    const c = await db(env, `odg?select=dati&project_id=eq.${riga.project_id}&data=eq.${d.data}&limit=1`);
+    vecchio = c && c[0] && c[0].dati || null;
+    tipo = tipoErrata(riga, vecchio, adesso);
+    if (tipo) {
+      const pp = await db(env, `posta?select=testo&project_id=eq.${riga.project_id}&id=neq.${riga.id}` +
+        `&order=ricevuta.desc&limit=5`);
+      righeE = righeErrata(letto && letto.errata, riga.testo, (pp || []).map(x => x.testo));
+      // Quello che sta nell'errata non si ripete in fondo, fra gli avvisi.
+      d.avvisi = (d.avvisi || []).filter(a => !righeE.some(r => piatto(a).includes(piatto(r)) || piatto(r).includes(piatto(a))));
+    }
+    if (vecchio && Array.isArray(vecchio.errata)) d.errata = vecchio.errata.slice(-4);
+  } catch (e) { console.log('[scrive] errata non riconosciuta:', e && e.message); }
+
+  // La sigla del film, se la mail la porta e non la sappiamo ancora.
+  try {
+    const sigla = siglaDa(riga);
+    if (sigla) await db(env, `projects?id=eq.${riga.project_id}&sigla=is.null`, {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ sigla }) });
+  } catch (_) { /* la colonna non c'e' ancora: si usano le iniziali */ }
+
+  /* La troupe serve gia' qui: l'errata porta con se' cosa cambia per
+     ognuno, e va scritta insieme al foglio. */
+  let membri = [];
+  try {
+    const mm = await db(env, `film_membri?select=user_id&project_id=eq.${riga.project_id}`);
+    const ids = [...new Set((mm || []).map(x => x.user_id).filter(Boolean))];
+    if (ids.length) {
+      const pp = await db(env, `profiles?select=id,nome,cognome&id=in.(${ids.join(',')})`);
+      const perId = new Map((pp || []).map(p => [p.id, p]));
+      membri = ids.map(id => ({ user_id: id, nome: (perId.get(id) || {}).nome || '',
+                                cognome: (perId.get(id) || {}).cognome || '' }));
+    }
+  } catch (e) { console.log('[scrive] troupe non letta:', e && e.message); }
+  if (tipo) {
+    let perChi = {};
+    // Solo fra due fogli letti qui: uno letto dal telefono ha un'altra forma,
+    // e confrontarli darebbe differenze che non esistono.
+    try { if (vecchio && vecchio.daServer) perChi = cambiPer(vecchio, d, membri, adesso); } catch (_) {}
+    d.errata = (d.errata || []).concat([{ quando: new Date(adesso).toISOString(), tipo, righe: righeE, perChi }]);
+  }
 
   // 1. L'ordine del giorno, dove i telefoni lo cercano.
   await db(env, 'odg?on_conflict=project_id,data', {
@@ -275,13 +429,7 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
   //    del giorno e' scritto, e un avviso mancato non lo rende meno vero.
   let notifiche = 0, avvisi = 0, errore = null;
   try {
-    const mm = await db(env, `film_membri?select=user_id&project_id=eq.${riga.project_id}`);
-    const ids = [...new Set((mm || []).map(x => x.user_id).filter(Boolean))];
-    if (ids.length) {
-      const pp = await db(env, `profiles?select=id,nome,cognome&id=in.(${ids.join(',')})`);
-      const perId = new Map((pp || []).map(p => [p.id, p]));
-      const membri = ids.map(id => ({ user_id: id, nome: (perId.get(id) || {}).nome || '',
-                                      cognome: (perId.get(id) || {}).cognome || '' }));
+    if (membri.length) {
       // Lo stesso calcolo degli avvisi: un solo posto decide di chi e' un pick-up.
       const lettoPerAvvisi = { data: d.data, catering: d.catering, cestini: d.cestini,
         tratte: d.tratte.map(t => ({ ...t, passeggeri: t.nomi })) };
@@ -290,7 +438,8 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
       const minuto = new Date(adesso).toISOString();
       const tutte = membri.map(m => ({
         user_id: m.user_id, project_id: riga.project_id, quando: minuto, genere: 'posta',
-        testo: notificaOdg(d, m, pickDi.get(m.user_id)),
+        testo: tipo ? notificaErrata(d, m, pickDi.get(m.user_id), tipo, righeE)
+                    : notificaOdg(d, m, pickDi.get(m.user_id)),
         chiave: `${m.user_id}:posta:${minuto.slice(0, 16)}`, mandato: null, mostrato: null
       })).concat(righe.map(x => ({
         user_id: x.user_id, project_id: riga.project_id, quando: x.quando, genere: x.genere, testo: x.testo,
@@ -301,7 +450,7 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
     }
   } catch (e) { errore = String(e && e.message || e).slice(0, 200); }
 
-  return { scritto: true, data: d.data, notifiche, avvisi, errore };
+  return { scritto: true, data: d.data, notifiche, avvisi, errore, errata: tipo };
 }
 
 /* La mail porta un piano di lavorazione che tocca al server e che non e'

@@ -210,6 +210,30 @@ ok('⚠ minima e massima uguali: un numero solo', await p.evaluate(()=>{
   const v=odgCorrente.previsione, tieni=[v.min,v.max]; v.min=19; v.max=19; odgRender();
   const t=[...document.querySelectorAll('#odgCorpo .k')].find(k=>k.textContent==='temp').nextElementSibling.textContent;
   [v.min,v.max]=tieni; odgRender(); return t; }), '19°');
+
+console.log('\n── ⚠ l\'errata corrige, in cima all\'ordine del giorno ──');
+{ const r=await p.evaluate(()=>{
+    const tieni=[odgCorrente.errata, currentUser]; currentUser={id:'u1'};
+    const leggi=()=>[...document.querySelectorAll('#odgCorpo .odg-errata')].map(e=>({ t:e.querySelector('.et').firstChild.textContent.trim(),
+      righe:[...e.querySelectorAll('p')].map(x=>x.textContent), perTe:[...e.querySelectorAll('.pt .r')].map(x=>[x.firstElementChild.textContent, x.querySelector('s').textContent, x.lastElementChild.lastChild.textContent]) }));
+    odgCorrente.errata=undefined; odgRender(); const senza=leggi().length;
+    odgCorrente.errata=[{quando:'2026-11-17T20:40:00Z',tipo:'errata',righe:['Convocazione posticipata alle ore 12:30'],
+      perChi:{u1:[['Convocazione','12.00','12.30'],['Pick-up','11.35','12.05']], u2:[['Pick-up','13.00','—']]}}];
+    odgRender(); const una=leggi();
+    const c=document.getElementById('odgCorpo'), box=c.querySelector('.odg-errata');
+    const primaDiTutto=!!(box.compareDocumentPosition(c.querySelector('.odg-orari')||c.querySelector('.card')) & Node.DOCUMENT_POSITION_FOLLOWING);
+    currentUser={id:'u9'}; odgRender(); const altro=leggi();
+    currentUser={id:'u1'};
+    odgCorrente.errata.push({quando:'2026-11-17T22:05:00Z',tipo:'aggiornato',righe:[],perChi:{}});
+    odgRender(); const due=leggi();
+    [odgCorrente.errata, currentUser]=tieni; odgRender(); return {senza,una,primaDiTutto,altro,due}; });
+  ok('senza errata, nessun riquadro', r.senza, 0);
+  ok('⚠ le parole della produzione, e cosa cambia per me', r.una, [{t:'Errata corrige',righe:['Convocazione posticipata alle ore 12:30'],perTe:[['Convocazione','12.00','12.30'],['Pick-up','11.35','12.05']]}]);
+  ok('⚠ sta sopra gli orari', r.primaDiTutto, true);
+  ok('a chi non cambia niente, solo le parole della produzione', r.altro[0].perTe, []);
+  ok('due lo stesso giorno: restano tutte e due, numerate', r.due.map(x=>[x.t,x.righe]), [['Errata corrige 1',['Convocazione posticipata alle ore 12:30']],['Aggiornato 2',["La produzione ha rimandato l'ordine del giorno."]]]);
+}
+
 /* Il nome del posto non sta piu' sulla scheda — era una riga in piu' su
    una pagina che si legge di corsa — ma non si puo' perdere: e' l'unico
    modo per accorgersi che il meteo sta guardando il comune sbagliato,

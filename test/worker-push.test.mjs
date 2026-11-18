@@ -115,7 +115,7 @@ const fabbrica = new Function('UTENTE', 'CORPO',
      const readJson = async () => ({ body: CORPO() });
      const requireUser = async () => (UTENTE() ? { user: UTENTE() } : { error: json({ error: 'no' }, 401) });`)
     .replace(/^\s*export /gm, '')
-  + '\nreturn {mandaScadute, handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, avvisaPosta, doveVa};');
+  + '\nreturn {mandaScadute, handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, avvisaPosta, doveVa, siglaDalTitolo, sigleDeiFilm, conSigla};');
 const push = fabbrica(() => utenteFinto, () => corpoFinto);
 
 let ko = 0;
@@ -344,6 +344,25 @@ ok('il catering all\'ordine del giorno', push.doveVa({ genere: 'catering', testo
 ok('un ordine del giorno nuovo, lì', push.doveVa({ genere: 'posta', testo: 'OdG 26 · martedì 17 novembre\nPick-up 15.35' }), 'odg');
 ok('⚠ un piano nuovo al piano', push.doveVa({ genere: 'posta', testo: 'Nuovo piano di lavorazione!\nPdL 7 · fino al 12 dicembre' }), 'piano');
 ok('la prova da nessuna parte', push.doveVa({ genere: 'prova', testo: 'Funziona!' }), null);
+
+console.log('\n── ⚠ la sigla del film in testa a ogni notifica ──');
+ok('dalle iniziali, finché la mail non la dice', [push.siglaDalTitolo('Missione San Gennaro'), push.siglaDalTitolo('Il sopravvissuto'), push.siglaDalTitolo('Separazioni'), push.siglaDalTitolo('')],
+   ['MSG', 'IS', 'SEP', '']);
+azzera();
+tavoli.projects = [{ id: 'f1', titolo: 'Missione San Gennaro', sigla: null }, { id: 'f2', titolo: 'Separazioni', sigla: 'SPRZ' }];
+{ const sigle = await push.sigleDeiFilm(ENV, ['f1', 'f2', 'f1', null]);
+  ok('quella trovata nelle mail vince sulle iniziali', [sigle.get('f1'), sigle.get('f2')], ['MSG', 'SPRZ']);
+  ok('⚠ davanti al titolo', push.conSigla({ project_id: 'f2', genere: 'posta', testo: 'OdG 4 · mercoledì 21 ottobre\nConvocazione 12.00' }, sigle),
+     'SPRZ - OdG 4 · mercoledì 21 ottobre\nConvocazione 12.00');
+  ok('anche sul pick-up', push.conSigla({ project_id: 'f1', genere: 'pickup', testo: 'Lorenzo è lì fra 10 minuti per il pick up!' }, sigle),
+     'MSG - Lorenzo è lì fra 10 minuti per il pick up!');
+  ok('una notifica senza film resta com\'è', push.conSigla({ project_id: null, genere: 'catering', testo: 'Catering pronto' }, sigle), 'Catering pronto');
+  ok('e la prova pure', push.conSigla({ project_id: 'f1', genere: 'prova', testo: 'Funziona!' }, sigle), 'Funziona!'); }
+// Prima di lanciare sigla.sql la colonna non c'è: non deve fermare le notifiche.
+azzera(); iscrivi('u1', 'https://web.push.apple.com/t1');
+tavoli.push_appuntamenti.push({ id: 'z1', user_id: 'u1', project_id: 'f-senza-tavola', quando: fra(-1), genere: 'posta', testo: 'OdG 27', mandato: null, mostrato: null });
+bussate.length = 0;
+ok('⚠ se i film non si leggono, la notifica parte lo stesso', [await push.mandaScadute(ENV), bussate.length], [1, 1]);
 
 console.log('\n── un indirizzo che non conosciamo non ottiene niente ──');
 corpoFinto = { endpoint: 'https://web.push.apple.com/non-mio' };

@@ -184,10 +184,10 @@ globalThis.fetch = async (url, opz = {}) => {
 };
 
 const CONFINE = 'xxB';
-function mail(nomi, oggetto = 'I: MSG - ODG #25 del 14.11.2026') {
+function mail(nomi, oggetto = 'I: MSG - ODG #25 del 14.11.2026', testoMail = 'ecco') {
   const pdf = Buffer.from('%PDF-1.4 finto').toString('base64');
   const corpo = ['From: simone <s@hotmail.it>', 'To: abc123@campobase.dev', 'Subject: ' + oggetto, 'Message-ID: <' + (++seq) + '@x>',
-    'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${CONFINE}"`, '', `--${CONFINE}`, 'Content-Type: text/plain', '', 'ecco', ''];
+    'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${CONFINE}"`, '', `--${CONFINE}`, 'Content-Type: text/plain; charset=utf-8', '', testoMail, ''];
   for (const n of nomi) corpo.push(`--${CONFINE}`, `Content-Type: application/pdf; name="${n}"`, 'Content-Transfer-Encoding: base64',
     `Content-Disposition: attachment; filename="${n}"`, '', pdf, '');
   corpo.push(`--${CONFINE}--`, '');
@@ -293,6 +293,85 @@ mondo(); await posta.riceviPosta(mail([ODG, GIRI, 'MSG - PDL rev 7.pdf']), ACCES
 ok('una mail col piano: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuovo piano di lavorazione!']);
 mondo(); await posta.riceviPosta(mail(['MSG_ACCOMMODATION NAPOLI.pdf'], 'I: MSG_ACCOMMODATION'), ACCESO, {});
 ok('una mail senza ordine del giorno: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuova posta dalla produzione']);
+// ── L'errata corrige ────────────────────────────────────────────────────────
+const { tipoErrata, righeErrata, cambiPer, notificaErrata, siglaDa } = await import(RADICE + '/worker/scrive.js');
+
+console.log('\n── ⚠ cosa cambia, dalle mail vere ──');
+{ const N1 = `Cari tutti,\nInvio in allegato\n- ODG #7 del 24.10.2026\n- Giri Auto\nSet\nCava di Faggiano\nhttps://maps.app.goo.gl/vwV\nPer le colazioni\nTursport Hotel Residence\n6:30 Cornetto + caffè o cappuccino al banco\nGrazie\nAlessia Ida`;
+  const E1 = `Buonasera,\n\ninviamo in allegato l’ODG #7 – ERRATA CORRIGE:\nANNULLIAMO LA CONVOCAZIONE DELL’ID 9 MONACO PER LA GIORNATA DI DOMANI.\nSet\nCava di Faggiano\nhttps://maps.app.goo.gl/vwV\nPer le colazioni\nTursport Hotel Residence\n6:30 Cornetto + caffè o cappuccino al banco\nGrazie\nAlessia Ida`;
+  const E2 = `Cari tutti,\ninviamo in allegato l’ODG #4 – ERRATA CORRIGE aggiornato nei seguenti orari:\n- Precall posticipata alle ore 12:00\n- Convocazione posticipata alle ore 12:30\nSET MASSERIA LAMIE - Strada Vicinale Citrezze-Monteiasi\nIndicazioni per raggiungere il set:`;
+  const N2 = `Cari tutti,\nInvio in allegato\n- ODG #4 del 21.10.2026\nSET MASSERIA LAMIE - Strada Vicinale Citrezze-Monteiasi\nIndicazioni per raggiungere il set:`;
+  const E3 = `Buonasera,\nIn allegato errata corrige dell'ODG #DAY 22, con inseriti indirizzi location e mezzi tecnici.\nA domani,\n--\nVittoria Bertoldi`;
+  const ANN = 'ANNULLIAMO LA CONVOCAZIONE DELL’ID 9 MONACO PER LA GIORNATA DI DOMANI.';
+  ok('il modello le copia: restano', righeErrata(['- Precall posticipata alle ore 12:00', 'Convocazione posticipata alle ore 12:30'], E2, [N2]),
+     ['Precall posticipata alle ore 12:00', 'Convocazione posticipata alle ore 12:30']);
+  ok('⚠ una frase inventata dal modello: via', righeErrata(['La convocazione è alle 12:30 per tutti i reparti', 'Convocazione posticipata alle ore 12:30'], E2, [N2]),
+     ['Convocazione posticipata alle ore 12:30']);
+  ok('⚠ quello che la mail ripete ogni sera non è una correzione', righeErrata(['6:30 Cornetto + caffè o cappuccino al banco', ANN], E1, [N1]), [ANN]);
+  ok('senza il modello, dal testo: la riga sotto l\'annuncio', righeErrata([], E1, [N1]), [ANN]);
+  ok('senza il modello: l\'elenco, e l\'annuncio che lo introduce', righeErrata(null, E2, [N2]),
+     ['inviamo in allegato l’ODG #4 – ERRATA CORRIGE aggiornato nei seguenti orari:', 'Precall posticipata alle ore 12:00', 'Convocazione posticipata alle ore 12:30']);
+  ok('una frase sola che dice tutto', righeErrata([], E3, []), ["In allegato errata corrige dell'ODG #DAY 22, con inseriti indirizzi location e mezzi tecnici."]);
+  ok('una mail normale non ha righe di errata', righeErrata([], N1, []), []);
+}
+
+console.log('\n── quando è un\'errata ──');
+ok('lo dice l\'oggetto', tipoErrata({ id: 'p9', oggetto: 'I: MSG - ERRATA CORRIGE ODG #7' }, null), 'errata');
+ok('lo dice il testo', tipoErrata({ id: 'p9', oggetto: 'ODG 7', testo: 'inviamo in allegato l’ODG #7 – ERRATA CORRIGE:' }, null), 'errata');
+ok('lo dice il nome del file', tipoErrata({ id: 'p9', oggetto: 'ODG 7', allegati: [{ nome: 'ODG_7_ERRATA_CORRIGE.pdf' }] }, null), 'errata');
+ok('⚠ un secondo foglio per lo stesso giorno, da un\'altra mail', tipoErrata({ id: 'p9', oggetto: 'ODG 7' }, { mail: 'p1' }), 'aggiornato');
+ok('⚠ la stessa mail riletta non è un\'errata', tipoErrata({ id: 'p1', oggetto: 'ODG 7' }, { mail: 'p1' }), null);
+ok('il primo foglio di un giorno', tipoErrata({ id: 'p1', oggetto: 'ODG 7' }, null), null);
+
+console.log('\n── la sigla del film ──');
+ok('dall\'oggetto inoltrato', siglaDa({ oggetto: 'I: MSG - ODG #25 del 14.11.2026' }), 'MSG');
+ok('dal nome del file', siglaDa({ oggetto: 'ordine del giorno', allegati: [{ nome: 'IS_ODG_12_del_03.03.pdf' }] }), 'IS');
+ok('dal piano', siglaDa({ oggetto: '', allegati: [{ nome: 'SPRZ_PDL7_03.11.pdf' }] }), 'SPRZ');
+ok('con l\'errata davanti', siglaDa({ oggetto: 'Fwd: R: MSG - ERRATA CORRIGE ODG #7' }), 'MSG');
+ok('⚠ senza sigla, niente a caso', [siglaDa({ oggetto: 'ODG #DAY 22 + STRALCI' }), siglaDa({ oggetto: 'I: Errata corrige ODG 4' }), siglaDa({ oggetto: 'Nuovo ODG 12' })], [null, null, null]);
+
+console.log('\n── ⚠ un\'errata dall\'inizio alla fine ──');
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI], 'I: MSG - ODG #25 del 14.11.2026', 'Cari tutti,\r\nInvio in allegato ODG e giri.\r\nSet\r\nChiesa del paese\r\nGrazie'), ACCESO, {});
+await leggiInOmbra(ACCESO);
+ok('il primo foglio non è un\'errata', [T.odg[0].dati.errata, T.posta[0].ombra.scritto.errata], [undefined, null]);
+ok('la sigla trovata nell\'oggetto è scritta sul film', T.projects[0].sigla, 'MSG');
+T.posta[0].ricevuta = new Date(Date.now() - 3600000).toISOString();
+T.push_appuntamenti.length = 0;
+// La produzione corregge: mezz'ora dopo per tutti, e Leone esce dai giri.
+const CORRETTO = { ...LETTO, convocazione: '13.00', fineLavorazione: '20.00',
+  errata: ['Convocazione posticipata alle ore 13:00', 'una frase che nella mail non c\'è'],
+  avvisi: ['Convocazione posticipata alle ore 13:00', 'Si raccomanda la massima puntualità.'],
+  troupe: [{ reparto: 'SUONO', ruolo: 'Microfonista', nome: 'S. Panetta', partenza: '', set: '13.00' },
+           { reparto: 'FOTOGRAFIA', ruolo: 'Data Manager', nome: 'V. Leone', partenza: '13.30', set: '' },
+           { reparto: 'COSTUMI', ruolo: 'Costumista', nome: 'R. Aprea', partenza: '', set: 'O.C.' }],
+  tratte: [{ autista: 'Luca Cammarosano Van', partenza: '12.30', luogo: 'TURSPORT HOTEL RESIDENCE', destinazione: 'SET', passeggeri: ['F.Lombardi', 'S.Panetta'] }] };
+modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: {}, content: [{ type: 'text', text: JSON.stringify(CORRETTO) }] }), { status: 200 });
+await posta.riceviPosta(mail(['MSG - ODG _25 ERRATA CORRIGE.pdf', GIRI], 'I: MSG - ERRATA CORRIGE ODG #25',
+  'Cari tutti,\r\ninviamo in allegato l’ODG #25 – ERRATA CORRIGE:\r\n- Convocazione posticipata alle ore 13:00\r\nSi raccomanda la massima puntualità.\r\nSet\r\nChiesa del paese\r\nGrazie'), ACCESO, {});
+ok('letta anche lei', await leggiInOmbra(ACCESO), 'fatta');
+const E = T.odg[0].dati.errata;
+ok('un solo ordine del giorno per quel giorno, quello corretto', [T.odg.length, T.odg[0].dati.convocazione], [1, '13.00']);
+ok('⚠ segnato come errata, con le parole della produzione', [E.length, E[0].tipo, E[0].righe], [1, 'errata', ['Convocazione posticipata alle ore 13:00']]);
+ok('⚠ per Panetta: convocazione, pick-up e fine lavorazione', E[0].perChi.u1, [['Convocazione', '12.30', '13.00'], ['Pick-up', '12.00', '12.30'], ['Fine lavorazione', '19.30', '20.00']]);
+ok('per Leone: il pick-up non c\'è più', E[0].perChi.u2, [['Pick-up', '13.00', '—'], ['Fine lavorazione', '19.30', '20.00']]);
+ok('per Aprea: solo quello che cambia per tutti', E[0].perChi.u3, [['Convocazione', '12.30', '13.00'], ['Fine lavorazione', '19.30', '20.00']]);
+ok('quello che sta nell\'errata non si ripete fra gli avvisi', T.odg[0].dati.avvisi, ['Si raccomanda la massima puntualità.']);
+ok('⚠ la notifica lo dice, con cosa cambia e gli orari nuovi', di('u1'),
+   'Errata corrige - OdG 25 - sabato 10 gennaio\nConvocazione posticipata alle ore 13:00\nPick-up 12.30 · Tursport Hotel Residence\nConvocazione 13.00 · Fine lavorazione 20.00');
+ok('a tutti e tre', T.push_appuntamenti.filter(a => a.genere === 'posta').length, 3);
+ok('⚠ l\'avviso del pick-up si sposta sul nuovo orario', T.push_appuntamenti.find(a => a.chiave === 'u1:pickup:2099-01-10').testo.split('\n')[1], 'Pick up alle 12.30 · Tursport hotel residence');
+
+console.log('\n── una seconda errata lo stesso giorno ──');
+T.posta[1].ricevuta = new Date(Date.now() - 1800000).toISOString();
+modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: {}, content: [{ type: 'text', text: JSON.stringify({ ...CORRETTO, errata: [], avvisi: [] }) }] }), { status: 200 });
+await posta.riceviPosta(mail(['MSG - ODG _25 ERRATA CORRIGE 2.pdf', GIRI], 'I: MSG - ERRATA CORRIGE ODG #25',
+  'Buonasera,\r\nin allegato errata corrige dell’ODG #25, con inserito l’indirizzo del parcheggio.\r\nGrazie'), ACCESO, {});
+await leggiInOmbra(ACCESO);
+ok('⚠ restano tutte e due, in ordine', T.odg[0].dati.errata.map(e => e.righe[0]),
+   ['Convocazione posticipata alle ore 13:00', 'in allegato errata corrige dell’ODG #25, con inserito l’indirizzo del parcheggio.']);
+ok('la seconda non ha niente che cambi per Panetta', T.odg[0].dati.errata[1].perChi.u1, undefined);
+
 /* Una prova a mano non scrive mai l'ordine del giorno di nessuno. */
 mondo(); T.posta.push({ id: 'pr', project_id: 'f1', stato: 'prova', oggetto: 'prova 025', ricevuta: '2026-01-01T00:00:00Z',
   ombra_stato: null, ombra: null, ombra_il: null, allegati: RIGA0.allegati });

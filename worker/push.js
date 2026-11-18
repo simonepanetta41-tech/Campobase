@@ -275,6 +275,36 @@ async function mandaAUtente(userId, testo, env, opz = {}) {
 
 // ── Il cron ─────────────────────────────────────────────────────────────────
 
+/* La sigla del film in testa: "MSG - OdG 26 · martedì 17 novembre".
+ * Chi ha due film aperti deve capire di quale si parla senza aprire.
+ * Si mette qui, al momento di mandare, e non dove la notifica nasce:
+ * le scrivono in tre (il server, il piano, il telefono) e cosi' il
+ * prefisso e' uno solo. La sigla e' quella trovata nelle mail
+ * (projects.sigla); finche' non c'e', le iniziali del titolo. */
+export function siglaDalTitolo(titolo) {
+  const p = String(titolo || '').trim().split(/\s+/).filter(Boolean);
+  if (!p.length) return '';
+  const s = p.length === 1 ? p[0].slice(0, 3) : p.map(x => x[0]).join('').slice(0, 5);
+  return s.replace(/[^A-Za-z0-9À-ÿ]/g, '').toUpperCase();
+}
+export async function sigleDeiFilm(env, ids) {
+  const uniche = [...new Set((ids || []).filter(Boolean))];
+  const out = new Map();
+  if (!uniche.length) return out;
+  let righe = null;
+  try { righe = await db(env, `projects?select=id,titolo,sigla&id=in.(${uniche.join(',')})`); }
+  catch (_) {
+    // La colonna sigla non c'e' ancora: restano le iniziali.
+    try { righe = await db(env, `projects?select=id,titolo&id=in.(${uniche.join(',')})`); } catch (_) {}
+  }
+  for (const r of righe || []) out.set(r.id, String(r.sigla || '').trim() || siglaDalTitolo(r.titolo));
+  return out;
+}
+export function conSigla(a, sigle) {
+  const s = a.genere === 'prova' ? '' : (sigle.get(a.project_id) || '');
+  return s ? s + ' - ' + a.testo : a.testo;
+}
+
 /* Dove porta una notifica, toccandola: il pick-up al proprio passaggio,
    un piano nuovo al piano, tutto il resto all'ordine del giorno. */
 export function doveVa(a) {
@@ -295,8 +325,9 @@ export async function mandaScadute(env) {
     `?select=id,user_id,project_id,testo,quando,genere&mandato=is.null` +
     `&quando=lte.${adesso}&quando=gte.${limite}&order=quando.asc&limit=100`);
 
+  const sigle = await sigleDeiFilm(env, (dovute || []).map(a => a.project_id));
   for (const a of dovute || []) {
-    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env,
+    const { partite, scartati } = await mandaAUtente(a.user_id, conSigla(a, sigle), env,
       { id: a.id, genere: a.genere, film: a.project_id || null, vai: doveVa(a) });
     await db(env, `push_appuntamenti?id=eq.${a.id}`, {
       method: 'PATCH',

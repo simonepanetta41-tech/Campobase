@@ -413,6 +413,16 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-pick .pick-altre{padding:10px 16px 12px;border-top:1px solid var(--border);
   font-size:11px;line-height:1.55;color:var(--orange)}
 .odg-osp{margin-top:9px}
+.odg-errata{margin:0 0 12px;border:1.5px solid rgba(245,197,66,.7);background:rgba(245,197,66,.09);border-radius:14px;padding:14px 16px}
+.odg-errata .et{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-family:'Space Grotesk',sans-serif;
+  font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--yellow)}
+.odg-errata .et span{font-family:'DM Mono',monospace;font-weight:400;font-size:11px;letter-spacing:0;text-transform:none;
+  color:var(--white-dim);white-space:nowrap}
+.odg-errata p{margin:9px 0 0;font-size:14.5px;line-height:1.45;color:var(--white)}
+.odg-errata .pt{margin-top:12px;padding-top:11px;border-top:1px solid rgba(245,197,66,.3)}
+.odg-errata .pt b{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:5px}
+.odg-errata .pt .r{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:13.5px;padding:2px 0;color:var(--white)}
+.odg-errata .pt .r s{color:var(--muted);margin-right:8px}
 .odg-avvisi{padding:14px 16px}
 .odg-avvisi p{margin:0;font-size:14px;line-height:1.5;color:var(--white-dim)}
 .odg-avvisi p + p{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
@@ -5248,7 +5258,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.168';
+const CB_VERSIONE = '1.169';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13358,6 +13368,31 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
+/* L'errata corrige: in cima, prima di tutto il resto. E' l'unica cosa
+   della pagina che non ci si puo' permettere di saltare. Dentro, le parole
+   della produzione com'erano nella mail e, sotto, cosa cambia per chi
+   guarda: l'orario di prima barrato e quello nuovo. Se in un giorno ne
+   arrivano due, restano tutte e due, in ordine. */
+function odgErrataHtml(d){
+  const lista = (d && Array.isArray(d.errata) ? d.errata : []).filter(e => e && (e.righe || e.perChi));
+  if (!lista.length) return '';
+  const ora = iso => { const t = new Date(iso); return isNaN(t) ? '' :
+    String(t.getHours()).padStart(2, '0') + '.' + String(t.getMinutes()).padStart(2, '0'); };
+  const io = currentUser ? currentUser.id : null;
+  return lista.map((e, i) => {
+    const mie = io && e.perChi && Array.isArray(e.perChi[io]) ? e.perChi[io] : [];
+    const righe = Array.isArray(e.righe) ? e.righe : [];
+    const titolo = (e.tipo === 'errata' ? 'Errata corrige' : 'Aggiornato') + (lista.length > 1 ? ' ' + (i + 1) : '');
+    return `<div class="odg-errata">
+      <div class="et">${titolo}<span>${ora(e.quando) ? 'ricevuta alle ' + ora(e.quando) : ''}</span></div>
+      ${righe.map(r => `<p>${esc(r)}</p>`).join('')}
+      ${!righe.length && !mie.length ? '<p>La produzione ha rimandato l\'ordine del giorno.</p>' : ''}
+      ${mie.length ? `<div class="pt"><b>Per te</b>${mie.map(([n, prima, dopo]) =>
+        `<div class="r"><span>${esc(n)}</span><span><s>${esc(prima)}</s>${esc(dopo)}</span></div>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
 /* Il comune, solo se l'indirizzo ha il CAP davanti: "..., 80131 Napoli NA". */
 function odgComuneCap(indirizzo){
   const m = String(indirizzo || '').replace(/\s+/g, ' ').trim()
@@ -13728,6 +13763,8 @@ function odgPienoHtml(d) {
     <div class="h1">OdG ${d.numero || '—'} · ${odgDataEstesa(d.data)}</div>
     ${d.ambiente ? `<div class="h2">${esc(odgCap(d.ambiente))}${pag ? ' · ' + odgFrazione(pag) + ' pag' : ''}</div>` : ''}
   </div>
+
+  ${odgErrataHtml(d)}
 
   ${odgBadgeHtml(d, io)}
 
