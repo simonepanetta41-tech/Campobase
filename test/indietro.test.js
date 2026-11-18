@@ -80,7 +80,7 @@ ok('ed è il primo, prima del nome',
      return b.firstElementChild.className;}), 'cb-back');
 ok('riporta alla scelta del progetto',
    await p.evaluate(()=>document.querySelector('.cb-ident').getAttribute('onclick')),
-   "showPage('home')");
+   "cbEsciDalFilm()");
 
 console.log('\n── sulla schermata di scelta non si torna da nessuna parte ──');
 await p.evaluate(()=>{
