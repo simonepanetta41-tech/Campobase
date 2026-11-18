@@ -5258,7 +5258,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.169';
+const CB_VERSIONE = '1.170';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -15924,6 +15924,12 @@ function ttBozza(el, tabId, field, di){
   if (t.orari[field][di] === el.value) return;
   t.orari[field][di] = el.value;
   ttTocca();
+  /* E il calcolato segue subito, senza aspettare che si esca dal campo:
+     appena l'orario e' intero (o e' stato svuotato). A meta' — "23.3" —
+     no: mostrerebbe per un attimo un conto su un orario che non esiste. */
+  if (el.value === '' || /^\d{1,2}[.:]\d{2}$/.test(el.value)) {
+    try { if (ttVista === 'giorno') ttAggiornaGiorno(tabId); else ttAggiornaCalc(tabId); } catch (_) {}
+  }
 }
 
 function ttDigita(el){
@@ -15968,14 +15974,19 @@ function ttSetO(tabId,field,di,val){
     if(box)el=box.querySelector(`input[data-f="${field}"][data-i="${di}"]`);
   }
   if(el&&el.value!==val)el.value=val;
-  if(t.orari[field][di]===val)return;
+  /* Qui non si esce se il valore e' "gia' quello": dal momento in cui ogni
+     tasto scrive la bozza (ttBozza), alla conferma il valore e' sempre gia'
+     quello, e uscendo il calcolato non si aggiornava mai. Correggendo
+     23.20 in 23.30 le ore restavano quelle delle 23.20, con l'orario
+     nuovo scritto sopra. */
+  const cambiato=t.orari[field][di]!==val;
   t.orari[field][di]=val;
   // Solo i valori calcolati cambiano: le caselle degli orari e il
   // contenitore che scorre restano quelli, insieme alla posizione
   // orizzontale e al campo su cui si sta scrivendo.
   if(ttVista==='giorno')ttAggiornaGiorno(tabId);
   else ttAggiornaCalc(tabId);
-  ttTocca();
+  if(cambiato)ttTocca();
 }
 function ttAddW(tabId){const inp=document.getElementById(`ttawi-${tabId}`);if(!inp)return;const n=inp.value.trim();if(!n)return;const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.push(n);ttRenderAll();}
 function ttRemoveW(tabId,wi){const t=ttTabelle.find(t=>t.id==tabId);if(!t)return;t.workers.splice(wi,1);ttRenderAll();}

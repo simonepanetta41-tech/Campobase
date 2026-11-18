@@ -91,6 +91,40 @@ for(const [larghezza, etichetta] of [[390,'iPhone'],[768,'schermo largo']]){
     ok(`vista ${vista}: i conti si muovono`, r.golden, 120);
   }
 
+  /* ⚠ La giornata di venerdi' 13 novembre, com'e' stata scritta sul set:
+     si corregge la fine da 23.20 a 23.30 battendo i tasti, come fa una
+     persona. Ogni tasto scrive gia' la bozza, quindi alla conferma il
+     valore era "gia' quello" e il calcolato restava alle 23.20: 10h20
+     lavorate e 3h40 di golden, sotto un orario che diceva 23.30. */
+  if(larghezza<600){
+    await p.evaluate(()=>{
+      const tab=ttTabelle[0];
+      ttMeta.tipoGiornata=8; ttMeta.raddoppio=1; ttMeta.applicazione='giornaliero'; ttMeta.viaggioConcesso=0;
+      ttVista='giorno'; ttGiornoSel=4;
+      Object.assign(tab.orari.partenza,{4:'12.30'}); Object.assign(tab.orari.inizio,{4:'13.00'});
+      Object.assign(tab.orari.fine,{4:'23.20'}); Object.assign(tab.orari.rientro,{4:'23.50'});
+      ttRenderAll();
+    });
+    const calc=()=>p.evaluate(()=>{ const c=document.querySelector('.ttg-calc');
+      return [c.querySelector('.ttg-tot .n').textContent, ...[...c.querySelectorAll('div:not(.ttg-tot)')].filter(d=>d.querySelector('.k')).map(d=>d.querySelector('.k').textContent+' '+d.querySelector('.v').textContent)]; });
+    ok('alle 23.20: dieci ore e venti', (await calc())[0], '10h 20');
+    const campo=p.locator('.ttg-orari input').nth(4);        // Fine
+    await campo.click(); await p.keyboard.press('End');
+    await p.keyboard.press('Backspace'); await p.keyboard.press('Backspace');
+    await p.keyboard.type('30');
+    ok('la casella dice 23.30', await campo.inputValue(), '23.30');
+    ok('⚠ e il conto segue subito, senza uscire dal campo', (await calc())[0], '10h 30');
+    await p.locator('.ttg-orari input').nth(5).click();      // si esce dal campo
+    const dopo=await calc();
+    ok('⚠ 2h30 oltre le otto, raddoppio dopo la prima: 4h di golden', dopo.find(x=>/^Golden notturna/.test(x)), 'Golden notturna 4h');
+    ok('la notturna all\'80% arriva alle 23.30', dopo.find(x=>/80%/.test(x)), 'Maggiorazione notturna 80% 2h 30');
+    ok('e il viaggio: mezz\'ora di andata, venti minuti di rientro', dopo.find(x=>/viaggio/.test(x)), 'Ore viaggio 55% 50min');
+    // A meta' di un orario il conto non si muove.
+    await campo.click(); await p.keyboard.press('End'); await p.keyboard.press('Backspace');
+    ok('a metà battitura ("23.3") il conto resta fermo', (await calc())[0], '10h 30');
+    await p.keyboard.type('0');
+  }
+
   ok('nessun errore di pagina', errori.filter(e=>!/supabase/i.test(e)), []);
   await p.close();
 }
