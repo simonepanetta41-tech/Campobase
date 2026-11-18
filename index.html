@@ -204,7 +204,11 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
   .result-tabs { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tabs-2 { position: fixed; bottom: 0; left: 0; right: 0; margin: 0; border-radius: 0; border-top: 1px solid var(--border); z-index: 100; padding: 0 0 env(safe-area-inset-bottom); background: var(--bg); }
   .result-tab { padding: 10px 8px 8px; font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* Lo spazio per la barra in basso sta sotto la firma, non sotto la
+     sezione: prima la firma ("Campobase · versione") finiva dietro la
+     barra in tutte le pagine lunghe, e si vedeva solo in quelle corte. */
+  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: 8px !important; }
+  #resultsPage.on ~ footer { margin-top: 28px; padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 }
 /* Il telefono sdraiato.
  *
@@ -221,7 +225,8 @@ header { padding: 28px 0 24px; border-bottom: 1px solid var(--border); margin-bo
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   .result-tab { padding: 11px 8px; font-size: 11px; flex-direction: row; gap: 8px; }
   .result-tab svg { width: 20px; height: 20px; }
-  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #spoglioSection, #pdlSection, #castSection, #timetableSection, #wrapSection, #scriptSection, #odgSection, #altroSection { padding-bottom: 8px !important; }
+  #resultsPage.on ~ footer { margin-top: 24px; padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
 }
 /* Una riga sottile fra una sezione e l'altra, dove la barra e' quella del
    telefono: dice dove finisce un tasto e comincia il prossimo. */
@@ -5243,7 +5248,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.167';
+const CB_VERSIONE = '1.168';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
