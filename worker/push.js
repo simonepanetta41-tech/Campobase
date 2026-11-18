@@ -39,6 +39,18 @@ export const VAPID_PUBBLICA =
  * bugia. Oltre questa soglia l'appuntamento si archivia senza mandarlo. */
 const SCADENZA = 20;
 
+/* Quanto il servizio (Apple, Google) tiene una notifica per un telefono
+ * senza campo, prima di buttarla. E' un'altra cosa dalla SCADENZA qui
+ * sopra, che riguarda noi in ritardo; questa riguarda il telefono.
+ *
+ * Con 20 minuti per tutte, sul set al chiuso meta' della troupe perdeva
+ * l'avviso del catering, e chi a mezzanotte era senza rete non riceveva
+ * mai l'ordine del giorno. L'ordine del giorno e il piano servono anche
+ * ore dopo. Il pick-up e il catering in ritardo servono meno, ma finche'
+ * l'app e' in prova e' meglio un avviso tardivo di uno perso: un'ora. */
+const DURATA_POSTA = 12 * 60, DURATA_AVVISI = 60;       // minuti
+const durata = genere => (genere === 'posta' ? DURATA_POSTA : DURATA_AVVISI);
+
 // ── Base64 come lo vuole il web push ────────────────────────────────────────
 
 function b64u(buf) {
@@ -194,15 +206,18 @@ async function db(env, percorso, opzioni = {}) {
 
 /* Manda la notifica a un dispositivo.
  * Torna true se e' partita, false se quell'iscrizione non esiste piu'. */
-async function bussa(isc, testo, env) {
+async function bussa(isc, testo, env, opz = {}) {
   const capo = {
     Authorization: await autorizzazione(isc.endpoint, env),
-    TTL: String(SCADENZA * 60),
+    TTL: String(durata(opz.genere) * 60),
     Urgency: 'high'
   };
   let corpo;
   if (isc.p256dh && isc.auth) {
-    corpo = await cifra(JSON.stringify({ testo }), isc.p256dh, isc.auth);
+    /* Con il testo viaggia il numero dell'appuntamento: il telefono lo
+       rimanda indietro quando la mostra, e la conferma va alla notifica
+       giusta anche se arriva ore dopo. */
+    corpo = await cifra(JSON.stringify(opz.id ? { testo, id: opz.id } : { testo }), isc.p256dh, isc.auth);
     capo['Content-Encoding'] = 'aes128gcm';
     capo['Content-Type'] = 'application/octet-stream';
   }
@@ -235,13 +250,13 @@ async function bussa(isc, testo, env) {
  * solo nel log: non dicono niente sull'iscrizione, e domani lo stesso
  * telefono funziona.
  */
-async function mandaAUtente(userId, testo, env) {
+async function mandaAUtente(userId, testo, env, opz = {}) {
   const isc = await db(env,
     `push_iscrizioni?select=id,endpoint,p256dh,auth&user_id=eq.${userId}`);
   let partite = 0, scartati = 0;
   for (const i of isc || []) {
     let viva;
-    try { viva = await bussa(i, testo, env); }
+    try { viva = await bussa(i, testo, env, opz); }
     catch (e) { console.error('push', i.id, e.message); continue; }
     if (viva) partite++;
     else {
@@ -262,11 +277,11 @@ export async function mandaScadute(env) {
   const limite = new Date(ora - SCADENZA * 60000).toISOString();
 
   const dovute = await db(env, 'push_appuntamenti' +
-    `?select=id,user_id,testo,quando&mandato=is.null` +
+    `?select=id,user_id,testo,quando,genere&mandato=is.null` +
     `&quando=lte.${adesso}&quando=gte.${limite}&order=quando.asc&limit=100`);
 
   for (const a of dovute || []) {
-    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env);
+    const { partite, scartati } = await mandaAUtente(a.user_id, a.testo, env, { id: a.id, genere: a.genere });
     await db(env, `push_appuntamenti?id=eq.${a.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ mandato: adesso, dispositivi: partite, scartati })
@@ -389,6 +404,15 @@ export async function handleMessaggio(request, env) {
   await db(env, `push_iscrizioni?id=eq.${io.id}`, {
     method: 'PATCH', body: JSON.stringify({ vista: new Date().toISOString() })
   });
+
+  /* La conferma con il numero: e' di quella notifica e di nessun'altra,
+     a qualunque ora arrivi. Deve essere sua, e non gia' confermata. */
+  if (b.id && /^[0-9a-f-]{36}$/i.test(String(b.id))) {
+    await db(env, `push_appuntamenti?id=eq.${b.id}&user_id=eq.${io.user_id}&mostrato=is.null`, {
+      method: 'PATCH', body: JSON.stringify({ mostrato: new Date().toISOString() })
+    });
+    return json({ testo: null });
+  }
 
   const limite = new Date(Date.now() - SCADENZA * 60000).toISOString();
   const pronti = await db(env, 'push_appuntamenti' +

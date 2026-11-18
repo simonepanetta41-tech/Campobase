@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v165';
+const CACHE = 'campobase-v166';
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -137,9 +137,10 @@ async function mostra(testo) {
 
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
-    let testo = null;
+    let testo = null, numero = null;
     // Di solito il testo e' dentro la notifica, cifrato: si legge e basta.
-    try { testo = (e.data && e.data.json() || {}).testo || null; } catch (_) {}
+    // Con lui c'e' il numero dell'appuntamento, da rimandare come conferma.
+    try { const d = e.data && e.data.json() || {}; testo = d.testo || null; numero = d.id || null; } catch (_) {}
     /* Il server va avvisato comunque, anche quando il testo c'e' gia':
        e' quella chiamata a segnare che questo telefono la notifica l'ha
        mostrata (push_iscrizioni.vista, push_appuntamenti.mostrato). Da
@@ -153,7 +154,7 @@ self.addEventListener('push', e => {
       const r = await fetch('/api/push/messaggio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint: sub.endpoint })
+        body: JSON.stringify(numero ? { endpoint: sub.endpoint, id: numero } : { endpoint: sub.endpoint })
       });
       return r.ok ? ((await r.json()).testo || null) : null;
     };

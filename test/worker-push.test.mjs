@@ -152,7 +152,7 @@ ok('mandato', await push.mandaScadute(ENV), 1);
 ok('una bussata sola', bussate.length, 1);
 ok('al telefono giusto', bussate[0].endpoint, 'https://web.push.apple.com/telefono1');
 ok('firmato', /^vapid t=[\w-]+\.[\w-]+\.[\w-]+, k=/.test(bussate[0].auth || ''), true);
-ok('con la scadenza giusta', bussate[0].ttl, '1200');
+ok('⚠ un avviso resta in attesa del telefono per un\'ora', bussate[0].ttl, '3600');
 ok('e col testo cifrato dentro', bussate[0].codifica, 'aes128gcm');
 /* 16 di sale + 4 di misura + 1 + 65 di chiave + il testo + 16 di firma. */
 ok('un pacchetto di misura sensata', bussate[0].byte > 102 && bussate[0].byte < 400, true);
@@ -309,6 +309,34 @@ corpoFinto = { endpoint: 'https://web.push.apple.com/t1' };
 const uno = (await (await push.handleMessaggio({}, ENV)).json()).testo;
 const due = (await (await push.handleMessaggio({}, ENV)).json()).testo;
 ok('la prima, poi la seconda', [uno, due], ['Nuovo ordine del giorno!', 'Catering pronto fra 15 minuti!']);
+
+console.log('\n── ⚠ l\'ordine del giorno aspetta il telefono dodici ore ──');
+azzera();
+iscrivi('u1', 'https://web.push.apple.com/t1');
+tavoli.push_appuntamenti.push({ id: 'p1', user_id: 'u1', quando: fra(-1), genere: 'posta', testo: 'OdG 27', mandato: null, mostrato: null });
+bussate.length = 0;
+await push.mandaScadute(ENV);
+ok('la posta: 12 ore', bussate[0].ttl, String(12 * 3600));
+
+console.log('\n── ⚠ la conferma col numero va alla notifica giusta, anche ore dopo ──');
+azzera();
+iscrivi('u1', 'https://web.push.apple.com/t1');
+iscrivi('u2', 'https://web.push.apple.com/t2');
+const N1 = '11111111-1111-4111-8111-111111111111', N2 = '22222222-2222-4222-8222-222222222222', N3 = '33333333-3333-4333-8333-333333333333';
+tavoli.push_appuntamenti.push(
+  { id: N1, user_id: 'u1', quando: fra(-600), genere: 'posta',  testo: 'OdG di ieri sera', mandato: fra(-600), mostrato: null },
+  { id: N2, user_id: 'u1', quando: fra(-5),   genere: 'pickup', testo: 'Pick-up',          mandato: fra(-5),   mostrato: null },
+  { id: N3, user_id: 'u2', quando: fra(-5),   genere: 'pickup', testo: 'Pick-up di un altro', mandato: fra(-5), mostrato: null });
+const visti = () => tavoli.push_appuntamenti.filter(a => a.mostrato).map(a => a.id);
+corpoFinto = { endpoint: 'https://web.push.apple.com/t1', id: N1 };
+await push.handleMessaggio({}, ENV);
+ok('quella di dieci ore fa, arrivata adesso: confermata lei', visti(), [N1]);
+corpoFinto = { endpoint: 'https://web.push.apple.com/t1', id: N3 };
+await push.handleMessaggio({}, ENV);
+ok('⚠ quella di un altro non si conferma', visti(), [N1]);
+corpoFinto = { endpoint: 'https://web.push.apple.com/t1', id: 'non-un-numero' };
+await push.handleMessaggio({}, ENV);
+ok('un numero che non è un numero: come senza (la più vecchia ancora valida)', visti(), [N1, N2]);
 
 console.log('\n── un indirizzo che non conosciamo non ottiene niente ──');
 corpoFinto = { endpoint: 'https://web.push.apple.com/non-mio' };

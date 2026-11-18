@@ -203,7 +203,7 @@ const swPieno = await p.evaluate(async()=>{
     clients:{matchAll:async()=>[],openWindow:async()=>null}, skipWaiting(){} };
   new Function('self','caches','fetch', sorgente)(self, {open:async()=>({put:async()=>{},add:async()=>{}}),keys:async()=>[],match:async()=>null,delete:async()=>{}}, window.fetch.bind(window));
   const atteso=[];
-  await self._h.push({ data:{ json:()=>({testo:'Nuovo ordine del giorno!\nMSG - ODG 23 del 12.11.2026'}) }, waitUntil:pr=>atteso.push(pr) });
+  await self._h.push({ data:{ json:()=>({testo:'Nuovo ordine del giorno!\nMSG - ODG 23 del 12.11.2026', id:'n-23'}) }, waitUntil:pr=>atteso.push(pr) });
   await Promise.all(atteso);
   return mostrate;
 });
@@ -212,6 +212,7 @@ ok('titolo e sottotitolo separati', swPieno, [{titolo:'Nuovo ordine del giorno!'
    si sa chi la notifica l'ha vista davvero. Senza, "mostrato" restava
    vuoto per tutta la troupe. */
 ok('⚠ e avvisa il server che l\'ha mostrata, una volta', chiesti.filter(c=>c.url==='/api/push/messaggio').map(c=>c.corpo.endpoint), ['x']);
+ok('⚠ rimandando il numero della notifica', chiesti.filter(c=>c.url==='/api/push/messaggio').map(c=>c.corpo.id), ['n-23']);
 messaggioRompi = true;
 const swSenzaRete = await p.evaluate(async()=>{
   const sorgente = await (await fetch('/sw.js')).text();
