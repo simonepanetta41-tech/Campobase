@@ -179,16 +179,22 @@ console.log('\n── ⚠ il posto, quando il foglio non ha link ──');
     const out={ msg: await prova(msg),
       link:    await prova({luoghi:[{nome:'Mezzi tecnici',url:'',indirizzo:'Via Roma 1, 00100 Roma RM'},{nome:'Set',url:'https://maps/x',indirizzo:''}]}),
       rotto:   await prova({luoghi:[{nome:'Set',url:'https://maps/rotto',indirizzo:'Via del Faro, 58, 74122 Taranto (TA)'}]}),
+      ponticelli: (await prova({luoghi:[{nome:'Set',url:'https://www.google.com/rotto',indirizzo:'Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli'}],
+                    ospedale:'OSPEDALE SAN GIUSEPPE MOSCATI VIA PER MARTINA FRANCA STATTE'})).slice(0,2),
       osp:     await prova({luoghi:[], ospedale:'PRONTO SOCCORSO DEL C.T.O. DI NAPOLI - Viale Colli Aminei, 21, 80131 Napoli NA'}),
       niente:  await prova({luoghi:[{nome:'Location',url:'',indirizzo:'CASA PAESE'}], ospedale:'OSPEDALE MOSCATI - VIA PER MARTINA FRANCA'}),
+      forme:[odgComuneCap('Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli'), odgComuneCap('Via del Faro, 58, 74122 Taranto (TA)'),
+             odgComuneCap('Via Appia 1, 00100 Roma RM, Italia'), odgComuneCap('Via X 3, 80147 Ponticelli, Napoli (NA)'), odgComuneCap('Via X, 80147 221/B')],
       cap:[odgComuneCap('Viale Colli Aminei, 3, 80131 Napoli NA'), odgComuneCap('SEMINARIO ARCIVESCOVILE'), odgComuneCap('Via X, 74023 Grottaglie'), odgComuneCap('')] };
     [odgCoordinate, odgCoordDaLink]=veri; return out; });
   ok('⚠ dall\'indirizzo dei mezzi tecnici, non dal nome della location', r.msg, ['Napoli',['comune:Napoli'],'']);
   ok('un link vince sempre su un indirizzo', r.link, ['dal link',['link:https://maps/x'],'']);
   ok('link rotto: si ripiega sull\'indirizzo', r.rotto.slice(0,2), ['Taranto',['link:https://maps/rotto','comune:Taranto']]);
-  ok('⚠ senza posti, il comune dell\'ospedale più vicino', r.osp, ['Napoli',['comune:Napoli'],'']);
+  ok('⚠ l\'ospedale non si usa: può essere quello di un\'altra città', r.osp, [null,[],"nei documenti non c'è un indirizzo con il CAP"]);
+  ok('⚠ il set del 21 novembre: quartiere e poi comune', r.ponticelli, ['Napoli',['link:https://www.google.com/rotto','comune:Napoli']]);
   ok('⚠ senza un CAP da nessuna parte, nessun meteo', r.niente, [null,[],"nei documenti non c'è un indirizzo con il CAP"]);
   ok('il comune si prende solo dietro a un CAP', r.cap, ['Napoli',null,'Grottaglie',null]);
+  ok('⚠ le forme che si incontrano', r.forme, ['Napoli','Taranto','Roma','Napoli',null]);
 }
 
 console.log('\n── come si vede nella scheda ──');

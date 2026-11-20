@@ -5279,7 +5279,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.172';
+const CB_VERSIONE = '1.173';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13440,9 +13440,16 @@ function odgErrataHtml(d){
 
 /* Il comune, solo se l'indirizzo ha il CAP davanti: "..., 80131 Napoli NA". */
 function odgComuneCap(indirizzo){
-  const m = String(indirizzo || '').replace(/\s+/g, ' ').trim()
-    .match(/\b\d{5}\s+([A-Za-z\u00c0-\u017f' ]{2,30}?)(?:\s+\(?[A-Z]{2}\)?)?\s*$/);
-  return m ? m[1].trim() : null;
+  /* Dopo il CAP puo' esserci il comune da solo ("80131 Napoli NA") o il
+     quartiere e poi il comune ("80147 Ponticelli, Napoli"): vale l'ultimo
+     pezzo, che e' il comune. Il quartiere da solo porterebbe altrove:
+     di Ponticelli ce n'e' piu' d'una in Italia. */
+  const m = String(indirizzo || '').replace(/\s+/g, ' ').trim().match(/\b\d{5}\s+(.{2,60})$/);
+  if (!m) return null;
+  const pezzi = m[1].split(',').map(x => x.replace(/\s+\(?[A-Z]{2}\)?\s*$/, '').replace(/^\(|\)$/g, '').trim())
+    .filter(x => x && !/^ital/i.test(x));
+  const ultimo = pezzi[pezzi.length - 1] || '';
+  return /^[A-Za-z\u00c0-\u017f' .-]{2,30}$/.test(ultimo) ? ultimo : null;
 }
 
 async function odgCoordinate(comune){
@@ -13543,9 +13550,12 @@ async function odgPosto(d){
      Roma — e il meteo di Roma mentre a Viterbo piove e' peggio di nessun
      meteo. La posizione viene dal link di Google o dall'indirizzo del
      campo base, e da nient'altro. */
-  /* In fondo, l'ospedale piu' vicino: lo sceglie la produzione partendo
-     dal set, quindi il suo comune e' quello del set o quello accanto. */
-  const comune = odgComune(d.location) || odgComuneCap(d.ospedale);
+  /* L'ospedale NON si usa. Sembrava un buon ripiego (lo sceglie la
+     produzione partendo dal set), ma nel foglio del 21 novembre, girato a
+     Napoli, c'era ancora quello di Taranto della settimana prima: la riga
+     dell'ospedale e' una di quelle che ci si dimentica di aggiornare.
+     Meglio nessun meteo che il meteo di trecento chilometri piu' in la'. */
+  const comune = odgComune(d.location);
   if (!comune) {
     motivi.push('nei documenti non c\'è un indirizzo con il CAP');
   } else {
@@ -13685,7 +13695,7 @@ async function odgPrevisione(d){
 /* La versione sale quando cambia cosa si chiede o come si cerca il posto:
    le previsioni gia' salvate si rifanno da sole, se no chi ha l'OdG di
    ieri resta con una scheda che non si puo' aprire. */
-const ODG_METEO_V = 8;
+const ODG_METEO_V = 9;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
