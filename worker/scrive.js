@@ -120,7 +120,7 @@ export function datiPerApp(letto, riga, adesso) {
          l'indirizzo. Senza quelli l'app non sa dove si gira, e non da'
          ne' la mappa ne' il meteo. Un link che non e' un link si butta,
          il posto resta. */
-      .map(l => ({ nome: testo(l && l.nome), url: /^https?:\/\//.test(testo(l && l.url)) ? testo(l.url) : '',
+      .map(l => ({ nome: testo(l && l.nome), url: linkVero(l && l.url),
                    indirizzo: testo(l && l.indirizzo) }))
       .filter(l => l.nome && (l.url || l.indirizzo)),
     avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo)
@@ -224,6 +224,18 @@ export function notificaOdg(d, membro, pickup) {
 /* Tutto quello che succede quando la lettura e' riuscita.
    Torna un riepilogo; lancia se non riesce a scrivere l'ordine del
    giorno — e allora chi chiama rilascia. */
+/* Il link di un posto vale se indica un punto. Una ricerca
+   ("…/maps/search/?query=SET") non lo indica: il 21 novembre il set
+   portava a un'azienda di nome Set. Meglio nessun link: l'app cerca
+   l'indirizzo, che c'e'. */
+export function linkVero(u) {
+  const t = testo(u);
+  if (!/^https?:\/\//i.test(t)) return '';
+  if (/google\.[a-z.]+\/(maps\/)?search/i.test(t)) return '';
+  if (/[?&](q|query)=/i.test(t) && !/[?&]q=-?\d+\.\d+,-?\d+\.\d+/.test(t)) return '';
+  return t;
+}
+
 /* Gli avvisi della produzione, dal testo della mail.
  *
  * Il modello li copia, e qui si controlla che li abbia copiati davvero:

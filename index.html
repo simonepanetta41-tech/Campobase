@@ -5279,7 +5279,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.173';
+const CB_VERSIONE = '1.174';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13389,6 +13389,44 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
+/* Dove porta "Mappa" per un posto.
+ *
+ * Tre errori visti in un solo foglio (21 novembre):
+ *   - il set aveva un link a una RICERCA di Google ("…query=SET") e
+ *     portava a un'azienda che si chiama Set: una ricerca non e' un posto,
+ *     e allora non si usa, anche se arriva dentro i dati;
+ *   - "Mezzi tecnici: @set" cercava "@set" sulla mappa: vuol dire "al
+ *     set", e porta dove porta il set;
+ *   - "Location: MASSERIA MORABITO", un nome senza indirizzo, cercato da
+ *     solo trova la masseria omonima in un'altra regione: gli si
+ *     aggiunge il comune della giornata, preso dagli altri posti.
+ */
+function odgUrlVero(u){
+  const t = String(u || '').trim();
+  if (!/^https?:\/\//i.test(t)) return '';
+  // Una ricerca (…/maps/search/…, …/search?q=…, …?query=…) non indica un punto.
+  if (/google\.[a-z.]+\/(maps\/)?search/i.test(t) || /[?&](q|query)=/i.test(t) && !/[?&]q=-?\d+\.\d+,-?\d+\.\d+/.test(t)) return '';
+  return t;
+}
+function odgAlSet(t){ return /^\s*(@|c\/o|presso|al|sul|come)\s*(il\s+)?set\s*$/i.test(String(t || '')); }
+function odgSembraIndirizzo(t){
+  return /\b\d{5}\b/.test(t) || /\b(via|viale|v\.le|piazza|p\.zza|corso|largo|strada|s\.p\.|s\.s\.|contrada|c\.da|localit[aà]|loc\.|vicolo|lungomare)\b/i.test(t);
+}
+function odgLinkPosto(l, luoghi, giro){
+  const vero = odgUrlVero(l && l.url);
+  if (vero) return vero;
+  const ind = String(l && l.indirizzo || '').trim(), tutti = luoghi || [];
+  if (odgAlSet(ind) && !giro) {
+    const set = tutti[odgPostoDelSet(tutti)];
+    if (set && set !== l && !odgAlSet(set.indirizzo)) return odgLinkPosto(set, tutti, true);
+  }
+  if (ind && odgSembraIndirizzo(ind)) return odgMaps(ind);
+  // Un nome solo: lo si cerca nel comune della giornata, se lo sappiamo.
+  const comune = tutti.map(x => odgComuneCap(x && x.indirizzo)).find(Boolean);
+  const nome = (ind && !odgAlSet(ind) ? ind : String(l && l.nome || '')).trim();
+  return odgMaps(comune ? nome + ', ' + comune : nome);
+}
+
 /* Come arrivare al set: una riga sotto il set, che si apre.
    Le indicazioni servono una volta, la mattina in macchina: chiuse
    occupano una riga, aperte mostrano i passi nell'ordine, con le parole
@@ -13525,7 +13563,7 @@ async function odgPosto(d){
   const motivi = [];
   const posti = [...(d.luoghi || [])].sort((a, b) => peso(a) - peso(b));
   for (const l of posti) {
-    if (!l.url) continue;
+    if (!odgUrlVero(l.url)) continue;
     try {
       const c = await odgCoordDaLink(l.url);
       d.posto = { ...c, nome: c.nome || l.nome };
@@ -13695,7 +13733,7 @@ async function odgPrevisione(d){
 /* La versione sale quando cambia cosa si chiede o come si cerca il posto:
    le previsioni gia' salvate si rifanno da sole, se no chi ha l'OdG di
    ieri resta con una scheda che non si puo' aprire. */
-const ODG_METEO_V = 9;
+const ODG_METEO_V = 10;
 
 async function odgCaricaMeteo(){
   const d = odgCorrente;
@@ -13873,10 +13911,10 @@ function odgPienoHtml(d) {
   ${(d.location || (d.luoghi || []).length) ? `<div class="odg-sez">DOVE</div>
   <div class="card">
     ${(d.luoghi || []).length
-      ? d.luoghi.map((l, i) => `<a class="odg-posto" href="${esc(l.url || odgMaps(l.indirizzo || l.nome))}" target="_blank" rel="noopener">
+      ? d.luoghi.map((l, i) => `<a class="odg-posto" href="${esc(odgLinkPosto(l, d.luoghi))}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
-          ${l.indirizzo ? `<span class="s">${esc(l.indirizzo)}</span>` : ''}</span>
+          ${l.indirizzo ? `<span class="s">${esc(odgAlSet(l.indirizzo) ? 'Al set' : l.indirizzo)}</span>` : ''}</span>
           <span class="go">Mappa ›</span></a>${i === odgPostoDelSet(d.luoghi) ? odgArrivoHtml(d) : ''}`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>

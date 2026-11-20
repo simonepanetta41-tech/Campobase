@@ -217,6 +217,31 @@ ok('⚠ minima e massima uguali: un numero solo', await p.evaluate(()=>{
   const t=[...document.querySelectorAll('#odgCorpo .k')].find(k=>k.textContent==='temp').nextElementSibling.textContent;
   [v.min,v.max]=tieni; odgRender(); return t; }), '19°');
 
+console.log('\n── ⚠ dove porta "Mappa", col foglio del 21 novembre ──');
+{ const r=await p.evaluate(()=>{
+    const L=[{nome:'Set',url:'https://www.google.com/maps/search/?api=1&query=SET',indirizzo:'Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli'},
+             {nome:'Location',url:'',indirizzo:'MASSERIA MORABITO'},
+             {nome:'Mezzi tecnici',url:'',indirizzo:'@set'}];
+    const q=u=>decodeURIComponent(u.split('query=')[1]||u);
+    const tieni=[odgCorrente.luoghi]; odgCorrente.luoghi=L; odgRender();
+    const righe=[...document.querySelectorAll('#odgCorpo .odg-posto')].filter(x=>/^(Set|Location|Mezzi tecnici)$/.test(x.querySelector('.t').textContent))
+      .map(x=>[x.querySelector('.t').textContent, x.querySelector('.s').textContent, q(x.getAttribute('href'))]);
+    [odgCorrente.luoghi]=tieni; odgRender();
+    return { righe,
+      vero:[odgUrlVero('https://maps.app.goo.gl/5aLY'), odgUrlVero('https://www.google.com/maps/place/X/@40.85,14.33,17z'), odgUrlVero('https://maps.google.com/?q=40.8512,14.3301'),
+            odgUrlVero('https://www.google.com/maps/search/?api=1&query=SET'), odgUrlVero('https://www.google.com/search?q=set'), odgUrlVero('set')].map(x=>x?'sì':'no'),
+      setConLink: odgLinkPosto({nome:'Mezzi tecnici',indirizzo:'@set'},[{nome:'Set',url:'https://maps.app.goo.gl/abc',indirizzo:'x'},{nome:'Mezzi tecnici',indirizzo:'@set'}]),
+      soloNome: q(odgLinkPosto({nome:'Location',indirizzo:'CAVA DI FAGGIANO'},[{nome:'Location',indirizzo:'CAVA DI FAGGIANO'}])),
+      alSet:['@set','@ set','c/o set','presso il set','Al set','set di Via Roma'].map(odgAlSet) }; });
+  ok('⚠ il set: l\'indirizzo, non la ricerca di "SET"', r.righe[0], ['Set','Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli','Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli']);
+  ok('⚠ un nome solo: cercato nel comune della giornata', r.righe[1], ['Location','MASSERIA MORABITO','MASSERIA MORABITO, Napoli']);
+  ok('⚠ "@set" porta dove porta il set, e lo dice', r.righe[2], ['Mezzi tecnici','Al set','Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli']);
+  ok('un punto è un link, una ricerca no', r.vero, ['sì','sì','sì','no','no','no']);
+  ok('"@set" con un set che ha il suo link: quello', r.setConLink, 'https://maps.app.goo.gl/abc');
+  ok('senza un comune da nessuna parte, il nome com\'è', r.soloNome, 'CAVA DI FAGGIANO');
+  ok('i modi di dire "al set"', r.alSet, [true,true,true,true,true,false]);
+}
+
 console.log('\n── ⚠ come arrivare al set, sotto il set ──');
 { const r=await p.evaluate(()=>{
     const tieni=[odgCorrente.luoghi, odgCorrente.indicazioni, odgCorrente.location];

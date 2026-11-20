@@ -293,6 +293,14 @@ mondo(); await posta.riceviPosta(mail([ODG, GIRI, 'MSG - PDL rev 7.pdf']), ACCES
 ok('una mail col piano: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuovo piano di lavorazione!']);
 mondo(); await posta.riceviPosta(mail(['MSG_ACCOMMODATION NAPOLI.pdf'], 'I: MSG_ACCOMMODATION'), ACCESO, {});
 ok('una mail senza ordine del giorno: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuova posta dalla produzione']);
+console.log('\n── ⚠ una ricerca non è il link di un posto ──');
+{ const { linkVero } = await import(RADICE + '/worker/scrive.js');
+  ok('un punto sulla mappa resta', [linkVero('https://maps.app.goo.gl/5aLY'), linkVero('https://share.google/mKx8')], ['https://maps.app.goo.gl/5aLY', 'https://share.google/mKx8']);
+  ok('⚠ una ricerca costruita col nome si butta', [linkVero('https://www.google.com/maps/search/?api=1&query=SET'), linkVero('https://www.google.com/search?q=masseria'), linkVero('SET')], ['', '', '']);
+  const dl = datiPerApp({ ...LETTO, luoghi: [{ nome: 'SET', url: 'https://www.google.com/maps/search/?api=1&query=SET', indirizzo: 'Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli' }] }, RIGA0);
+  ok('il posto resta, col suo indirizzo e senza quel link', dl.luoghi, [{ nome: 'SET', url: '', indirizzo: 'Via Angelo Camillo De Meis, 221, 80147 Ponticelli, Napoli' }]);
+}
+
 console.log('\n── ⚠ come arrivare al set, dal testo della mail ──');
 { const { indicazioniDallaMail } = await import(RADICE + '/worker/scrive.js');
   const PASSI = `Cari tutti,\nSET MASSERIA LAMIE - Strada Vicinale Citrezze-Monteiasi\nIndicazioni per raggiungere il set:\nPRIMO STEP:\nInserire come prima indicazione la posizione del distributore eniLIVE MICCOLIS LORENZO\nhttps://maps.app.goo.gl/5aLYrrMcRVVDL4u16\nSECONDO STEP:\nProseguire dritto per 800 metri e svoltare\na destra sulla strada sterrata\nGrazie`;
