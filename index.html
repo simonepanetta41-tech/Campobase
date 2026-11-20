@@ -423,6 +423,22 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-errata .pt b{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:5px}
 .odg-errata .pt .r{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:13.5px;padding:2px 0;color:var(--white)}
 .odg-errata .pt .r s{color:var(--muted);margin-right:8px}
+.odg-arrivo{border-top:1px solid var(--border)}
+.odg-arrivo:first-child{border-top:none}
+.odg-arrivo + .odg-posto{border-top:1px solid var(--border)}
+.odg-arrivo summary{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;list-style:none;font-size:14px;color:var(--white)}
+.odg-arrivo summary::-webkit-details-marker{display:none}
+.odg-arrivo summary .n{margin-left:auto;font-size:11.5px;color:var(--muted)}
+.odg-arrivo summary .fr{color:var(--yellow);font-size:13px;transition:transform .15s}
+.odg-arrivo[open] summary .fr{transform:rotate(90deg)}
+.odg-passi{padding:2px 16px 14px}
+.odg-passo{display:flex;gap:12px;padding:10px 0}
+.odg-passo + .odg-passo{border-top:1px solid var(--border)}
+.odg-passo .num{flex:none;width:24px;height:24px;border-radius:50%;border:1px solid rgba(245,197,66,.6);color:var(--yellow);
+  font-family:'DM Mono',monospace;font-size:12px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.odg-passo .tx{flex:1;min-width:0;font-size:13.5px;line-height:1.45;color:var(--white-dim)}
+.odg-passo a{display:inline-block;margin-top:7px;padding:6px 12px;border-radius:99px;border:1px solid rgba(245,197,66,.6);
+  color:var(--yellow);font-size:12.5px;text-decoration:none}
 .odg-avvisi{padding:14px 16px}
 .odg-avvisi p{margin:0;font-size:14px;line-height:1.5;color:var(--white-dim)}
 .odg-avvisi p + p{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
@@ -5263,7 +5279,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.171';
+const CB_VERSIONE = '1.172';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13373,6 +13389,30 @@ function odgComune(indirizzo){
   return p.length ? p[p.length-1] : null;
 }
 
+/* Come arrivare al set: una riga sotto il set, che si apre.
+   Le indicazioni servono una volta, la mattina in macchina: chiuse
+   occupano una riga, aperte mostrano i passi nell'ordine, con le parole
+   della produzione e, dove la mail da' un link, il tasto per la mappa.
+   Con un passo solo non c'e' niente da numerare. */
+function odgPostoDelSet(luoghi){
+  const l = luoghi || [];
+  let i = l.findIndex(x => /^(set|location)\b/i.test(String(x.nome || '')));
+  if (i < 0) i = l.findIndex(x => /set|location/i.test(String(x.nome || '')));
+  return i < 0 ? l.length - 1 : i;
+}
+function odgArrivoHtml(d){
+  const passi = (d && Array.isArray(d.indicazioni) ? d.indicazioni : []).filter(p => p && p.testo);
+  if (!passi.length) return '';
+  const uno = passi.length === 1;
+  return `<details class="odg-arrivo">
+    <summary><span class="fr">›</span>Come arrivare al set${uno ? '' : `<span class="n">${passi.length} passi</span>`}</summary>
+    <div class="odg-passi">${passi.map((p, i) => `<div class="odg-passo">
+      ${uno ? '' : `<span class="num">${i + 1}</span>`}
+      <span class="tx">${esc(p.testo)}${/^https?:\/\//.test(p.link || '')
+        ? `<br><a href="${esc(p.link)}" target="_blank" rel="noopener">Apri mappa ›</a>` : ''}</span></div>`).join('')}</div>
+  </details>`;
+}
+
 /* L'errata corrige: in cima, prima di tutto il resto. E' l'unica cosa
    della pagina che non ci si puo' permettere di saltare. Dentro, le parole
    della produzione com'erano nella mail e, sotto, cosa cambia per chi
@@ -13817,18 +13857,21 @@ function odgPienoHtml(d) {
       qui c'è la partenza più mattiniera. Controlla il foglio se aspettavi un altro orario.</div>` : ''}
   </div>` : ''}
 
+  ${!(d.location || (d.luoghi || []).length) && (d.indicazioni || []).length ? `<div class="odg-sez">DOVE</div>
+  <div class="card">${odgArrivoHtml(d)}</div>` : ''}
+
   ${(d.location || (d.luoghi || []).length) ? `<div class="odg-sez">DOVE</div>
   <div class="card">
     ${(d.luoghi || []).length
-      ? d.luoghi.map(l => `<a class="odg-posto" href="${esc(l.url || odgMaps(l.indirizzo || l.nome))}" target="_blank" rel="noopener">
+      ? d.luoghi.map((l, i) => `<a class="odg-posto" href="${esc(l.url || odgMaps(l.indirizzo || l.nome))}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
           ${l.indirizzo ? `<span class="s">${esc(l.indirizzo)}</span>` : ''}</span>
-          <span class="go">Mappa ›</span></a>`).join('')
+          <span class="go">Mappa ›</span></a>${i === odgPostoDelSet(d.luoghi) ? odgArrivoHtml(d) : ''}`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
-          <span class="go">Mappa ›</span></a>`}
+          <span class="go">Mappa ›</span></a>${odgArrivoHtml(d)}`}
     ${d.pickup || !d.location ? '' : `<a class="odg-posto" href="${odgMapsVicino('parcheggio', d.location)}" target="_blank" rel="noopener">
       <span class="i">${ODG_SEGNI.parcheggio}</span>
       <span class="c"><span class="t">Dove parcheggiare</span>

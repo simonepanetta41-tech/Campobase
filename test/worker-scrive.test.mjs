@@ -293,6 +293,26 @@ mondo(); await posta.riceviPosta(mail([ODG, GIRI, 'MSG - PDL rev 7.pdf']), ACCES
 ok('una mail col piano: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuovo piano di lavorazione!']);
 mondo(); await posta.riceviPosta(mail(['MSG_ACCOMMODATION NAPOLI.pdf'], 'I: MSG_ACCOMMODATION'), ACCESO, {});
 ok('una mail senza ordine del giorno: strada vecchia', [T.posta[0].stato, titoli()[0]], ['nuova', 'Nuova posta dalla produzione']);
+console.log('\n── ⚠ come arrivare al set, dal testo della mail ──');
+{ const { indicazioniDallaMail } = await import(RADICE + '/worker/scrive.js');
+  const PASSI = `Cari tutti,\nSET MASSERIA LAMIE - Strada Vicinale Citrezze-Monteiasi\nIndicazioni per raggiungere il set:\nPRIMO STEP:\nInserire come prima indicazione la posizione del distributore eniLIVE MICCOLIS LORENZO\nhttps://maps.app.goo.gl/5aLYrrMcRVVDL4u16\nSECONDO STEP:\nProseguire dritto per 800 metri e svoltare\na destra sulla strada sterrata\nGrazie`;
+  const PAROLE = `Buonasera,\nper arrivare al set impostare prima Via Roma 1 a Faggiano e poi andare dritto fino alla cava, girando a destra dopo il ponte.\nA domani`;
+  const P1 = 'Inserire come prima indicazione la posizione del distributore eniLIVE MICCOLIS LORENZO';
+  const P2 = 'Proseguire dritto per 800 metri e svoltare a destra sulla strada sterrata';
+  const L1 = 'https://maps.app.goo.gl/5aLYrrMcRVVDL4u16';
+  ok('a passi: il testo e il suo link', indicazioniDallaMail([{ testo: P1, link: L1 }, { testo: P2, link: '' }], PASSI),
+     [{ testo: P1, link: L1 }, { testo: P2, link: '' }]);
+  ok('⚠ un link copiato male si toglie, il passo resta', indicazioniDallaMail([{ testo: P1, link: 'https://maps.app.goo.gl/5aLYrrMcRVVDL4u1G' }], PASSI), [{ testo: P1, link: '' }]);
+  ok('⚠ un passo inventato o riscritto: via', indicazioniDallaMail([{ testo: 'Dal distributore girare a sinistra e proseguire fino al set', link: '' }, { testo: P2 }], PASSI), [{ testo: P2, link: '' }]);
+  const FRASE = 'per arrivare al set impostare prima Via Roma 1 a Faggiano e poi andare dritto fino alla cava, girando a destra dopo il ponte.';
+  ok('tutto a parole: una frase sola, intera', indicazioniDallaMail([{ testo: FRASE }], PAROLE), [{ testo: FRASE, link: '' }]);
+  ok('a parole, divise dal modello in due pezzi veri', indicazioniDallaMail([{ testo: 'impostare prima Via Roma 1 a Faggiano' }, { testo: 'andare dritto fino alla cava, girando a destra dopo il ponte.' }], PAROLE).length, 2);
+  ok('senza mail o senza passi, niente', [indicazioniDallaMail([{ testo: P1 }], ''), indicazioniDallaMail(null, PASSI), indicazioniDallaMail([{ testo: 'ok' }], PASSI)], [[], [], []]);
+  const dd = datiPerApp({ ...LETTO, indicazioni: [{ testo: P1, link: L1 }], avvisi: [P1, 'Grazie'] }, { ...RIGA0, testo: PASSI });
+  ok('⚠ nell\'ordine del giorno, e non ripetute fra gli avvisi', [dd.indicazioni, dd.avvisi], [[{ testo: P1, link: L1 }], []]);
+  ok('una mail senza indicazioni: lista vuota', d.indicazioni, []);
+}
+
 // ── L'errata corrige ────────────────────────────────────────────────────────
 const { tipoErrata, righeErrata, cambiPer, notificaErrata, siglaDa } = await import(RADICE + '/worker/scrive.js');
 

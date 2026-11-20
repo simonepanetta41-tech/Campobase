@@ -211,6 +211,26 @@ ok('⚠ minima e massima uguali: un numero solo', await p.evaluate(()=>{
   const t=[...document.querySelectorAll('#odgCorpo .k')].find(k=>k.textContent==='temp').nextElementSibling.textContent;
   [v.min,v.max]=tieni; odgRender(); return t; }), '19°');
 
+console.log('\n── ⚠ come arrivare al set, sotto il set ──');
+{ const r=await p.evaluate(()=>{
+    const tieni=[odgCorrente.luoghi, odgCorrente.indicazioni, odgCorrente.location];
+    const leggi=()=>{ const e=document.querySelector('#odgCorpo .odg-arrivo'); if(!e) return null;
+      return { aperto:e.open, titolo:e.querySelector('summary').textContent.replace(/\s+/g,' ').trim(), prima:e.previousElementSibling?.querySelector('.t')?.textContent||null,
+        passi:[...e.querySelectorAll('.odg-passo')].map(x=>[x.querySelector('.num')?.textContent||'', x.querySelector('.tx').firstChild.textContent, x.querySelector('a')?.getAttribute('href')||'']) }; };
+    odgCorrente.luoghi=[{nome:'Mezzi tecnici',url:'',indirizzo:'Via X, 74023 Grottaglie TA'},{nome:'Set',url:'',indirizzo:'MASSERIA LAMIE'}];
+    odgCorrente.indicazioni=[]; odgRender(); const senza=leggi();
+    odgCorrente.indicazioni=[{testo:'Inserire come prima indicazione il distributore',link:'https://maps.app.goo.gl/abc'},{testo:'Proseguire dritto per 800 metri',link:''}];
+    odgRender(); const due=leggi();
+    odgCorrente.indicazioni=[{testo:'Impostare prima Via Roma e poi andare dritto fino alla cava.',link:''}]; odgRender(); const uno=leggi();
+    odgCorrente.luoghi=[]; odgCorrente.location=''; odgRender(); const soli=leggi();
+    [odgCorrente.luoghi, odgCorrente.indicazioni, odgCorrente.location]=tieni; odgRender(); return {senza,due,uno,soli}; });
+  ok('senza indicazioni, niente riga', r.senza, null);
+  ok('⚠ chiusa, sotto il set e non sotto il primo posto', [r.due.aperto, r.due.titolo, r.due.prima], [false, '›Come arrivare al set2 passi', 'Set']);
+  ok('⚠ i passi nell\'ordine, col link dove c\'è', r.due.passi, [['1','Inserire come prima indicazione il distributore','https://maps.app.goo.gl/abc'],['2','Proseguire dritto per 800 metri','']]);
+  ok('una frase sola: niente numeri né conteggio', [r.uno.titolo, r.uno.passi], ['›Come arrivare al set', [['','Impostare prima Via Roma e poi andare dritto fino alla cava.','']]]);
+  ok('senza posti nel foglio, le indicazioni si vedono lo stesso', r.soli && r.soli.passi.length, 1);
+}
+
 console.log('\n── ⚠ l\'errata corrige, in cima all\'ordine del giorno ──');
 { const r=await p.evaluate(()=>{
     const tieni=[odgCorrente.errata, currentUser]; currentUser={id:'u1'};

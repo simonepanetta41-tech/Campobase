@@ -123,7 +123,9 @@ export function datiPerApp(letto, riga, adesso) {
       .map(l => ({ nome: testo(l && l.nome), url: /^https?:\/\//.test(testo(l && l.url)) ? testo(l.url) : '',
                    indirizzo: testo(l && l.indirizzo) }))
       .filter(l => l.nome && (l.url || l.indirizzo)),
-    avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo),
+    avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo)
+      .filter(a => !indicazioniDallaMail(L.indicazioni, riga && riga.testo).some(p => p.testo.includes(a) || a.includes(p.testo))),
+    indicazioni: indicazioniDallaMail(L.indicazioni, riga && riga.testo),
     contatti: (Array.isArray(L.contatti) ? L.contatti : [])
       .map(c => ({ nome: testo(c && c.nome), ruolo: testo(c && c.ruolo), tel: testo(c && c.tel).replace(/[^\d+]/g, '') }))
       .filter(c => c.nome && c.tel),
@@ -242,6 +244,31 @@ export function avvisiDallaMail(avvisi, corpo) {
     if (!mail.includes(piatto(t))) continue;
     if (!out.includes(t)) out.push(t);
     if (out.length >= 6) break;
+  }
+  return out;
+}
+
+/* Come arrivare al set, dal testo della mail.
+ *
+ * Non c'e' una forma fissa: a passi, in elenco, tutto a parole. Il modello
+ * divide in passi; qui si tiene di ogni passo solo quello che sta, parola
+ * per parola, nella mail. Vale ancora di piu' per i link: un link copiato
+ * con un carattere sbagliato porta la troupe da un'altra parte, e allora
+ * si toglie il link e si lascia il testo. Meglio un passo senza mappa che
+ * una mappa sbagliata.
+ */
+export function indicazioniDallaMail(passi, corpo) {
+  const semplice = s => String(s || '').replace(/^[ \t]*>+ ?/gm, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const mail = semplice(corpo), grezzo = String(corpo || '');
+  if (!mail || !Array.isArray(passi)) return [];
+  const out = [];
+  for (const p of passi) {
+    const t = String(p && p.testo || '').replace(/\s+/g, ' ').trim();
+    if (t.length < 10 || t.length > 900 || !mail.includes(semplice(t))) continue;
+    if (out.some(x => x.testo === t)) continue;
+    const l = String(p && p.link || '').trim();
+    out.push({ testo: t, link: /^https?:\/\/\S+$/.test(l) && grezzo.includes(l) ? l : '' });
+    if (out.length >= 10) break;
   }
   return out;
 }
