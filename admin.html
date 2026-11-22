@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Campobase · Admin</title>
+<!-- Aggiunta alla Home si distingue da Campobase: fondo giallo, nome "Admin". -->
+<link rel="manifest" href="/admin.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="/admin-180.png">
+<link rel="icon" type="image/svg+xml" href="/admin.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Admin">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#07080a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,7 +91,8 @@ body.aperta #scheda{display:block}
   </div>
 </div>
 <div id="piede" style="max-width:1040px;margin:34px auto 0;padding-top:14px;border-top:1px solid var(--bd);text-align:center;font-size:11px;color:var(--m);line-height:1.7">
-  <b style="color:var(--d);font-weight:500">Campobase</b> · amministrazione<br><span id="versione" style="font-family:'DM Mono',monospace">v —</span></div>
+  <b style="color:var(--d);font-weight:500">Campobase</b> · amministrazione<br><span id="versione" style="font-family:'DM Mono',monospace">v —</span>
+  <div id="esciRiga" style="display:none;margin-top:10px"><button class="mini" style="margin:0" onclick="esci()">Esci</button></div></div>
 <div id="velo" onclick="if(event.target===this)chiudiFoglio()"><div id="foglio"></div></div>
 <div id="avviso"></div>
 
@@ -136,11 +146,27 @@ async function entra() {
     await chiedi('io');
   } catch (e) {
     document.getElementById('corpo').style.display = 'none';
+    document.getElementById('esciRiga').style.display = 'none';
+    /* chi esce non lascia sullo schermo i dati di prima */
+    PERSONE = []; FILM = []; aperta = null; corsa++; giro++;
+    document.body.classList.remove('aperta'); document.getElementById('indietro').style.display = 'none';
+    document.getElementById('scheda').innerHTML = ''; document.getElementById('lista').innerHTML = '';
+    document.getElementById('conta').textContent = '';
     if (e.stato === 401) {
-      porta.innerHTML = '<div class="card"><div class="vuoto">Per entrare qui apri prima Campobase e accedi con il tuo account, poi torna su questa pagina.<br><br><a href="/" style="color:var(--y)">Apri Campobase</a></div></div>';
+      /* Aggiunta alla Home dell'iPhone, questa pagina ha una memoria sua,
+         separata da quella di Campobase: l'accesso fatto nell'app qui non
+         c'e'. Quindi si entra da qui, con lo stesso account. */
+      porta.innerHTML = '<div class="card" style="padding:16px"><div style="font-size:15px;font-weight:700;margin-bottom:4px">Entra</div>' +
+        '<div class="sotto" style="margin-bottom:12px">Con lo stesso account di Campobase.</div>' +
+        '<input class="cerca" id="aMail" type="email" placeholder="Email" autocomplete="username" autocapitalize="off">' +
+        '<input class="cerca" id="aPass" type="password" placeholder="Password" autocomplete="current-password">' +
+        '<button class="btn y" id="aEntra" style="margin-top:0" onclick="accedi()">Entra</button>' +
+        '<button class="btn" onclick="accediGoogle()">Entra con Google</button>' +
+        '<div class="nota no" id="aErrore"></div></div>';
     } else if (e.stato === 403) {
       porta.innerHTML = '<div class="card"><div class="vuoto">Questa pagina è riservata.' +
-        (e.dati && e.dati.id ? '<br><br><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--d);word-break:break-all">' + esc(e.dati.id) + '</span>' : '') + '</div></div>';
+        (e.dati && e.dati.id ? '<br><br><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--d);word-break:break-all">' + esc(e.dati.id) + '</span>' : '') +
+        '<br><br><button class="mini" style="margin:0" onclick="esci()">Esci da questo account</button></div></div>';
     } else {
       porta.innerHTML = '<div class="card"><div class="vuoto">Non riesco a parlare con il server: ' + esc(e.message) + '</div></div>';
     }
@@ -148,8 +174,24 @@ async function entra() {
   }
   porta.innerHTML = '';
   document.getElementById('corpo').style.display = '';
+  document.getElementById('esciRiga').style.display = '';
   await caricaPersone();
 }
+
+async function accedi() {
+  const t = document.getElementById('aEntra'), err = document.getElementById('aErrore');
+  t.disabled = true; err.textContent = '';
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email: document.getElementById('aMail').value.trim(),
+                                                         password: document.getElementById('aPass').value });
+    if (error) throw error;
+    await entra();
+  } catch (e) { err.textContent = /invalid login/i.test(e.message || '') ? 'Email o password sbagliate.' : (e.message || 'Accesso non riuscito'); t.disabled = false; }
+}
+async function accediGoogle() {
+  await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + '/admin.html' } });
+}
+async function esci() { try { await sb.auth.signOut(); } catch (_) {} entra(); }
 
 /* ── L'elenco ── */
 async function caricaPersone() {

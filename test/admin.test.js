@@ -17,7 +17,12 @@ const apri=async(scena, larghezza=390)=>{
   p.errori=[]; p.on('pageerror',e=>p.errori.push(e.message));
   await p.addInitScript((scena)=>{
     window.CHIESTE=[]; window.SCENA=scena; window.ESITI=[];
-    window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session: SCENA==='fuori'?null:{access_token:'tok'}}})}})};
+    window.DENTRO = scena!=='fuori'; window.ACCESSI=[];
+    window.supabase={createClient:()=>({auth:{
+      getSession:async()=>({data:{session: DENTRO?{access_token:'tok'}:null}}),
+      signInWithPassword:async(c)=>{ ACCESSI.push(c); if(c.password!=='giusta') return {error:{message:'Invalid login credentials'}}; DENTRO=true; SCENA='admin'; return {error:null}; },
+      signInWithOAuth:async(c)=>{ ACCESSI.push(c); return {}; },
+      signOut:async()=>{ DENTRO=false; return {}; } }})};
     const A='aaaaaaaa-1111-4111-8111-111111111111', L='bbbbbbbb-1111-4111-8111-111111111111', FA='f1f1f1f1-1111-4111-8111-111111111111', FB='f2f2f2f2-1111-4111-8111-111111111111';
     const persone=[{id:A,nome:'Anna',cognome:'Riva',reparto:'Regia',email:'anna@x.it',film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',ruolo:'membro'}],telefoni:1,ultima:new Date().toISOString(),bloccato:false},
                    {id:L,nome:'Luca',cognome:'Berti',reparto:'Fotografia',email:'luca@x.it',film:[],telefoni:0,ultima:null,bloccato:false},
@@ -46,10 +51,20 @@ const azioni=p=>p.evaluate(()=>CHIESTE.filter(c=>!/^(io|persone|persona|esito)$/
 
 console.log('\n── ⚠ chi non può non vede niente ──');
 let p=await apri('fuori');
-ok('senza accesso: invita a entrare, e non chiede niente al server', [await p.evaluate(()=>/accedi con il tuo account/.test(document.getElementById('porta').textContent)), await p.evaluate(()=>CHIESTE.length), await p.evaluate(()=>document.getElementById('corpo').style.display)], [true,0,'none']);
+ok('senza accesso: si entra da qui, e non chiede niente al server', [await p.evaluate(()=>!!document.getElementById('aMail')&&!!document.getElementById('aPass')), await p.evaluate(()=>CHIESTE.length), await p.evaluate(()=>document.getElementById('corpo').style.display)], [true,0,'none']);
+await p.fill('#aMail',' simone@x.it '); await p.fill('#aPass','sbagliata'); await p.click('#aEntra'); await p.waitForTimeout(150);
+ok('⚠ password sbagliata: lo dice e resta fuori', [await p.evaluate(()=>document.getElementById('aErrore').textContent), await p.evaluate(()=>document.getElementById('corpo').style.display), await p.evaluate(()=>CHIESTE.length)], ['Email o password sbagliate.','none',0]);
+await p.fill('#aPass','giusta'); await p.click('#aEntra'); await p.waitForTimeout(300);
+ok('con quella giusta entra e vede l\'elenco', [await p.evaluate(()=>ACCESSI[1].email), await p.evaluate(()=>document.getElementById('lista').children.length), await p.evaluate(()=>document.getElementById('porta').innerHTML)], ['simone@x.it',3,'']);
+await p.evaluate(()=>accediGoogle());
+ok('con Google si torna su questa pagina, non nell\'app', await p.evaluate(()=>/\/admin\.html$/.test(ACCESSI[2].options.redirectTo)), true);
+await p.click('#esciRiga button'); await p.waitForTimeout(200);
+ok('⚠ uscendo l\'elenco sparisce e torna l\'ingresso', [await p.evaluate(()=>document.getElementById('corpo').style.display), await p.evaluate(()=>!!document.getElementById('aMail')), await p.evaluate(()=>getComputedStyle(document.getElementById('esciRiga')).display)], ['none',true,'none']);
+ok('nessun errore di pagina', p.errori, []);
 await p.close();
 p=await apri('estraneo');
 ok('⚠ non amministratore: pagina riservata, nessun elenco', [await p.evaluate(()=>/riservata/.test(document.getElementById('porta').textContent)), await p.evaluate(()=>document.getElementById('lista').children.length), await p.evaluate(()=>CHIESTE.map(c=>c.azione))], [true,0,['io']]);
+ok('e può uscire per entrare con un altro account', await p.evaluate(()=>!!document.querySelector('#porta button[onclick="esci()"]')), true);
 ok('gli viene mostrato solo il suo numero', await p.evaluate(()=>/il-mio-numero/.test(document.getElementById('porta').textContent)), true);
 await p.close();
 
@@ -57,6 +72,7 @@ console.log('\n── l\'elenco ──');
 p=await apri('admin');
 const righe=()=>p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>[r.querySelector('.t').textContent, r.querySelector('.s').textContent.split(' · ').slice(0,2).join(' · '), r.querySelector('.tag')?.textContent||'']));
 ok('tutti, con film e stato', await righe(), [['Anna Riva','Regia · MSG',''],['Luca Berti','Fotografia · nessun film',''],['bloccato@x.it','nessun film','bloccato']]);
+ok('⚠ sulla Home ha la sua icona e il suo nome', await p.evaluate(()=>[document.querySelector('link[rel="apple-touch-icon"]').getAttribute('href'), document.querySelector('meta[name="apple-mobile-web-app-title"]').content, document.querySelector('link[rel="manifest"]').getAttribute('href')]), ['/admin-180.png','Admin','/admin.webmanifest']);
 ok('⚠ in fondo, la versione che è online', await p.evaluate(()=>document.getElementById('versione').textContent), 'v 1.175');
 ok('il conto in fondo', await p.evaluate(()=>document.getElementById('conta').textContent), '3 persone · 1 film con una troupe · 1 di una persona sola');
 await p.fill('#cerca','gennaro');

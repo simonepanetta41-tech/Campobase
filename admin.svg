@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#F5C542"/><g transform="translate(0 -8) scale(1)">
+ <rect x="13" y="56" width="74" height="14" rx="3" fill="#0A0B0D"/>
+ <path d="M20 56 L27 56 L33 70 L26 70 Z" fill="#F5C542"/><path d="M39 56 L46 56 L52 70 L45 70 Z" fill="#F5C542"/><path d="M58 56 L65 56 L71 70 L64 70 Z" fill="#F5C542"/>
+ <g transform="rotate(-17 18 54)"><rect x="13" y="40" width="74" height="14" rx="3" fill="#0A0B0D"/>
+ <path d="M26 40 L33 40 L27 54 L20 54 Z" fill="#F5C542"/><path d="M45 40 L52 40 L46 54 L39 54 Z" fill="#F5C542"/><path d="M64 40 L71 40 L65 54 L58 54 Z" fill="#F5C542"/></g></g><text x="50" y="88" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="13" letter-spacing="2.5" fill="#0A0B0D">ADMIN</text></svg>
