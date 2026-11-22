@@ -81,6 +81,19 @@ body.aperta .ling{display:none}
 .riga .t.due-righe{white-space:normal}
 #foglio pre{font-family:'DM Mono',monospace;font-size:11px;line-height:1.5;color:var(--d);white-space:pre-wrap;word-break:break-word;margin:10px 0 0;user-select:text;-webkit-user-select:text}
 #foglio.largo{max-width:760px}
+#foglio textarea{width:100%;min-height:96px;resize:vertical;background:var(--bg);border:1px solid var(--bd);border-radius:10px;color:var(--w);font:inherit;font-size:16px;padding:10px 12px;margin-top:12px}
+#foglio label{display:block;font-size:11.5px;color:var(--m);margin:12px 0 0;letter-spacing:.04em}
+#foglio label + .cerca{margin:5px 0 0}
+.graf{padding:12px 12px 10px}
+.graf h4{margin:0 0 2px;font-size:13px;font-weight:500;color:var(--d)}
+.graf svg{display:block;width:100%;height:auto;overflow:visible}
+.graf .asse{stroke:var(--bd);stroke-width:1}
+.graf text{font-family:'DM Mono',monospace;font-size:9.5px;fill:var(--m)}
+.graf text.v{fill:var(--d)}
+.graf .b{fill:#4b8ef0}.graf .l{fill:none;stroke:#4b8ef0;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.graf .p{fill:#4b8ef0;stroke:var(--card);stroke-width:2}
+.graf .tocca{fill:transparent;cursor:pointer}.graf .tocca:hover,.graf .tocca.on{fill:rgba(255,255,255,.06)}
+.graf .dice{font-size:12px;color:var(--d);min-height:17px;margin-top:6px;font-family:'DM Mono',monospace}
 body.sola #scheda{display:none !important}
 body.aperta #elenco{display:none}
 body.aperta #scheda{display:block}
@@ -124,7 +137,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.7';
+const ADMIN_VERSIONE = '1.8';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -307,6 +320,8 @@ function disegnaScheda(p) {
 
     '<div class="sez">Uso</div>' +
     '<div class="card"><div class="kv"><span>Ultimi 7 giorni</span><span>' + Math.round((p.uso7 || 0) / 60) + ' min</span></div>' +
+      (p.versione ? '<div class="kv"><span>Versione dell\'app</span><span>' + esc(p.versione) + (p.versioneVista ? ' · ' + quando(p.versioneVista, true) : '') + '</span></div>' : '') +
+      (p.dollari ? '<div class="kv"><span>Spesa dal telefono</span><span>' + soldi(p.dollari) + '</span></div>' : '') +
       (consumi.length ? consumi.map(([scopo, c]) => '<div class="kv"><span>' + esc(scopo) + ' · ' + c.chiamate + '</span><span>' +
         Math.round((c.entrata + c.uscita) / 1000) + 'k token</span></div>').join('') : '<div class="kv"><span>Chiamate al modello</span><span>nessuna</span></div>') + '</div>' +
 
@@ -481,12 +496,61 @@ function serverHtml(s) {
       '<div class="card"><b>' + soldi(c.sempre.dollari) + '</b><span>' + (c.dal ? 'dal ' + quando(c.dal) : 'dall\'inizio') + '</span></div></div>' +
     '<div class="card" style="margin-top:8px">' + (c.scopi.length ? c.scopi.map(x => '<div class="kv"><span>' + esc(SCOPI[x.scopo] || x.scopo) + ' · ' + x.chiamate +
         '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Ancora nessuna chiamata registrata.</div>') + '</div>' +
+    '<div class="card graf" style="margin-top:8px"><h4>Spesa al giorno, ultimi 14 giorni</h4>' + graficoGiorni(c.giorni || []) + '</div>' +
     '<div class="nota">Ieri ' + soldi(c.ieri.dollari) + '. Stima dai token, al listino: ' +
       esc(s.prezzi.map(p => p.modello.replace('claude-', '') + ' $' + String(p.entrata).replace('.', ',') + ' / $' + String(p.uscita).replace('.', ',')).join(' · ')) + ' per milione (entrata / uscita).' +
       (c.sempre.senzaPrezzo ? ' ' + c.sempre.senzaPrezzo + ' chiamate a un modello fuori listino non sono nel conto.' : '') +
       (c.troncato ? ' Le righe sono troppe per leggerle tutte: il totale è per difetto.' : '') + '</div>') +
+    ((c.persone || []).length ? '<div class="sez">Chi spende dal telefono</div><div class="card">' + c.persone.map(x => '<button class="riga" onclick="apriScheda(\'' + x.id + '\')">' +
+        '<span class="c"><span class="t">' + esc(x.nome) + '</span><div class="s">' + x.chiamate + (x.chiamate === 1 ? ' chiamata' : ' chiamate') + ' · ' + mila(x.entrata + x.uscita) + ' token</div></span>' +
+        '<span class="fr" style="font-family:DM Mono,monospace;font-size:13px;color:var(--d)">' + soldi(x.dollari) + '</span></button>').join('') + '</div>' : '') +
+    ((s.tempi || []).length > 1 ? '<div class="sez">Tempo di lettura</div><div class="card graf"><h4>Secondi per ordine del giorno, ultime ' + s.tempi.length + ' letture</h4>' + graficoTempi(s.tempi) + '</div>' : '') +
+    versioniHtml(s.versioni) +
     '<div class="sez">Interruttori</div><div class="card">' + s.interruttori.map(i => kv(i.nome, i.acceso ? 'acceso' : 'spento', i.acceso ? 'ok' : '')).join('') + '</div>' +
     '<div class="nota">Si cambiano dalle variabili di Cloudflare, non da qui.</div>';
+}
+/* ── I grafici ──
+   Una serie sola per grafico, quindi niente legenda: lo dice il titolo.
+   Toccando (o passando sopra) una colonna, sotto compare il suo valore;
+   sul grafico restano scritti solo il massimo e l'ultimo. */
+function tocca(el, testo) {
+  const g = el.closest('.graf'); g.querySelectorAll('.tocca.on').forEach(x => x.classList.remove('on'));
+  el.classList.add('on'); g.querySelector('.dice').textContent = testo;
+}
+const giornoCorto = g => { const d = new Date(g + 'T12:00:00'); return d.getDate() + ' ' + ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'][d.getMonth()]; };
+function graficoGiorni(gg) {
+  if (!gg.length) return '';
+  const W = 320, H = 96, base = 80, alto = 62, passo = W / gg.length, larga = Math.min(14, passo - 2);
+  const max = Math.max(...gg.map(g => g.dollari), 0.0001), iMax = gg.findIndex(g => g.dollari === max);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Spesa al giorno"><line class="asse" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>';
+  gg.forEach((g, i) => {
+    const h = g.dollari ? Math.max(2, g.dollari / max * alto) : 0, x = i * passo + (passo - larga) / 2, y = base - h, r = Math.min(3, h);
+    if (h) s += '<path class="b" d="M' + x + ' ' + base + 'V' + (y + r) + 'q0 -' + r + ' ' + r + ' -' + r + 'h' + (larga - 2 * r) + 'q' + r + ' 0 ' + r + ' ' + r + 'V' + base + 'z"/>';
+    if (g.dollari && (i === iMax || i === gg.length - 1)) s += '<text class="v" text-anchor="' + (i === gg.length - 1 ? 'end' : i === 0 ? 'start' : 'middle') + '" x="' + (i === gg.length - 1 ? W : i === 0 ? 0 : x + larga / 2) + '" y="' + (y - 4) + '">' + soldi(g.dollari) + '</text>';
+    s += '<rect class="tocca" x="' + (i * passo) + '" y="0" width="' + passo + '" height="' + base + '" data-t="' + esc(giornoCorto(g.giorno) + ' · ' + soldi(g.dollari) + ' · ' + g.chiamate + (g.chiamate === 1 ? ' chiamata' : ' chiamate')) + '" onclick="tocca(this,this.dataset.t)" onmouseenter="tocca(this,this.dataset.t)"/>';
+  });
+  s += '<text x="0" y="' + (base + 13) + '">' + giornoCorto(gg[0].giorno) + '</text><text text-anchor="end" x="' + W + '" y="' + (base + 13) + '">oggi</text></svg>';
+  return s + '<div class="dice">' + (gg.some(g => g.dollari) ? 'Tocca una colonna per il giorno.' : 'Nessuna spesa in questi giorni.') + '</div>';
+}
+function graficoTempi(tt) {
+  const W = 320, H = 96, base = 80, alto = 58, max = Math.max(...tt.map(t => t.secondi)), iMax = tt.findIndex(t => t.secondi === max);
+  const passo = W / tt.length, X = i => i * passo + passo / 2, Y = v => base - v / max * alto;
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Tempo di lettura"><line class="asse" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>' +
+    '<polyline class="l" points="' + tt.map((t, i) => X(i) + ',' + Y(t.secondi)).join(' ') + '"/>';
+  tt.forEach((t, i) => {
+    const ultimo = i === tt.length - 1;
+    if (ultimo || i === iMax) s += '<circle class="p" cx="' + X(i) + '" cy="' + Y(t.secondi) + '" r="4"/><text class="v" text-anchor="' + (X(i) > W - 30 ? 'end' : X(i) < 30 ? 'start' : 'middle') + '" x="' + (X(i) > W - 30 ? W : X(i) < 30 ? 0 : X(i)) + '" y="' + (Y(t.secondi) - 8) + '">' + t.secondi + ' s</text>';
+    s += '<rect class="tocca" x="' + (i * passo) + '" y="0" width="' + passo + '" height="' + base + '" data-t="' + esc(quando(t.quando, true) + ' · ' + t.secondi + ' s · ' + t.oggetto) + '" onclick="tocca(this,this.dataset.t)" onmouseenter="tocca(this,this.dataset.t)"/>';
+  });
+  s += '<text x="0" y="' + (base + 13) + '">' + quando(tt[0].quando) + '</text><text text-anchor="end" x="' + W + '" y="' + (base + 13) + '">ultima</text></svg>';
+  return s + '<div class="dice">Tocca un punto per la lettura.</div>';
+}
+function versioniHtml(v) {
+  if (!v || !v.ultima) return '';
+  return '<div class="sez">Versione dell\'app</div><div class="card"><div class="kv"><span>La più recente vista</span><span>' + esc(v.ultima) + ' · ' + v.aggiornati + (v.aggiornati === 1 ? ' persona' : ' persone') + '</span></div>' +
+    v.indietro.map(x => '<button class="riga" onclick="apriScheda(\'' + x.id + '\')"><span class="c"><span class="t">' + esc(x.nome) + '</span><div class="s">' + (x.vista ? 'aperta ' + quando(x.vista, true) : '') + '</div></span><span class="tag y">' + esc(x.versione) + '</span></button>').join('') +
+    (v.indietro.length ? '' : '<div class="kv"><span>Rimasti indietro</span><span class="ok">nessuno</span></div>') + '</div>' +
+    (v.ignoti ? '<div class="nota">' + v.ignoti + (v.ignoti === 1 ? ' persona non ha' : ' persone non hanno') + ' ancora aperto l\'app da quando si registra la versione.</div>' : '');
 }
 function apriDettaglio(id) {
   aperta = id; const mia = ++corsa;
@@ -510,9 +574,56 @@ async function apriFilm(id) {
       '<div class="sez">Ultime mail</div><div class="card">' + (f.posta.length ? f.posta.map(m => rigaMailHtml(m, false)).join('') : '<div class="vuoto">Nessuna mail arrivata.</div>') + '</div>' +
       '<div class="sez">Costi dall\'inizio · ' + soldi(f.totale.dollari) + '</div><div class="card">' + (f.consumi.length ? f.consumi.map(x => '<div class="kv"><span>' + esc(SCOPI[x.scopo] || x.scopo) + ' · ' + x.chiamate +
         '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>' +
-      '<div class="sez">Film</div><button class="btn r" style="margin-top:0" onclick="eliminaFilm()">Elimina il film</button>';
+      '<div class="sez">Film</div><button class="btn y" style="margin-top:0" onclick="scriviAllaTroupe()">Scrivi alla troupe</button>' +
+      '<button class="btn" onclick="modificaFilm()">Modifica titolo, sigla, mittente</button>' +
+      '<button class="btn r" onclick="eliminaFilm()">Elimina il film</button>';
     window.FILM_APERTO = f;
   } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+/* Un messaggio a tutta la troupe del film: una notifica scritta a mano.
+   Il tasto dice a quante persone arriva, ed e' lui la conferma. */
+function scriviAllaTroupe() {
+  const f = window.FILM_APERTO, n = f.membri.length;
+  apriFoglio('<h3>Scrivi alla troupe</h3><div class="sotto">Arriva come notifica a chi è in «' + esc(f.titolo || 'Senza titolo') + '»' + (f.sigla ? ', con «' + esc(f.sigla) + ' - Avviso» come titolo' : '') + '.</div>' +
+    '<textarea id="mTesto" maxlength="240" placeholder="Il messaggio"></textarea><div class="sotto" id="mConta" style="text-align:right">0 / 240</div>' +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="mSi" disabled>Manda a ' + (n === 1 ? '1 persona' : n + ' persone') + '</button></div>');
+  const t = document.getElementById('mTesto'), si = document.getElementById('mSi');
+  t.oninput = () => { document.getElementById('mConta').textContent = t.value.length + ' / 240'; si.disabled = t.value.trim().length < 3; };
+  si.onclick = async () => {
+    const testo = t.value; si.disabled = true;
+    try { const r = await chiedi('messaggio', { film: f.id, testo }); chiudiFoglio();
+      avvisa('Mandato a ' + r.persone + (r.persone === 1 ? ' persona' : ' persone') + ' · ' + r.raggiunte + ' con le notifiche attive'); }
+    catch (e) { si.disabled = false; avvisa(e.message, true); }
+  };
+}
+/* Correggere titolo, sigla e mittente atteso. Si manda solo quello che e' cambiato. */
+function modificaFilm() {
+  const f = window.FILM_APERTO;
+  apriFoglio('<h3>Modifica il film</h3>' +
+    '<label>TITOLO</label><input class="cerca" id="fTitolo" autocomplete="off" value="' + esc(f.titolo || '') + '">' +
+    '<label>SIGLA · il prefisso delle notifiche</label><input class="cerca" id="fSigla" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="nessuna" value="' + esc(f.sigla || '') + '">' +
+    '<label>MITTENTE ATTESO DELLA POSTA</label><input class="cerca" id="fMittente" type="email" autocomplete="off" autocapitalize="off" placeholder="qualunque" value="' + esc(f.mittente || '') + '">' +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="fSi">Salva</button></div>');
+  document.getElementById('fSi').onclick = async () => {
+    const v = k => document.getElementById(k).value.trim(), c = {};
+    if (v('fTitolo') !== (f.titolo || '')) c.titolo = v('fTitolo');
+    if (v('fSigla').toUpperCase() !== (f.sigla || '')) c.sigla = v('fSigla');
+    if (v('fMittente').toLowerCase() !== (f.mittente || '')) c.mittente = v('fMittente');
+    if (!Object.keys(c).length) return chiudiFoglio();
+    try { await chiedi('filmCambia', { id: f.id, ...c }); chiudiFoglio(); avvisa('Salvato'); FILM = []; apriFilm(f.id); caricaElenco(); }
+    catch (e) { avvisa(e.message, true); }
+  };
+}
+/* Una mail messa da parte perche' non sembrava del film. */
+async function accettaMail(id) {
+  try { const r = await chiedi('accetta', { id }); avvisa(r.legge === 'server' ? 'Accettata: il server la legge e avvisa la troupe' : 'Accettata: passata ai telefoni'); apriMail(id); caricaElenco(); }
+  catch (e) { avvisa(e.message, true); }
+}
+function scartaMail(id) {
+  apriFoglio('<h3>Scartare questa mail?</h3><div class="sotto">Resta in elenco come scartata: nessuno la legge e la troupe non ne sa niente.</div>' +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn r" id="sSi">Scarta</button></div>');
+  document.getElementById('sSi').onclick = async () => { chiudiFoglio();
+    try { await chiedi('scarta', { id }); avvisa('Scartata'); apriMail(id); caricaElenco(); } catch (e) { avvisa(e.message, true); } };
 }
 /* Eliminare un film: si dice cosa va perso e di chi e', e per un film con
    una troupe bisogna riscriverne il titolo. */
@@ -552,9 +663,12 @@ async function apriMail(id, zitta) {
       '<div class="sez">Cosa è successo</div><div class="card">' + m.passi.map(p => '<div class="passo"><time>' + ora(p.quando) + '</time><div><span class="' +
         ({ g: 'ok', r: 'no', y: 'boh' }[p.colore] || '') + '">' + esc(p.titolo) + '</span>' + (p.testo ? '<div class="d">' + esc(p.testo) + '</div>' : '') + '</div></div>').join('') + '</div>' +
       (m.nota ? '<div class="nota">' + esc(m.nota) + '</div>' : '') +
+      (m.esito === 'da verificare' ? '<button class="btn y" onclick="accettaMail(\'' + m.id + '\')">Accetta e leggi</button>' +
+        '<button class="btn r" onclick="scartaMail(\'' + m.id + '\')">Scarta</button>' : '') +
       (m.haOdg ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'odg\')">Vedi la lettura dell\'ordine del giorno</button>' : '') +
       (m.haPiano ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'piano\')">Vedi la lettura del piano</button>' : '') +
       (m.esito === 'in rilettura' ? '<div class="nota boh">Il server la sta rileggendo: di solito ci mette un minuto o due.</div>' :
+        m.esito === 'da verificare' ? '' :
         ((m.rileggibile || {}).odg ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'odg\')">Fai rileggere l\'ordine del giorno</button>' : '') +
         ((m.rileggibile || {}).piano ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'piano\')">Fai rileggere il piano</button>' : ''));
     /* Mentre rilegge si torna a guardare da soli, finche' non ha finito. */

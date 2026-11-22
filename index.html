@@ -2915,6 +2915,12 @@ async function showApp() {
     provider: currentUser.app_metadata?.provider || 'email',
     last_seen: new Date().toISOString()
   }, { onConflict: 'id' });
+  /* Che versione dell'app ha aperto questo telefono (sql/versione.sql):
+     la legge solo l'amministrazione, per sapere chi e' rimasto indietro.
+     In un passo suo: se le colonne non ci sono ancora fallisce da sola,
+     senza portarsi dietro l'upsert qui sopra. */
+  sb.from('profiles').update({ app_versione: CB_VERSIONE, app_vista: new Date().toISOString() })
+    .eq('id', currentUser.id).then(() => {}, () => {});
   if (!profiloBenvenuto()) loadHistory();
   else loadHistory();
   /* Le notifiche si chiedono qui, appena fatto l'accesso.
@@ -5283,7 +5289,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.175';
+const CB_VERSIONE = '1.176';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

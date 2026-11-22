@@ -39,6 +39,7 @@ import { scriviTutto, rilascia, rilasciaInRitardo, pianoInSospeso } from './scri
 import { smista, daSmistare, genereDi, toccaAlServer } from './smista.js';
 import { indiceStralci } from './stralci.js';
 import { segnaConsumo } from './consumi.js';
+import { avvisaAdmin, guasto } from './guardia.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -171,11 +172,22 @@ export async function leggiInOmbra(env) {
   try { esito = await leggi(env, giro); return esito; }
   finally {
     if (giro.rilettura && esito !== 'già presa') {
+      /* Una mail accettata dall'amministrazione puo' portare anche un
+         piano mai letto: allora non si chiude, passa alla lettura del
+         piano (piano.js) con la stessa scelta sulle notifiche. */
+      const r = giro.rilettura;
+      const ancheIlPiano = r.piano_stato == null && String(env.PIANO_SCRIVE || '').toLowerCase() === 'si'
+        && (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
       try {
-        await db(env, `posta?id=eq.${giro.rilettura.id}&stato=eq.rilettura`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ stato: 'fatta', nota: ('rilettura: ' + (esito || 'interrotta')).slice(0, 300) }) });
+        await db(env, `posta?id=eq.${r.id}&stato=eq.rilettura`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify(ancheIlPiano ? { stato: 'rilettura piano' }
+            : { stato: 'fatta', nota: ('rilettura: ' + (esito || 'interrotta')).slice(0, 300) }) });
       } catch (_) {}
     }
+    /* Se e' andata male lo deve sapere chi amministra, subito. */
+    const perche = guasto(esito, giro);
+    if (perche) await avvisaAdmin(env, { titolo: 'Lettura dell\'ordine del giorno fallita', oggetto: giro.riga.oggetto, perche,
+      film: giro.riga.project_id, chiave: giro.riga.id + ':odg' });
   }
 }
 async function leggi(env, giro) {
@@ -203,7 +215,7 @@ async function leggi(env, giro) {
      'nuova' e 'in analisi'. */
   /* Prima di tutto le riletture chieste a mano: senza scadenza, e solo
      se il server scrive (altrimenti rileggere non cambierebbe niente). */
-  const CAMPI = 'posta?select=id,project_id,oggetto,testo,allegati,stato,nota,ombra_il,ombra';
+  const CAMPI = 'posta?select=id,project_id,oggetto,testo,allegati,stato,nota,ombra_il,ombra,piano_stato';
   let righe = scrive ? await db(env, CAMPI + '&ombra_stato=is.null&stato=eq.rilettura&order=ricevuta.desc&limit=1') : [];
   let riga = righe && righe[0];
   let rilettura = !!riga;
@@ -239,6 +251,7 @@ async function leggi(env, giro) {
   }
   if (!riga) return 'niente da leggere';
   if (rilettura) giro.rilettura = riga;
+  giro.riga = riga; giro.prova = prova;
   const senzaAvvisare = rilettura && /senza notifiche/.test(riga.nota || '');
   const tentativi = ((riga.ombra && riga.ombra.tentativi) || 0) + 1;
 
@@ -390,6 +403,7 @@ async function leggi(env, giro) {
           scritto = await scriviTutto(env, riga, letto, { stralciIndice, rilettura, muta: senzaAvvisare });
         } catch (e) {
           scritto = { scritto: false, errore: String(e.message).slice(0, 200) };
+          giro.nonScritto = scritto.errore;
           await rilascia(env, riga, scritto.errore);
         }
       } else {

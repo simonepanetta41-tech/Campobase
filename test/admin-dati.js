@@ -32,7 +32,11 @@ module.exports = function dati() {
     server:{stato:{ultima:{quando:fa(60*17),esito:'letta',colore:'g',oggetto:'MSG - ODG #30'},coda:0,errori:1,mail:9,secondi:46,notifiche:{partite:96,senza:4}},
       costi:{oggi:somma(2,40000,9000,0.17),ieri:somma(5,90000,30000,0.48),sette:somma(31,600000,260000,3.8),sempre:somma(63,1100000,420000,6.42),dal:'2026-11-12T10:00:00Z',
         scopi:[{scopo:'piano',origine:'server',...somma(20,543190,197104,3.06)},{scopo:'odg',origine:'server',...somma(22,340000,221000,2.89)},
-               {scopo:'spoglio',origine:'telefono',...somma(3,150000,30000,0.45)},{scopo:'stralci',origine:'server',...somma(18,60000,9000,0.02)}],troncato:false,manca:false},
+               {scopo:'spoglio',origine:'telefono',...somma(3,150000,30000,0.45)},{scopo:'stralci',origine:'server',...somma(18,60000,9000,0.02)}],troncato:false,manca:false,
+        giorni:[0,0.31,0.62,0,0.48,0.71,0.29,0,0.66,1.24,0.52,0.3,0.48,0.17].map((d,i)=>({giorno:new Date(ora-(13-i)*86400000).toISOString().slice(0,10),dollari:d,chiamate:d?Math.round(d*8):0})),
+        persone:[{id:A,nome:'Anna Riva',...somma(2,120000,22000,0.34)},{id:A,nome:'Luca Berti',...somma(1,30000,8000,0.11)}]},
+      tempi:[44,41,47,52,39,43,95,45,42,46,44].map((s,i)=>({quando:fa(60*24*(11-i)),secondi:s,oggetto:'MSG - ODG #'+(20+i)})),
+      versioni:{ultima:'1.176',aggiornati:12,indietro:[{id:A,nome:'Luca Berti',versione:'1.171',vista:fa(60*50)}],ignoti:3},
       prezzi:[{modello:'claude-sonnet-5-5',entrata:2,uscita:10},{modello:'claude-haiku-5-5',entrata:0.1,uscita:0.5}],
       interruttori:[{nome:'Legge gli ordini del giorno',acceso:true},{nome:'Scrive gli ordini del giorno',acceso:true},{nome:'Legge i piani',acceso:true},{nome:'Scrive i piani',acceso:true},
         {nome:'Smistamento allegati',acceso:true},{nome:'Indice degli stralci',acceso:true},{nome:'Avvisi dalla lettura in ombra',acceso:false}]} };

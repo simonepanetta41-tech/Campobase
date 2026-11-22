@@ -49,7 +49,9 @@ const SCADENZA = 20;
  * ore dopo. Il pick-up e il catering in ritardo servono meno, ma finche'
  * l'app e' in prova e' meglio un avviso tardivo di uno perso: un'ora. */
 const DURATA_POSTA = 12 * 60, DURATA_AVVISI = 60;       // minuti
-const durata = genere => (genere === 'posta' ? DURATA_POSTA : DURATA_AVVISI);
+// 'avviso' e' un messaggio scritto a mano dall'amministrazione, 'admin' un
+// allarme per chi amministra: come la posta, servono anche ore dopo.
+const durata = genere => (/^(posta|avviso|admin)$/.test(genere) ? DURATA_POSTA : DURATA_AVVISI);
 
 // ── Base64 come lo vuole il web push ────────────────────────────────────────
 
@@ -308,7 +310,7 @@ export function conSigla(a, sigle) {
 /* Dove porta una notifica, toccandola: il pick-up al proprio passaggio,
    un piano nuovo al piano, tutto il resto all'ordine del giorno. */
 export function doveVa(a) {
-  if (!a || a.genere === 'prova') return null;
+  if (!a || /^(prova|avviso|admin)$/.test(a.genere)) return null;
   if (a.genere === 'pickup') return 'passaggio';
   if (a.genere === 'posta' && /piano di lavorazione/i.test(String(a.testo || '').split('\n')[0])) return 'piano';
   return 'odg';

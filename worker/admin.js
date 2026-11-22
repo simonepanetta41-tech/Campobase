@@ -19,7 +19,7 @@
  */
 import { json, readJson, requireUser } from './shared.js';
 import { db } from './ombra.js';
-import { mandaScadute } from './push.js';
+import { mandaScadute, avvisaPosta } from './push.js';
 import { genereDi } from './smista.js';
 import { costo, PREZZI } from './consumi.js';
 
@@ -83,7 +83,7 @@ async function tutte(env, percorso, pagine = 15) {
   }
   return { righe: out, troncato: true };
 }
-const CAMPI_CONSUMI = 'quando,origine,scopo,project_id,posta_id,modello,token_entrata,token_uscita,token_cache_letti,token_cache_scritti';
+const CAMPI_CONSUMI = 'quando,origine,scopo,project_id,posta_id,user_id,modello,token_entrata,token_uscita,token_cache_letti,token_cache_scritti';
 
 /* Una somma di righe dei consumi. senzaPrezzo conta le chiamate a un
    modello che nel listino non c'e': i loro dollari mancano dal totale. */
@@ -103,6 +103,20 @@ function perScopo(righe) {
   return [...g].map(([scopo, rr]) => ({ scopo, origine: rr[0].origine || null, ...somma(rr) })).sort((a, b) => b.dollari - a.dollari);
 }
 const giornoRoma = t => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(new Date(t));
+
+/* I profili, con la versione dell'app che ognuno ha aperto per ultima
+   (sql/versione.sql): se le colonne non ci sono ancora si fa senza. */
+async function profili(env, uno) {
+  const dove = uno ? `&id=eq.${uno}` : '';
+  try { return await db(env, `profiles?select=id,nome,cognome,reparto,app_versione,app_vista${dove}`) || []; }
+  catch (_) { return await db(env, `profiles?select=id,nome,cognome,reparto${dove}`) || []; }
+}
+/* "1.176" contro "1.98": si confrontano i numeri, non le lettere. */
+export function versioneMaggiore(a, b) {
+  const x = String(a || '').split('.').map(n => +n || 0), y = String(b || '').split('.').map(n => +n || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+  return false;
+}
 
 /* Le mail: i campi che servono a dire com'e' andata, senza tirarsi dietro
    la lettura intera (decine di migliaia di caratteri per riga). */
@@ -162,7 +176,7 @@ const AZIONI = {
 
   async persone(env) {
     const [acc, prof, membri, ff, iscr, uso] = await Promise.all([
-      account(env), db(env, 'profiles?select=id,nome,cognome,reparto'),
+      account(env), profili(env),
       db(env, 'film_membri?select=project_id,user_id,ruolo'), film(env),
       db(env, 'push_iscrizioni?select=user_id'),
       db(env, 'uso?select=user_id,ultimo&order=ultimo.desc&limit=3000').catch(() => [])
@@ -181,7 +195,8 @@ const AZIONI = {
       const p = P.get(a.id) || {};
       return { id: a.id, nome: p.nome || '', cognome: p.cognome || '', reparto: p.reparto || '', email: a.email || '',
                film: filmDi.get(a.id) || [], telefoni: telefoni.get(a.id) || 0,
-               ultima: visto.get(a.id) || null, iscritto: a.created_at || null, bloccato: bloccato(a) };
+               ultima: visto.get(a.id) || null, iscritto: a.created_at || null, bloccato: bloccato(a),
+               versione: p.app_versione || null };
     }).sort((x, y) => String(y.ultima || '').localeCompare(String(x.ultima || '')));
     /* Di ogni film, quante persone ha dentro: nella tabella dei film ci
        sono anche quelli nati da una vecchia analisi e mai usati da una
@@ -195,7 +210,7 @@ const AZIONI = {
   async persona(env, b) {
     const u = id(b.id); if (!u) throw new Error('manca la persona');
     const [acc, prof, membri, ff, iscr, notifiche, uso, consumi] = await Promise.all([
-      account(env, u), db(env, `profiles?select=id,nome,cognome,reparto&id=eq.${u}`),
+      account(env, u), profili(env, u),
       db(env, `film_membri?select=project_id,ruolo,segna,created_at&user_id=eq.${u}`)
         .catch(() => db(env, `film_membri?select=project_id,ruolo,created_at&user_id=eq.${u}`)),
       film(env),
@@ -203,7 +218,7 @@ const AZIONI = {
       db(env, `push_appuntamenti?select=id,genere,testo,quando,mandato,mostrato,dispositivi,scartati&user_id=eq.${u}` +
               `&mandato=not.is.null&order=mandato.desc&limit=8`),
       db(env, `uso?select=sezione,secondi,giorno,ultimo&user_id=eq.${u}&order=giorno.desc&limit=200`).catch(() => []),
-      db(env, `consumi?select=scopo,token_entrata,token_uscita&user_id=eq.${u}&limit=2000`).catch(() => [])
+      db(env, `consumi?select=${CAMPI_CONSUMI}&user_id=eq.${u}&limit=1000`).catch(() => [])
     ]);
     const a = acc[0] || {}, p = (prof || [])[0] || {}, F = new Map((ff || []).map(f => [f.id, f]));
     const perScopo = {};
@@ -215,6 +230,7 @@ const AZIONI = {
       id: u, nome: p.nome || '', cognome: p.cognome || '', reparto: p.reparto || '', email: a.email || '',
       iscritto: a.created_at || null, ultimoAccesso: a.last_sign_in_at || null, bloccato: bloccato(a),
       ultima: ((uso || [])[0] || {}).ultimo || null,
+      versione: p.app_versione || null, versioneVista: p.app_vista || null, dollari: somma(consumi).dollari,
       film: (membri || []).filter(m => F.has(m.project_id)).map(m => ({ id: m.project_id, titolo: F.get(m.project_id).titolo,
               sigla: F.get(m.project_id).sigla || null, ruolo: m.ruolo, segna: !!m.segna, entrato: m.created_at })),
       telefoni: (iscr || []).map(i => ({ creata: i.creata, vista: i.vista,
@@ -399,6 +415,79 @@ const AZIONI = {
     return { letto: r.letto != null ? r.letto : null, testo: r.letto != null ? null : r.testo };
   },
 
+  /* Una mail messa da parte perche' "non sembra di questo film": la si
+     accetta o la si scarta. Accettata, va letta come se fosse appena
+     arrivata, e la troupe — che non ne ha saputo niente — va avvisata:
+     se il server scrive passa dalla rilettura (con notifiche), altrimenti
+     torna 'nuova' e la prendono i telefoni. */
+  async accetta(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const r = ((await db(env, `posta?select=id,project_id,oggetto,stato,allegati&id=eq.${m}&limit=1`)) || [])[0];
+    if (!r) throw new Error('mail non trovata');
+    if (r.stato !== 'da verificare') throw new Error('non è una mail messa da parte');
+    const ha = g => (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === g);
+    const spento = v => String(v || '').toLowerCase() === 'no';
+    const odg = ha('odg') && si(env.OMBRA_SCRIVE) && !spento(env.OMBRA), piano = ha('pdl') && si(env.PIANO_SCRIVE) && !spento(env.PIANO);
+    const stato = odg ? 'rilettura' : piano ? 'rilettura piano' : 'nuova';
+    const fatte = await db(env, `posta?id=eq.${m}&stato=eq.da%20verificare`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ stato, nota: stato === 'nuova' ? 'accettata dall\'amministrazione' : 'rilettura: con notifiche' }) });
+    if (!fatte || !fatte.length) throw new Error('qualcun altro l\'ha già sistemata');
+    if (stato === 'nuova') {
+      const fatti = [ha('odg') && 'odg', ha('pdl') && 'pdl'].filter(Boolean);
+      try { await avvisaPosta(env, r.project_id, fatti, r.oggetto); await mandaScadute(env); } catch (_) {}
+    }
+    return { fatto: true, legge: stato === 'nuova' ? 'telefoni' : 'server' };
+  },
+  async scarta(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const fatte = await db(env, `posta?id=eq.${m}&stato=eq.da%20verificare`, { method: 'PATCH', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ stato: 'scartata', nota: 'scartata dall\'amministrazione' }) });
+    if (!fatte || !fatte.length) throw new Error('non è una mail messa da parte');
+    return { fatto: true };
+  },
+
+  /* Correggere un film: titolo, sigla (il prefisso delle notifiche),
+     mittente atteso della posta. Chi l'ha aperto non si cambia da qui:
+     gli ordini del giorno sono scritti a suo nome, e spostarli e' un
+     lavoro a parte. */
+  async filmCambia(env, b) {
+    const f = id(b.id); if (!f) throw new Error('manca il film');
+    const c = {};
+    if (b.titolo !== undefined) { c.titolo = String(b.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 120); if (!c.titolo) throw new Error('il titolo non può essere vuoto'); }
+    if (b.sigla !== undefined) {
+      const s = String(b.sigla || '').trim().toUpperCase();
+      if (s && !/^[A-Z][A-Z0-9]{1,5}$/.test(s)) throw new Error('la sigla è di 2-6 lettere o numeri, e comincia con una lettera');
+      c.sigla = s || null;
+    }
+    if (b.mittente !== undefined) {
+      const mm = String(b.mittente || '').toLowerCase().split(/[,;\s]+/).filter(Boolean);
+      if (mm.some(x => !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(x))) throw new Error('il mittente dev\'essere un indirizzo mail (o più, separati da virgola)');
+      c.mittente = mm.join(', ') || null;
+    }
+    if (!Object.keys(c).length) throw new Error('niente da cambiare');
+    const fatti = await db(env, `projects?id=eq.${f}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(c) });
+    if (!fatti || !fatti.length) throw new Error('film non trovato');
+    return { fatto: true, ...c };
+  },
+
+  /* Un messaggio scritto a mano a tutta la troupe di un film. Parte
+     subito, con la sigla del film davanti come le altre notifiche. */
+  async messaggio(env, b) {
+    const f = id(b.film); if (!f) throw new Error('manca il film');
+    const testo = String(b.testo || '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+    if (testo.length < 3) throw new Error('il messaggio è vuoto');
+    if (testo.length > 240) throw new Error('il messaggio è troppo lungo: al massimo 240 caratteri');
+    const membri = await db(env, `film_membri?select=user_id&project_id=eq.${f}`) || [];
+    if (!membri.length) throw new Error('in questo film non c\'è nessuno');
+    const adesso = new Date();
+    await db(env, 'push_appuntamenti', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(membri.map(m => ({ user_id: m.user_id, project_id: f, quando: adesso.toISOString(), genere: 'avviso',
+        chiave: `${m.user_id}:avviso:${adesso.getTime()}`, testo: 'Avviso\n' + testo }))) });
+    await mandaScadute(env);
+    const esito = await db(env, `push_appuntamenti?select=dispositivi&project_id=eq.${f}&genere=eq.avviso&quando=eq.${encodeURIComponent(adesso.toISOString())}`).catch(() => []);
+    return { fatto: true, persone: membri.length, raggiunte: (esito || []).filter(e => (e.dispositivi || 0) > 0).length };
+  },
+
   /* Far rileggere una mail. Non la si rimette 'al server': quello stato
      ha una scadenza di pochi minuti, e una mail di ieri verrebbe subito
      passata ai telefoni con una notifica a tutti. Ha uno stato suo, che
@@ -428,11 +517,36 @@ const AZIONI = {
   /* ── Il server ── */
   async server(env) {
     const adesso = Date.now(), sette = new Date(adesso - 7 * 86400000).toISOString();
-    const [posta, push, cons] = await Promise.all([
+    const [posta, push, cons, prof, letture] = await Promise.all([
       db(env, `posta?select=${CAMPI_POSTA}&stato=neq.prova&ricevuta=gte.${encodeURIComponent(sette)}&order=ricevuta.desc&limit=300`).catch(() => []),
       tutte(env, `push_appuntamenti?select=mandato,mostrato,dispositivi&mandato=gte.${encodeURIComponent(sette)}&order=mandato.asc`, 5).catch(() => ({ righe: [] })),
-      tutte(env, `consumi?select=${CAMPI_CONSUMI}&order=id.asc`).catch(() => ({ righe: [], troncato: false, manca: true }))
+      tutte(env, `consumi?select=${CAMPI_CONSUMI}&order=id.asc`).catch(() => ({ righe: [], troncato: false, manca: true })),
+      profili(env).catch(() => []),
+      db(env, 'posta?select=ombra_il,oggetto,info:ombra->info&ombra_stato=eq.fatta&stato=neq.prova&order=ombra_il.desc&limit=30').catch(() => [])
     ]);
+    const nomeDi = new Map((prof || []).map(p => [p.id, [p.nome, p.cognome].filter(Boolean).join(' ') || 'Senza nome']));
+    /* Chi spende dal telefono: spoglio, confronto, cast. Le letture del
+       server non sono di nessuno e qui non entrano. */
+    const diChi = new Map();
+    for (const c of cons.righe) { if (!c.user_id || c.origine === 'server') continue; if (!diChi.has(c.user_id)) diChi.set(c.user_id, []); diChi.get(c.user_id).push(c); }
+    const spendono = [...diChi].map(([u, rr]) => ({ id: u, nome: nomeDi.get(u) || 'Account eliminato', ...somma(rr) }))
+      .sort((a, b) => b.dollari - a.dollari || b.chiamate - a.chiamate).slice(0, 8);
+    /* Giorno per giorno, gli ultimi quattordici (anche quelli a zero). */
+    const perGiorno = new Map();
+    for (const c of cons.righe) { const g = giornoRoma(c.quando); if (!perGiorno.has(g)) perGiorno.set(g, []); perGiorno.get(g).push(c); }
+    const giorni = [];
+    for (let i = 13; i >= 0; i--) { const g = giornoRoma(adesso - i * 86400000), t = somma(perGiorno.get(g) || []); giorni.push({ giorno: g, dollari: t.dollari, chiamate: t.chiamate }); }
+    /* Quanto ci mette a leggere un ordine del giorno, lettura per lettura. */
+    const tempiLettura = (letture || []).filter(r => r.ombra_il && r.info && +r.info.ms > 0)
+      .map(r => ({ quando: r.ombra_il, secondi: Math.round(+r.info.ms / 1000), oggetto: String(r.oggetto || '').slice(0, 60) })).reverse();
+    /* Che versione dell'app ha aperto ognuno, l'ultima volta. */
+    const conVersione = (prof || []).filter(p => p.app_versione);
+    const ultimaV = conVersione.map(p => p.app_versione).reduce((m, v) => (m == null || versioneMaggiore(v, m) ? v : m), null);
+    const versioni = { ultima: ultimaV, aggiornati: conVersione.filter(p => p.app_versione === ultimaV).length,
+      indietro: conVersione.filter(p => p.app_versione !== ultimaV)
+        .map(p => ({ id: p.id, nome: nomeDi.get(p.id), versione: p.app_versione, vista: p.app_vista || null }))
+        .sort((a, b) => String(b.vista || '').localeCompare(String(a.vista || ''))),
+      ignoti: (prof || []).length - conVersione.length };
     const lette = (posta || []).map(r => ({ r, il: [r.ombra_il, r.piano_il].filter(Boolean).sort().pop(), e: esitoMail(r) }))
       .filter(x => x.il && /^(letta|errata|errore|troncata|letta in ombra)$/.test(x.e[0]));
     const ultima = lette.slice().sort((a, b) => String(b.il).localeCompare(String(a.il)))[0];
@@ -449,7 +563,8 @@ const AZIONI = {
         notifiche: { partite: partite.length, senza: partite.filter(n => !n.mostrato).length } },
       costi: { oggi: somma(di(oggi)), ieri: somma(di(ieri)), sette: somma(cons.righe.filter(c => Date.parse(c.quando) >= adesso - 7 * 86400000)), sempre: somma(cons.righe),
         dal: cons.righe.length ? cons.righe.map(c => c.quando).sort()[0] : null,
-        scopi: perScopo(cons.righe), troncato: !!cons.troncato, manca: !!cons.manca },
+        scopi: perScopo(cons.righe), troncato: !!cons.troncato, manca: !!cons.manca, giorni, persone: spendono },
+      tempi: tempiLettura, versioni,
       prezzi: Object.entries(PREZZI).map(([modello, p]) => ({ modello, entrata: p.entrata, uscita: p.uscita })),
       interruttori: [
         interruttore('Legge gli ordini del giorno', env.OMBRA, true), interruttore('Scrive gli ordini del giorno', env.OMBRA_SCRIVE),

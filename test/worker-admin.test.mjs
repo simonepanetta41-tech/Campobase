@@ -47,7 +47,7 @@ globalThis.fetch = async (url, opz = {}) => {
     if (m) return R(acc(m[1]));
     return R({ users: [IO, ANNA, LUCA].map(acc) });
   }
-  if (url.startsWith('https://web.push.')) return R(null, 201);
+  if (url.startsWith('https://web.push.')) { (globalThis.SPEDITE ||= []).push(url); return R(null, 201); }
   if (url === 'https://db.test/storage/v1/object/posta' && metodo === 'DELETE') { (globalThis.TOLTI ||= []).push(...JSON.parse(opz.body).prefixes); return R([]); }
   const m = /^https:\/\/db\.test\/rest\/v1\/([a-z_]+)\??(.*)$/.exec(url);
   if (!m) throw new Error('chiamata inattesa: ' + url);
@@ -67,9 +67,16 @@ globalThis.fetch = async (url, opz = {}) => {
     return R(out);
   }
   if (metodo === 'DELETE') { T[m[1]] = tavola.filter(r => !tiene(r)); return R(null, 204); }
-  if (metodo === 'PATCH') { tavola.filter(tiene).forEach(r => Object.assign(r, JSON.parse(opz.body))); return R(null, 204); }
+  if (metodo === 'PATCH') { const toccate = tavola.filter(tiene); toccate.forEach(r => Object.assign(r, JSON.parse(opz.body)));
+    return /representation/.test((opz.headers || {}).Prefer || '') ? R(toccate) : R(null, 204); }
   if (metodo === 'POST') {
-    const nuova = JSON.parse(opz.body);
+    const corpo = JSON.parse(opz.body);
+    if (Array.isArray(corpo)) {          // piu' righe insieme, con o senza chiave unica
+      for (const n of corpo) { const gia = /on_conflict=chiave/.test(m[2] || '') && tavola.find(r => r.chiave === n.chiave);
+        if (gia) Object.assign(gia, n); else tavola.push({ id: 'n' + tavola.length, ...(m[1] === 'push_appuntamenti' ? { mandato: null, mostrato: null, dispositivi: null } : {}), ...n }); }
+      return R(null, 201);
+    }
+    const nuova = corpo;
     if (m[1] === 'film_membri' && tavola.some(r => r.project_id === nuova.project_id && r.user_id === nuova.user_id)) return R(null, 201);
     if (m[1] === 'film_membri') nuova.ruolo = nuova.ruolo || 'membro';
     if (m[1] === 'push_appuntamenti') nuova.id = U(8);
@@ -270,6 +277,82 @@ ok('⚠ e i suoi file, solo i suoi', [globalThis.TOLTI, d.file, d.fileRimasti], 
 ok('⚠ gli altri film non sono toccati', [T.film_membri.filter(m => m.project_id === FA).length, T.odg.length, T.posta.some(m => m.project_id === FA)], [3, 1, true]);
 [st, d] = await chiedi('tok-io', { azione: 'eliminaFilm', id: FA, conferma: '  missione san gennaro ' });
 ok('con il titolo scritto, anche quello con la troupe', [st, d.persone, T.projects.map(p => p.titolo)], [200, 3, ['Separazioni']]);
+
+console.log('\n── mail messe da parte: accettare o scartare ──');
+mondo();
+const D1 = U(4), D2 = U(5), D3 = U(6);
+const pdfDi = (nome) => ({ nome, byte: 5, tenuto: true, percorso: 'x/' + nome });
+T.posta = [{ id: D1, project_id: FA, oggetto: 'MSG - ODG #31', stato: 'da verificare', allegati: [pdfDi('MSG - ODG _31.pdf'), pdfDi('MSG PDL 9.pdf')] },
+           { id: D2, project_id: FA, oggetto: 'Varie', stato: 'da verificare', allegati: [pdfDi('contratto.pdf')] },
+           { id: D3, project_id: FA, oggetto: 'MSG - ODG #30', stato: 'fatta', allegati: [pdfDi('MSG - ODG _30.pdf')] }];
+T.push_appuntamenti = [];
+ENV.OMBRA_SCRIVE = 'si'; ENV.OMBRA = ''; ENV.PIANO_SCRIVE = ''; ENV.PIANO = '';
+const mailDi = x => T.posta.find(m => m.id === x);
+ok('un membro qualsiasi non può', [(await chiedi('tok-anna', { azione: 'accetta', id: D1 }))[0], (await chiedi('tok-anna', { azione: 'scarta', id: D1 }))[0], mailDi(D1).stato], [403, 403, 'da verificare']);
+ok('⚠ una mail già a posto non si "accetta"', [(await chiedi('tok-io', { azione: 'accetta', id: D3 }))[0], (await chiedi('tok-io', { azione: 'scarta', id: D3 }))[0], mailDi(D3).stato], [400, 400, 'fatta']);
+[st, d] = await chiedi('tok-io', { azione: 'accetta', id: D1 });
+ok('accettata con un ordine del giorno: la legge il server, e avvisa la troupe', [d.legge, mailDi(D1).stato, mailDi(D1).nota], ['server', 'rilettura', 'rilettura: con notifiche']);
+ok('⚠ la notifica non parte adesso: parte quando è scritto', T.push_appuntamenti.length, 0);
+[st, d] = await chiedi('tok-io', { azione: 'accetta', id: D2 });
+ok('accettata senza niente che il server legga: ai telefoni, con l\'avviso a tutti', [d.legge, mailDi(D2).stato, T.push_appuntamenti.filter(a => a.genere === 'posta').length], ['telefoni', 'nuova', 3]);
+mailDi(D2).stato = 'da verificare';
+await chiedi('tok-io', { azione: 'scarta', id: D2 });
+ok('scartata: resta, ma nessuno la prende', [mailDi(D2).stato, (await chiedi('tok-io', { azione: 'posta' }))[1].mail.find(m => m.id === D2).esito], ['scartata', 'scartata']);
+
+console.log('\n── correggere un film ──');
+mondo();
+ok('un membro qualsiasi non può', (await chiedi('tok-anna', { azione: 'filmCambia', id: FA, sigla: 'XX' }))[0], 403);
+[st, d] = await chiedi('tok-io', { azione: 'filmCambia', id: FA, sigla: ' msg2 ', mittente: 'Prod@Esempio.it; altra@esempio.it' });
+ok('sigla in maiuscolo, mittenti in ordine', [st, T.projects[0].sigla, T.projects[0].mittente, T.projects[0].titolo], [200, 'MSG2', 'prod@esempio.it, altra@esempio.it', 'Missione San Gennaro']);
+ok('⚠ una sigla strana no', [(await chiedi('tok-io', { azione: 'filmCambia', id: FA, sigla: 'M S G' }))[0], (await chiedi('tok-io', { azione: 'filmCambia', id: FA, sigla: 'TROPPOLUNGA' }))[0], T.projects[0].sigla], [400, 400, 'MSG2']);
+ok('⚠ un titolo vuoto no, un mittente che non è una mail no', [(await chiedi('tok-io', { azione: 'filmCambia', id: FA, titolo: '   ' }))[0], (await chiedi('tok-io', { azione: 'filmCambia', id: FA, mittente: 'la produzione' }))[0]], [400, 400]);
+await chiedi('tok-io', { azione: 'filmCambia', id: FA, sigla: '', mittente: '' });
+ok('vuoti: si tolgono', [T.projects[0].sigla, T.projects[0].mittente], [null, null]);
+ok('⚠ chi ha aperto il film da qui non si tocca', [(await chiedi('tok-io', { azione: 'filmCambia', id: FA, user_id: ANNA, capo: ANNA }))[0], T.projects[0].user_id], [400, IO]);
+
+console.log('\n── un messaggio alla troupe ──');
+mondo(); T.push_appuntamenti = []; globalThis.SPEDITE = [];
+ok('un membro qualsiasi non può', [(await chiedi('tok-anna', { azione: 'messaggio', film: FA, testo: 'ciao a tutti' }))[0], T.push_appuntamenti.length], [403, 0]);
+ok('⚠ vuoto o troppo lungo non parte', [(await chiedi('tok-io', { azione: 'messaggio', film: FA, testo: '  ' }))[0], (await chiedi('tok-io', { azione: 'messaggio', film: FA, testo: 'x'.repeat(241) }))[0], T.push_appuntamenti.length], [400, 400, 0]);
+[st, d] = await chiedi('tok-io', { azione: 'messaggio', film: FA, testo: 'Domani si gira lo stesso.' });
+ok('una notifica a testa, solo a chi è nel film', [st, d.persone, T.push_appuntamenti.map(a => a.user_id).sort(), T.push_appuntamenti.every(a => a.genere === 'avviso' && a.project_id === FA)], [200, 3, [IO, ANNA, LUCA].sort(), true]);
+ok('parte subito, senza aspettare il minuto dopo', [typeof d.raggiunte, T.push_appuntamenti.every(a => a.mandato)], ['number', true]);
+ok('il testo, sotto "Avviso"', T.push_appuntamenti[0].testo, 'Avviso\nDomani si gira lo stesso.');
+
+console.log('\n── chi spende, giorno per giorno, e le versioni ──');
+mondo();
+const fam = m => new Date(Date.now() - m * 60000).toISOString();
+T.consumi = [
+  { quando: fam(30), origine: 'telefono', scopo: 'spoglio', user_id: ANNA, project_id: FA, modello: 'claude-sonnet-5-5', token_entrata: 100000, token_uscita: 20000 },
+  { quando: fam(60 * 24 * 3), origine: 'telefono', scopo: 'cast', user_id: LUCA, project_id: FA, modello: 'claude-sonnet-5-5', token_entrata: 10000, token_uscita: 1000 },
+  { quando: fam(60 * 24 * 3), origine: 'server', scopo: 'odg', user_id: null, project_id: FA, modello: 'claude-sonnet-5-5', token_entrata: 16000, token_uscita: 10000 },
+  { quando: fam(60 * 24 * 40), origine: 'telefono', scopo: 'spoglio', user_id: ANNA, project_id: FA, modello: 'claude-sonnet-5-5', token_entrata: 100000, token_uscita: 20000 }
+];
+T.profiles.find(p => p.id === IO).app_versione = '1.176'; T.profiles.find(p => p.id === ANNA).app_versione = '1.98';
+T.profiles.find(p => p.id === ANNA).app_vista = fam(500);
+T.posta = [{ id: U(4), project_id: FA, oggetto: 'MSG - ODG #30', stato: 'fatta', ricevuta: fam(100), ombra_stato: 'fatta', ombra_il: fam(99), info: { ms: 44000 } },
+           { id: U(5), project_id: FA, oggetto: 'MSG - ODG #29', stato: 'fatta', ricevuta: fam(1500), ombra_stato: 'fatta', ombra_il: fam(1499), info: { ms: 90000 } }];
+[st, d] = await chiedi('tok-io', { azione: 'server' });
+ok('⚠ chi spende: solo dai telefoni, dal più caro', d.costi.persone.map(x => [x.nome, x.chiamate, x.dollari]), [['Anna R', 2, 0.8], ['Luca B', 1, 0.03]]);
+ok('quattordici giorni, anche quelli a zero, fino a oggi', [d.costi.giorni.length, d.costi.giorni[13].dollari, d.costi.giorni[10].chiamate, d.costi.giorni.filter(g => g.chiamate).length], [14, 0.4, 2, 2]);
+ok('i tempi di lettura, dal più vecchio', d.tempi.map(t => t.secondi), [90, 44]);
+ok('⚠ le versioni si confrontano da numeri: 1.176 è dopo 1.98', [d.versioni.ultima, d.versioni.aggiornati, d.versioni.indietro.map(x => [x.nome, x.versione]), d.versioni.ignoti], ['1.176', 1, [['Anna R', '1.98']], 1]);
+[st, d] = await chiedi('tok-io', { azione: 'persona', id: ANNA });
+ok('nella scheda: versione e spesa', [d.versione, d.dollari], ['1.98', 0.8]);
+ok('nell\'elenco: la versione di ognuno', (await chiedi('tok-io', { azione: 'persone' }))[1].persone.map(p => p.versione).sort(), ['1.176', '1.98', null].sort());
+
+console.log('\n── ⚠ l\'avviso a chi amministra ──');
+const { avvisaAdmin, guasto, adminIds } = await import(RADICE + '/worker/guardia.js');
+ok('una lettura riuscita non è un guasto', [guasto('fatta', { riga: {} }), guasto('saltata: doppione', { riga: {} }), guasto('niente da leggere', {})], [null, null, null]);
+ok('errore, troncata, letta ma non scritta: sì', [guasto('errore: modello 529', { riga: {} }), guasto('tronca', { riga: {} }), guasto('fatta', { riga: {}, nonScritto: 'manca la data' })], ['modello 529', 'lettura troncata', 'non scritto: manca la data']);
+ok('⚠ una prova fallita non sveglia nessuno', guasto('errore: x', { riga: {}, prova: true }), null);
+mondo(); T.push_appuntamenti = [];
+ok('va solo agli amministratori', [adminIds(ENV), await avvisaAdmin(ENV, { titolo: 'Lettura fallita', oggetto: 'MSG - PDL 8', perche: 'modello 529', film: FA, chiave: 'm1:piano' }), T.push_appuntamenti.map(a => [a.user_id, a.genere, a.testo])],
+  [[IO], 1, [[IO, 'admin', 'Lettura fallita\nMSG - PDL 8\nmodello 529']]]);
+T.push_appuntamenti[0].mandato = 'ieri';
+await avvisaAdmin(ENV, { titolo: 'Lettura fallita', oggetto: 'MSG - PDL 8', perche: 'modello 529', film: FA, chiave: 'm1:piano' });
+ok('⚠ la stessa mail riprovata non suona due volte', [T.push_appuntamenti.length, T.push_appuntamenti[0].mandato], [1, 'ieri']);
+ok('senza amministratori non fa niente e non si rompe', await avvisaAdmin({ ...ENV, ADMIN_IDS: '' }, { titolo: 'x' }), 0);
 
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);

@@ -437,5 +437,35 @@ ok('l\'ordine del giorno di prima resta dov\'era', T.odg.length, 1);
 daRileggere('rilettura: senza notifiche');
 ok('⚠ con la scrittura spenta non si rilegge niente', [await leggiInOmbra(BASE), T.posta[0].stato], ['niente da leggere', 'rilettura']);
 
+console.log('\n── ⚠ se il server sbaglia, chi amministra lo sa ──');
+const CAPO = '11111111-1111-4111-8111-111111111111', CON_ADMIN = { ...ACCESO, ADMIN_IDS: CAPO };
+const allarmi = () => T.push_appuntamenti.filter(a => a.genere === 'admin');
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI]), CON_ADMIN, {});
+await leggiInOmbra(CON_ADMIN);
+ok('una lettura riuscita non avvisa nessuno', allarmi().length, 0);
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI]), CON_ADMIN, {});
+modello = () => new Response('{"error":"sovraccarico"}', { status: 529 });
+await leggiInOmbra(CON_ADMIN);
+ok('una lettura fallita: un avviso all\'amministratore, con la mail e il perché', allarmi().map(a => [a.user_id, a.project_id, a.testo.split('\n').slice(0, 2).join(' | '), /529/.test(a.testo)]),
+  [[CAPO, 'f1', 'Lettura dell\'ordine del giorno fallita | I: MSG - ODG #25 del 14.11.2026', true]]);
+ok('e la troupe ha comunque la sua mail, dai telefoni', [T.posta[0].stato, titoli().length], ['nuova', 3]);
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI]), ACCESO, {});
+modello = () => new Response('{"error":"sovraccarico"}', { status: 529 });
+await leggiInOmbra(ACCESO);
+ok('senza ADMIN_IDS non parte niente e non si rompe niente', [allarmi().length, T.posta[0].stato], [0, 'nuova']);
+
+console.log('\n── una mail accettata con ordine del giorno e piano ──');
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI, 'MSG PDL 9.pdf']), ACCESO, {}); await leggiInOmbra(ACCESO);
+Object.assign(T.posta[0], { stato: 'rilettura', nota: 'rilettura: con notifiche', ombra_stato: null, ombra: null, ombra_il: null, piano_stato: null });
+await leggiInOmbra({ ...ACCESO, PIANO_SCRIVE: 'si' });
+ok('⚠ letto l\'ordine del giorno non si chiude: tocca al piano, con la stessa scelta', [T.posta[0].stato, T.posta[0].nota, T.posta[0].ombra_stato], ['rilettura piano', 'rilettura: con notifiche', 'fatta']);
+Object.assign(T.posta[0], { stato: 'rilettura', ombra_stato: null, ombra: null, ombra_il: null, piano_stato: 'fatta' });
+await leggiInOmbra({ ...ACCESO, PIANO_SCRIVE: 'si' });
+ok('se il piano era già stato letto, si chiude e basta', T.posta[0].stato, 'fatta');
+
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);

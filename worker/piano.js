@@ -23,6 +23,7 @@ import { db, firma, ragionamento, genereDalNome } from './ombra.js';
 import { rilascia } from './scrive.js';
 import { genereDi } from './smista.js';
 import { segnaConsumo } from './consumi.js';
+import { avvisaAdmin, guasto } from './guardia.js';
 
 const MODELLO = 'claude-sonnet-5-5';
 const FINESTRA_ORE = 36;
@@ -455,6 +456,9 @@ export async function leggiPiano(env) {
           body: JSON.stringify({ stato: 'fatta', nota: ('rilettura del piano: ' + (esito || 'interrotta')).slice(0, 300) }) });
       } catch (_) {}
     }
+    const perche = guasto(esito, giro);
+    if (perche) await avvisaAdmin(env, { titolo: 'Lettura del piano fallita', oggetto: giro.riga.oggetto, perche,
+      film: giro.riga.project_id, chiave: giro.riga.id + ':piano' });
   }
 }
 async function leggiUnPiano(env, giro) {
@@ -488,6 +492,7 @@ async function leggiUnPiano(env, giro) {
   }
   if (!riga) return 'niente da leggere';
   const mia = scrive && !prova && (riga.stato === 'al server' || rilettura);        // questo va scritto
+  giro.riga = riga; giro.prova = prova;
 
   const pdl = (riga.allegati || []).find(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
   if (!pdl) { await scrivi(env, riga.id, JSON.stringify({ piano_stato: 'saltata' })); return 'saltata: nessun piano'; }
@@ -548,6 +553,7 @@ async function leggiUnPiano(env, giro) {
         await chiudi(env, riga, scritto.vecchio ? 'piano più vecchio di quello in uso: lasciato stare' : 'piano scritto dal server');
       } catch (e) {
         scritto = { scritto: false, errore: String(e.message).slice(0, 200) };
+        giro.nonScritto = scritto.errore;
         await rilascia(env, riga, 'piano: ' + scritto.errore);
       }
     }
