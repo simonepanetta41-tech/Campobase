@@ -5450,7 +5450,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.178';
+const CB_VERSIONE = '1.179';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -16845,6 +16845,49 @@ function ttBuildPdfPage(doc, tab, produzione, film, reparto, settimana, dal, al,
     doc.text('Note: '+note, mg, finalY, {maxWidth: W-mg*2});
     doc.setTextColor(0,0,0);
   }
+  ttFirmaPdf(doc);
+}
+
+/* La firma in fondo al foglio orari: l'icona, "Made with Campobase" e
+   l'indirizzo, in basso a destra. Il foglio va alla produzione: e' li'
+   che qualcuno puo' chiedersi con cosa e' fatto. Tutta la riga e' un
+   collegamento.
+   L'icona e' disegnata a tratti, non e' un'immagine: cosi' non c'e' un
+   file da scaricare (senza rete l'esportazione deve funzionare) e in
+   stampa resta nitida. Le misure sono quelle di campobase.svg, su 100. */
+const TT_FIRMA = { testo: 'Made with ', nome: 'Campobase', sito: 'campobase.dev', url: 'https://campobase.dev' };
+function ttFirmaPdf(doc){
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  const mg = 12, lato = 6, corpo = 10, base = H - 9;          // millimetri; corpo in punti
+  doc.setFontSize(corpo);
+  const pezzi = [[TT_FIRMA.testo, 'normal', [95,95,95]], [TT_FIRMA.nome, 'bold', [20,20,20]], ['  ·  ' + TT_FIRMA.sito, 'normal', [95,95,95]]];
+  const larghe = pezzi.map(p => { doc.setFont('helvetica', p[1]); return doc.getTextWidth(p[0]); });
+  const tutta = lato + 2.5 + larghe.reduce((a, b) => a + b, 0);
+  let x = W - mg - tutta;
+  const inizio = x, yI = base - lato + 1.3;
+
+  // L'icona: fondo scuro, due assi gialle del ciak (quella sopra alzata), tre tacche per asse.
+  const u = lato / 100, P = (px, py) => [x + px * u, yI + py * u];
+  const poligono = (punti, colore) => {
+    doc.setFillColor(colore[0], colore[1], colore[2]);
+    const a = punti.map(p => P(p[0], p[1]));
+    doc.lines(a.slice(1).map((p, i) => [p[0] - a[i][0], p[1] - a[i][1]]), a[0][0], a[0][1], [1, 1], 'F', true);
+  };
+  const gira = (px, py) => { const g = -17 * Math.PI / 180, dx = px - 18, dy = py - 54;      // la rotazione dell'asse di sopra
+    return [18 + dx * Math.cos(g) - dy * Math.sin(g), 54 + dx * Math.sin(g) + dy * Math.cos(g)]; };
+  const SCURO = [10,11,13], GIALLO = [245,197,66];
+  doc.setFillColor(SCURO[0], SCURO[1], SCURO[2]);
+  doc.roundedRect(x, yI, lato, lato, lato * .2, lato * .2, 'F');
+  poligono([[13,56],[87,56],[87,70],[13,70]], GIALLO);
+  [[20,27,33,26],[39,46,52,45],[58,65,71,64]].forEach(t => poligono([[t[0],56],[t[1],56],[t[2],70],[t[3],70]], SCURO));
+  poligono([[13,40],[87,40],[87,54],[13,54]].map(p => gira(p[0], p[1])), GIALLO);
+  [[26,33,27,20],[45,52,46,39],[64,71,65,58]].forEach(t => poligono([[t[0],40],[t[1],40],[t[2],54],[t[3],54]].map(p => gira(p[0], p[1])), SCURO));
+
+  x += lato + 2.5;
+  pezzi.forEach((p, i) => { doc.setFont('helvetica', p[1]); doc.setTextColor(p[2][0], p[2][1], p[2][2]); doc.text(p[0], x, base); x += larghe[i]; });
+  doc.link(inizio, yI - 0.5, tutta, lato + 1, { url: TT_FIRMA.url });
+  doc.setTextColor(0,0,0); doc.setFont('helvetica','normal');
+  return { x: inizio, y: yI, larga: tutta, alta: lato };
 }
 // ══════════════════════════════════════════════
 // END TIMETABLE ENGINE
