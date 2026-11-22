@@ -1,4 +1,9 @@
-const CACHE = 'campobase-v176';
+const CACHE = 'campobase-v177';
+// Quanto si aspetta la rete prima di aprire la pagina salvata (millisecondi).
+const ATTESA_RETE = 3000;
+// Le cache che restano da una versione all'altra: il biglietto della
+// notifica toccata e i dati letti dal server (index.html, sbFetch).
+const RESTANO = ['campobase-apri', 'campobase-dati'];
 
 // Dipendenze che devono esserci offline.
 // pdf.js serve a leggere le sceneggiature, jsPDF a esportare: senza queste
@@ -37,7 +42,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE && k !== 'campobase-apri').map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && !RESTANO.includes(k)).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -67,15 +72,24 @@ self.addEventListener('fetch', e => {
   // rete si apriva quella al posto del lavoro.
   if (e.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     const chiave = url.pathname === '/' ? '/index.html' : url.pathname;
-    e.respondWith(
-      fetch(e.request)
-        .then(r => {
-          const copy = r.clone();
-          caches.open(CACHE).then(cache => cache.put(chiave, copy));
-          return r;
-        })
-        .catch(() => caches.match(chiave).then(c => c || caches.match('/index.html')))
-    );
+    /* La rete ha tre secondi. Sotto terra il campo non manca del tutto:
+       va e viene, e una richiesta che non fallisce e non arriva teneva lo
+       schermo bianco per un minuto. Passati tre secondi si apre la copia
+       salvata; la risposta, se poi arriva, aggiorna la copia per la volta
+       dopo. Senza copia salvata si continua ad aspettare la rete. */
+    const rete = fetch(e.request).then(r => {
+      if (r && r.ok) { const copy = r.clone(); caches.open(CACHE).then(cache => cache.put(chiave, copy)); }
+      return r;
+    });
+    const riserva = () => caches.match(chiave).then(c => c || caches.match('/index.html'));
+    e.respondWith(new Promise((ris, no) => {
+      let fatto = false;
+      const dai = r => { if (!fatto && r) { fatto = true; ris(r); } };
+      const t = setTimeout(() => riserva().then(dai).catch(() => {}), ATTESA_RETE);
+      rete.then(r => { clearTimeout(t); dai(r); },
+                err => { clearTimeout(t); riserva().then(c => { if (c) dai(c); else if (!fatto) { fatto = true; no(err); } }).catch(() => no(err)); });
+    }));
+    if (e.waitUntil) e.waitUntil(rete.catch(() => {}));
     return;
   }
 

@@ -1398,6 +1398,12 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
    giorno ci siamo chiesti se una modifica fosse arrivata sul telefono e
    abbiamo tirato a indovinare: adesso basta guardare in fondo. */
 .cb-ver { font-family: 'DM Mono', monospace; font-size: 9px; opacity: .55; }
+/* Senza rete: a schermo ci sono i dati dell'ultima apertura. Una riga
+   piccola in fondo, che non sposta niente e non si tocca. */
+#cbSenzaRete { display: none; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 900; pointer-events: none; padding: 5px 11px; border-radius: 999px; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--white-dim); font-family: 'DM Mono', monospace; font-size: 10.5px; letter-spacing: .02em; white-space: nowrap; }
+body.senza-rete #cbSenzaRete { display: block; }
 
 @media print {
   body { background:#fff !important; color:#000 !important; font-family: Arial, sans-serif; }
@@ -2341,6 +2347,7 @@ footer .fr { font-size: 10px; color: var(--muted); text-align: right; line-heigh
       </div>
     </div>
 
+    <div id="cbSenzaRete">Senza rete · dati salvati</div>
     <footer>
       <div class="fl">Campo<em>base</em></div>
       <div class="fr">by ohsfaccimmarosound<br><span id="cbVer" class="cb-ver"></span></div>
@@ -2821,7 +2828,146 @@ document.getElementById('shareModal').addEventListener('click', e => {
 
 const SUPA_URL  = 'https://cmeccqzlkinpwalmehdf.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZWNjcXpsa2lucHdhbG1laGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDEwMTIsImV4cCI6MjA5NDY3NzAxMn0.FdamHVdDLkgKSnGgt39eAFE3dXQLgWoQQ1dXrBUxF90';
-const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
+/* ── Senza rete ──
+ *
+ * Sul set il campo manca spesso (un interno, un sotterraneo) e peggio
+ * ancora c'e' a meta': una richiesta che non fallisce e non arriva. L'app
+ * restava su "Caricamento…" perche' tutto quello che mostra lo legge dal
+ * server al momento.
+ *
+ * Qui passano tutte le chiamate a Supabase. Ogni LETTURA riuscita si
+ * mette da parte sul telefono; quando la rete non risponde entro tre
+ * secondi, o non c'e', si restituisce l'ultima risposta salvata per la
+ * stessa identica domanda. Cosi' la lista dei film, lo spoglio, il piano,
+ * le scene segnate tornano com'erano all'ultima apertura, senza che
+ * ognuna di quelle funzioni debba saperne niente.
+ *
+ * Le scritture non si toccano: senza rete falliscono come prima.
+ * Gli allegati della posta non passano di qui: hanno gia' la loro
+ * dispensa (cbFileSalva).
+ */
+const SB_DATI = 'campobase-dati';
+const SB_ATTESA = 3000;                 // quanto si aspetta la rete se una copia c'e'
+let sbLentaFino = 0;                    // la rete ha appena fatto cilecca: per un po' non la si aspetta
+let sbRinnovoFallito = () => {};        // chi aspetta il rinnovo del gettone ci mette il suo campanello
+let sbDaRiserva = false;                // a schermo ci sono dati salvati, non freschi
+function sbScadenza(input, init, ms) {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms), s = init && init.signal;
+  if (s) { if (s.aborted) c.abort(); else s.addEventListener('abort', () => c.abort(), { once: true }); }
+  return fetch(input, { ...(init || {}), signal: c.signal }).finally(() => clearTimeout(t));
+}
+function sbSegna(daRiserva) {
+  if (!daRiserva) sbLentaFino = 0;
+  if (sbDaRiserva === daRiserva) return;
+  sbDaRiserva = daRiserva;
+  try { document.body.classList.toggle('senza-rete', daRiserva); } catch (_) {}
+}
+async function sbFetch(input, init) {
+  let u, metodo, capi;
+  try {
+    u = new URL(typeof input === 'string' ? input : input.url);
+    metodo = String((init && init.method) || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
+    capi = new Headers((init && init.headers) || (typeof input !== 'string' && input.headers) || {});
+  } catch (_) { return fetch(input, init); }
+  const lenta = Date.now() < sbLentaFino;
+  const lettura = metodo === 'GET' && (u.pathname.startsWith('/rest/v1/')
+    || (u.pathname.startsWith('/storage/v1/object/') && !u.pathname.startsWith('/storage/v1/object/posta/')));
+  if (!lettura) {
+    /* Le domande brevi che l'avvio aspetta (chi sono, sono ancora nel
+       film) non devono tenerlo fermo: hanno una scadenza. Il resto —
+       salvataggi, caricamenti di PDF — va come e' sempre andato. */
+    const breve = metodo === 'POST' && (u.pathname.startsWith('/rest/v1/rpc/') || u.pathname.startsWith('/auth/v1/token'));
+    if (!breve) return fetch(input, init);
+    const chiesta = sbScadenza(input, init, lenta ? 2500 : 8000);
+    // Il rinnovo del gettone che fallisce: chi lo sta aspettando (piu' sotto) lo sa subito.
+    if (u.pathname.startsWith('/auth/v1/token')) chiesta.catch(() => { try { sbRinnovoFallito(); } catch (_) {} });
+    return chiesta;
+  }
+  /* La stessa domanda puo' volere una riga o una lista (.single()): sono
+     due risposte diverse e si tengono separate. E quelle di un account
+     non si danno a un altro. */
+  const chi = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || 'nessuno';
+  const chiave = u.origin + u.pathname + (u.search ? u.search + '&' : '?') + '__chi=' + chi
+    + (/vnd\.pgrst\.object/.test(capi.get('accept') || '') ? '&__una=1' : '') + (capi.get('range') ? '&__r=' + encodeURIComponent(capi.get('range')) : '');
+  let dispensa = null, salvata = null;
+  try { dispensa = await caches.open(SB_DATI); salvata = await dispensa.match(chiave); } catch (_) {}
+  /* Mai letta prima: non c'e' niente da dare al suo posto. Ma se la rete
+     e' appesa non la si aspetta all'infinito — la libreria riprova da
+     sola quattro volte — e se ha appena fatto cilecca si dice subito. */
+  if (!salvata && lenta) throw new TypeError('rete non raggiungibile');
+  const rete = sbScadenza(input, init, salvata ? 20000 : 10000).then(r => {
+    /* Un "non autorizzato" o un guasto del server valgono come la rete
+       che manca, se una copia c'e': capita quando il gettone e' scaduto
+       e non si e' riusciti a rinnovarlo. */
+    if (salvata && (r.status === 401 || r.status >= 500)) throw new Error('risposta ' + r.status);
+    if (r.ok && r.status === 200 && dispensa) { try { dispensa.put(chiave, r.clone()).catch(() => {}); } catch (_) {} }
+    sbSegna(false);
+    return r;
+  }, e => { if (!salvata && e && e.name === 'AbortError') sbLentaFino = Date.now() + 20000; throw e; });
+  if (!salvata) return rete;
+  if (lenta) { rete.catch(() => {}); return salvata; }
+  let scaduta = false;
+  const prima = await Promise.race([rete.catch(() => null), new Promise(r => setTimeout(() => { scaduta = true; r(null); }, SB_ATTESA))]);
+  if (prima) return prima;
+  /* Rete appesa (non assente: quella fallisce subito e non costa niente
+     riprovarla): per venti secondi le prossime letture non la aspettano,
+     se no ognuna si prenderebbe i suoi tre secondi. Se poi la risposta
+     arriva, aggiorna la copia per la prossima volta. */
+  if (scaduta) { sbLentaFino = Date.now() + 20000; rete.catch(() => {}); }
+  sbSegna(true);
+  return salvata;
+}
+/* Uscendo dall'account i dati salvati se ne vanno: il prossimo che entra
+   su questo telefono non deve trovarsi lo spoglio di un altro. */
+function sbDimentica() { try { return caches.delete(SB_DATI).catch(() => {}); } catch (_) { return Promise.resolve(); } }
+/* La sessione com'e' salvata su questo telefono, letta da dove la tiene
+   Supabase: serve quando la rete non c'e' e il gettone e' scaduto. */
+function sbSessioneIntera() {
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!/^sb-.+-auth-token$/.test(k)) continue;
+      const v = JSON.parse(localStorage.getItem(k) || 'null');
+      const s = v && v.currentSession ? v.currentSession : v;
+      if (s && s.user && s.user.id) return s;
+    }
+  } catch (_) {}
+  return null;
+}
+function sbSessioneSalvata() { const s = sbSessioneIntera(); return s ? s.user : null; }
+
+const sb = supabase.createClient(SUPA_URL, SUPA_ANON, { global: { fetch: sbFetch } });
+
+/* Il gettone dura un'ora. Scaduto, Supabase prima di QUALUNQUE lettura
+ * prova a rinnovarlo, e se la rete non c'e' riprova per venticinque
+ * secondi prima di arrendersi — a ogni lettura. Era questo a lasciare la
+ * lista dei film su "Caricamento…": le letture non partivano nemmeno.
+ *
+ * Qui gli si da' una scadenza. Se il gettone e' ancora buono non cambia
+ * niente. Se e' scaduto e in quattro secondi non si rinnova, si va avanti
+ * con la sessione salvata: le letture partono, falliscono subito e
+ * prendono i dati messi da parte (sbFetch). Per mezzo minuto non ci si
+ * riprova; quando torna il campo Supabase lo rinnova da solo.
+ * Se invece l'accesso e' stato tolto davvero, Supabase la sessione
+ * salvata la cancella, e allora qui non c'e' niente da usare.
+ */
+let sbAuthGiuFino = 0;
+try {
+  const vera = sb.auth.getSession.bind(sb.auth);
+  sb.auth.getSession = async function () {
+    const salvata = sbSessioneIntera();
+    const scaduta = salvata && (salvata.expires_at || 0) * 1000 < Date.now() + 90000;
+    if (!salvata || !scaduta) return vera();
+    const conQuellaSalvata = () => { sbSegna(true); return { data: { session: salvata }, error: null }; };
+    if (navigator.onLine === false || Date.now() < sbAuthGiuFino) return conQuellaSalvata();
+    const chiesta = vera();
+    const prima = await Promise.race([chiesta.catch(e => ({ data: { session: null }, error: e || true })), new Promise(r => setTimeout(() => r(null), 4000)),
+      new Promise(r => { sbRinnovoFallito = () => r(null); })]);       // rete assente: fallisce subito, inutile aspettare
+    sbRinnovoFallito = () => {};
+    if (prima && ((prima.data && prima.data.session) || !prima.error)) return prima;     // rinnovata, oppure "non c'e'" detto dal server
+    sbAuthGiuFino = Date.now() + 30000;
+    return sbSessioneIntera() ? conQuellaSalvata() : (prima || { data: { session: null }, error: null });
+  };
+} catch (_) {}
 
 let currentUser = null;
 
@@ -2886,6 +3032,7 @@ async function logoutChiedi() {
 }
 async function logout() {
   filmDimentica(); ultimoDimentica();
+  await sbDimentica();
   await sb.auth.signOut();
 }
 
@@ -2908,13 +3055,16 @@ async function showApp() {
   if (ue) ue.textContent = currentUser.email;
   document.getElementById('settingsEmail').textContent = currentUser.email;
   systemInit();
-  // Upsert profile
-  await sb.from('profiles').upsert({
-    id: currentUser.id,
-    email: currentUser.email,
-    provider: currentUser.app_metadata?.provider || 'email',
-    last_seen: new Date().toISOString()
-  }, { onConflict: 'id' });
+  // Upsert profile. Non lo si aspetta: e' una scrittura, e con il campo
+  // che va e viene teneva ferma l'apertura dell'app.
+  try {
+    sb.from('profiles').upsert({
+      id: currentUser.id,
+      email: currentUser.email,
+      provider: currentUser.app_metadata?.provider || 'email',
+      last_seen: new Date().toISOString()
+    }, { onConflict: 'id' }).then(() => {}, () => {});
+  } catch (_) {}
   /* Che versione dell'app ha aperto questo telefono (sql/versione.sql):
      la legge solo l'amministrazione, per sapere chi e' rimasto indietro.
      In un passo suo: se le colonne non ci sono ancora fallisce da sola,
@@ -2977,11 +3127,20 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-sb.auth.getSession().then(({ data: { session } }) => {
+/* All'avvio. Senza rete Supabase non riesce a rinnovare il gettone e dice
+   che la sessione non c'e': ma se su questo telefono si era entrati, e'
+   la rete che manca, non l'accesso. Si entra con quello che c'e' salvato;
+   quando torna il campo il gettone si rinnova da solo. Se invece
+   l'accesso e' stato revocato davvero, Supabase la sessione salvata la
+   cancella, e qui non si trova niente. */
+function avvioSessione(session, guasto) {
   if (window.location.pathname.startsWith('/share/')) return;
-  if (session) { currentUser = session.user; showApp(); }
-  else { showAuth(); }
-});
+  if (session) { currentUser = session.user; showApp(); return; }
+  const persona = (guasto || navigator.onLine === false) ? sbSessioneSalvata() : null;
+  if (persona) { currentUser = persona; sbSegna(true); showApp(); }
+  else showAuth();
+}
+sb.auth.getSession().then(r => avvioSessione(r && r.data && r.data.session, r && r.error), e => avvioSessione(null, e || true));
 
 // ══ PAGE NAV ══
 /* Il nome in testa: il film su cui stai lavorando, o Campobase quando non
@@ -5291,7 +5450,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.176';
+const CB_VERSIONE = '1.177';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11824,6 +11983,34 @@ async function odgRipristina() {
   odgRender();
   odgPassatiCarica();     // non si aspetta: lo spoglio si ridisegna quando arriva
   odgStralciRipara();     // idem: se gli stralci sono senza rientri, li rilegge dal PDF
+  odgAllegatiInCasa();    // e i PDF del giorno si scaricano adesso, finche' c'e' campo
+}
+
+/* I PDF dell'ordine del giorno — il foglio, i giri, gli stralci — si
+   mettono sul telefono appena l'ordine del giorno arriva, senza aspettare
+   che qualcuno li apra: sul set servono proprio dove il campo non c'e'.
+   Uno alla volta, in sottofondo, e solo quelli che in casa non ci sono. */
+let odgAllegatiInCorso = false;
+async function odgAllegatiInCasa(){
+  const d = odgCorrente;
+  if (!d || odgAllegatiInCorso || sbDaRiserva || navigator.onLine === false) return 0;
+  odgAllegatiInCorso = true;
+  let presi = 0;
+  try {
+    const foglio = { nome: d.nomeFile, file: d.file, percorso: d.percorso, _foglio: true };
+    for (const a of [foglio].concat(d.allegati || [])) {
+      if (!a || !a.nome || odgCorrente !== d) continue;
+      const chiave = a.file || odgChiaveFile(a.nome);
+      if (await cbFileLeggi(chiave)) { if (!a.file) { a.file = chiave; presi++; } continue; }   // c'e' gia'
+      if (!a.percorso && !currentUser) continue;
+      if (await odgByteDi(a)) presi++;
+    }
+    if (foglio.file && !d.file) d.file = foglio.file;
+    if (foglio.percorso && !d.percorso) d.percorso = foglio.percorso;
+    if (presi && odgCorrente === d) odgTieni(d);       // i file trovati si ricordano con l'ordine del giorno
+  } catch (e) { console.log('[odg] allegati non messi da parte:', e && e.message); }
+  finally { odgAllegatiInCorso = false; }
+  return presi;
 }
 
 /* Un film si chiude quando si esce dall'account: il prossimo che entra

@@ -13,6 +13,11 @@
   `ADMIN_VERSIONE` (admin.html): e' la "A 1.4" in fondo alla pagina di
   amministrazione, separata dalla versione dell'app. Il primo numero scatta
   (2.0) solo con un rifacimento importante, deciso con Simone.
+- Senza rete l'app mostra l'ultima cosa letta: tutte le chiamate a Supabase
+  passano da `sbFetch` (index.html), che mette da parte ogni lettura e la
+  restituisce quando la rete manca. Una lettura fatta con `fetch` diretto, o
+  con una domanda che cambia a ogni apertura (un orario nell'indirizzo), senza
+  rete non c'e'. Prove: `test/senza-rete.test.js`, `test/sw-rete.test.js`.
 - **Mai riscrivere un file leggendolo nella stessa espressione**
   (`open(f,'w').write(open(f).read()...)` lo tronca prima di leggerlo: e'
   cosi' che `sw.js` e' andato online vuoto). Leggere, poi scrivere.
