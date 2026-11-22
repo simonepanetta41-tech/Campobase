@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Campobase · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=DM+Mono&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#07080a;--card:#1f242c;--card2:#2a3039;--bd:#3d4552;--w:#f2f3f5;--d:#b6bcc6;--m:#7f8794;--y:#f5c542;--g:#6ee7b7;--r:#f87171}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--w);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-text-size-adjust:100%}
+body{touch-action:manipulation;padding:calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+button{font-family:inherit;cursor:pointer}
+.pagina{max-width:1040px;margin:0 auto}
+.top{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--bd);margin-bottom:14px}
+.top b{font-size:15px;letter-spacing:.02em}
+.top .ad{margin-left:auto;font-size:10px;color:var(--y);border:1px solid rgba(245,197,66,.5);border-radius:99px;padding:3px 9px;letter-spacing:.08em}
+.indietro{background:none;border:none;color:var(--d);font-size:22px;padding:0 6px 0 0;line-height:1}
+.cerca{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:11px 12px;font-family:'DM Mono',monospace;font-size:16px;color:var(--w);margin-bottom:12px}
+.cerca::placeholder{color:var(--m)}
+.sez{font-size:10.5px;letter-spacing:.12em;color:var(--m);margin:18px 2px 8px;text-transform:uppercase}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.riga{display:flex;align-items:center;gap:10px;padding:12px 14px;width:100%;background:none;border:none;color:inherit;text-align:left}
+.riga + .riga{border-top:1px solid var(--bd)}
+.riga.sel{background:var(--card2)}
+.riga .c{flex:1;min-width:0}.riga .t{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.riga .s{font-size:11.5px;color:var(--m);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pall{width:8px;height:8px;border-radius:50%;flex:none}
+.fr{color:var(--m)}
+.tag{font-size:10px;border-radius:99px;padding:3px 8px;border:1px solid var(--bd);color:var(--d);white-space:nowrap}
+.tag.g{border-color:rgba(110,231,183,.5);color:var(--g)}.tag.r{border-color:rgba(248,113,113,.5);color:var(--r)}.tag.y{border-color:rgba(245,197,66,.5);color:var(--y)}
+.nome{font-size:20px;font-weight:700}
+.sotto{font-size:12px;color:var(--m);margin-top:3px;line-height:1.5;word-break:break-word}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:11px 14px;font-size:13px}
+.kv + .kv{border-top:1px solid var(--bd)}
+.kv span:last-child{font-family:'DM Mono',monospace;color:var(--d);font-size:12.5px;text-align:right}
+.btn{display:block;width:100%;text-align:center;padding:12px;border-radius:11px;border:1px solid var(--bd);background:none;color:var(--w);font-size:13.5px;margin-top:8px}
+.btn.y{background:var(--y);border-color:var(--y);color:#111;font-weight:700}
+.btn.r{border-color:rgba(248,113,113,.5);color:var(--r)}
+.btn:disabled{opacity:.5}
+.due{display:flex;gap:8px}.due .btn{flex:1}
+.mini{background:none;border:1px solid var(--bd);border-radius:99px;color:var(--d);font-size:11px;padding:5px 10px;margin-left:6px;white-space:nowrap}
+.mini.r{border-color:rgba(248,113,113,.4);color:var(--r)}
+.nota{font-size:12.5px;color:var(--d);line-height:1.5;margin:10px 2px 0}
+.vuoto{padding:22px 16px;color:var(--m);font-size:13px;text-align:center}
+.ok{color:var(--g) !important}.no{color:var(--r) !important}.boh{color:var(--y) !important}
+#velo{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:16px}
+#velo.on{display:flex}
+#foglio{background:var(--card);border:1px solid var(--bd);border-radius:16px;width:100%;max-width:420px;padding:18px;max-height:80vh;overflow:auto}
+#foglio h3{margin:0 0 4px;font-size:16px}
+#avviso{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--card2);border:1px solid var(--bd);
+  border-radius:99px;padding:10px 16px;font-size:13px;display:none;z-index:60;max-width:90vw}
+#avviso.on{display:block}#avviso.r{border-color:rgba(248,113,113,.6);color:var(--r)}
+/* Sul telefono si vede una cosa alla volta; su uno schermo largo l'elenco
+   resta a sinistra e la scheda si apre a destra. */
+#scheda{display:none}
+body.aperta #elenco{display:none}
+body.aperta #scheda{display:block}
+@media (min-width:900px){
+  #corpo{display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start}
+  body.aperta #elenco{display:block}
+  #scheda{display:block}
+  .indietro{display:none}
+  #velo{align-items:center}
+}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <div class="top"><button class="indietro" id="indietro" onclick="chiudiScheda()" style="display:none" aria-label="Indietro">‹</button><b>CAMPOBASE</b><span class="ad">ADMIN</span></div>
+  <div id="porta"></div>
+  <div id="corpo" style="display:none">
+    <div id="elenco">
+      <input class="cerca" id="cerca" placeholder="Cerca nome, mail, film…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="card" id="lista"></div>
+      <div class="sez" id="conta"></div>
+    </div>
+    <div id="scheda"></div>
+  </div>
+</div>
+<div id="velo" onclick="if(event.target===this)chiudiFoglio()"><div id="foglio"></div></div>
+<div id="avviso"></div>
+
+<script>
+const SUPA_URL  = 'https://cmeccqzlkinpwalmehdf.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZWNjcXpsa2lucHdhbG1laGRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMDEwMTIsImV4cCI6MjA5NDY3NzAxMn0.FdamHVdDLkgKSnGgt39eAFE3dXQLgWoQQ1dXrBUxF90';
+const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+let PERSONE = [], FILM = [], aperta = null, corsa = 0;
+
+/* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
+   se chi chiede puo'. La pagina da sola non vede niente. */
+async function chiedi(azione, dati) {
+  const { data } = await sb.auth.getSession();
+  const token = data && data.session && data.session.access_token;
+  if (!token) { const e = new Error('non sei entrato'); e.stato = 401; throw e; }
+  const r = await fetch('/api/admin', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ azione, ...(dati || {}) }) });
+  let d = {}; try { d = await r.json(); } catch (_) {}
+  if (!r.ok) { const e = new Error(d.error || ('errore ' + r.status)); e.stato = r.status; e.dati = d; throw e; }
+  return d;
+}
+
+function avvisa(testo, rosso) {
+  const a = document.getElementById('avviso');
+  a.textContent = testo; a.className = 'on' + (rosso ? ' r' : '');
+  clearTimeout(avvisa.t); avvisa.t = setTimeout(() => { a.className = ''; }, rosso ? 6000 : 3000);
+}
+
+/* Le date, come si dicono: "oggi 14:20", "ieri 23:51", "9 nov". */
+function quando(iso, conOra) {
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const giorno = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((giorno(new Date()) - giorno(d)) / 86400000);
+  const ora = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const M = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  if (diff === 0) return 'oggi ' + ora;
+  if (diff === 1) return 'ieri ' + ora;
+  return d.getDate() + ' ' + M[d.getMonth()] + (conOra ? ' ' + ora : '');
+}
+const nomeDi = p => [p.nome, p.cognome].filter(Boolean).join(' ') || p.email || 'Senza nome';
+const sigle = p => (p.film || []).map(f => f.sigla || f.titolo).join(', ');
+
+/* ── L'ingresso ── */
+async function entra() {
+  const porta = document.getElementById('porta');
+  try {
+    await chiedi('io');
+  } catch (e) {
+    document.getElementById('corpo').style.display = 'none';
+    if (e.stato === 401) {
+      porta.innerHTML = '<div class="card"><div class="vuoto">Per entrare qui apri prima Campobase e accedi con il tuo account, poi torna su questa pagina.<br><br><a href="/" style="color:var(--y)">Apri Campobase</a></div></div>';
+    } else if (e.stato === 403) {
+      porta.innerHTML = '<div class="card"><div class="vuoto">Questa pagina è riservata.' +
+        (e.dati && e.dati.id ? '<br><br><span style="font-family:DM Mono,monospace;font-size:11px;color:var(--d);word-break:break-all">' + esc(e.dati.id) + '</span>' : '') + '</div></div>';
+    } else {
+      porta.innerHTML = '<div class="card"><div class="vuoto">Non riesco a parlare con il server: ' + esc(e.message) + '</div></div>';
+    }
+    return;
+  }
+  porta.innerHTML = '';
+  document.getElementById('corpo').style.display = '';
+  await caricaPersone();
+}
+
+/* ── L'elenco ── */
+async function caricaPersone() {
+  const lista = document.getElementById('lista');
+  if (!PERSONE.length) lista.innerHTML = '<div class="vuoto">Carico…</div>';
+  try {
+    const d = await chiedi('persone');
+    PERSONE = d.persone || []; FILM = d.film || [];
+    disegnaLista();
+  } catch (e) { lista.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+function statoDi(p) {
+  if (p.bloccato) return ['var(--r)', '<span class="tag r">bloccato</span>'];
+  if (!(p.film || []).length) return ['var(--m)', '<span class="fr">›</span>'];
+  if (!p.telefoni) return ['var(--y)', '<span class="tag y">senza notifiche</span>'];
+  return ['var(--g)', '<span class="fr">›</span>'];
+}
+function disegnaLista() {
+  const q = document.getElementById('cerca').value.trim().toLowerCase();
+  const mostrate = PERSONE.filter(p => !q || [nomeDi(p), p.email, p.reparto, (p.film || []).map(f => f.titolo + ' ' + (f.sigla || '')).join(' ')]
+    .join(' ').toLowerCase().includes(q));
+  document.getElementById('lista').innerHTML = mostrate.length ? mostrate.map(p => {
+    const [colore, coda] = statoDi(p);
+    const sotto = [p.reparto, sigle(p) || 'nessun film', p.bloccato ? '' : (p.ultima ? quando(p.ultima) : 'mai aperta')].filter(Boolean).join(' · ');
+    return '<button class="riga' + (aperta === p.id ? ' sel' : '') + '" onclick="apriScheda(\'' + p.id + '\')">' +
+      '<span class="pall" style="background:' + colore + '"></span>' +
+      '<span class="c"><span class="t">' + esc(nomeDi(p)) + '</span><div class="s">' + esc(sotto) + '</div></span>' + coda + '</button>';
+  }).join('') : '<div class="vuoto">Nessuno trovato.</div>';
+  const conFilm = new Set(); PERSONE.forEach(p => (p.film || []).forEach(f => conFilm.add(f.id)));
+  document.getElementById('conta').textContent = PERSONE.length + ' persone · ' + FILM.length + ' film';
+}
+document.getElementById('cerca').addEventListener('input', disegnaLista);
+
+/* ── La scheda di una persona ── */
+async function apriScheda(id) {
+  aperta = id; const mia = ++corsa;
+  document.body.classList.add('aperta'); document.getElementById('indietro').style.display = '';
+  const s = document.getElementById('scheda');
+  s.innerHTML = '<div class="vuoto">Carico…</div>'; disegnaLista(); window.scrollTo(0, 0);
+  try {
+    const p = await chiedi('persona', { id });
+    if (mia !== corsa) return;
+    disegnaScheda(p);
+  } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+function chiudiScheda() {
+  aperta = null; corsa++;
+  document.body.classList.remove('aperta'); document.getElementById('indietro').style.display = 'none';
+  document.getElementById('scheda').innerHTML = ''; disegnaLista();
+}
+function disegnaScheda(p) {
+  const ultime = p.notifiche || [];
+  const mostrate = ultime.filter(n => n.mostrato).length, senza = ultime.filter(n => !n.mostrato && (n.dispositivi || 0) > 0).length;
+  const prima = ultime[0];
+  const tel = (p.telefoni || []).length;
+  const consumi = Object.entries(p.consumi || {});
+  document.getElementById('scheda').innerHTML =
+    '<div class="nome">' + esc(nomeDi(p)) + (p.bloccato ? ' <span class="tag r" style="vertical-align:middle">bloccato</span>' : '') + '</div>' +
+    '<div class="sotto">' + esc([p.reparto, p.email].filter(Boolean).join(' · ')) + '<br>' +
+      esc(['iscritto ' + (quando(p.iscritto) || '—'), 'ultima apertura ' + (quando(p.ultima, true) || 'mai')].join(' · ')) + '</div>' +
+
+    '<div class="sez">Film</div>' +
+    '<div class="card">' + ((p.film || []).length ? p.film.map(f =>
+      '<div class="riga"><span class="c"><span class="t">' + esc(f.titolo) + '</span><div class="s">' +
+        esc([f.ruolo === 'capo' ? 'ha aperto il film' : 'membro', f.segna ? 'segna le scene' : ''].filter(Boolean).join(' · ')) + '</div></span>' +
+        (f.ruolo === 'capo' ? '' : '<button class="mini" onclick="scegliFilm(\'sposta\',\'' + f.id + '\')">Sposta</button>' +
+          '<button class="mini r" onclick="togli(\'' + f.id + '\')">Togli</button>') + '</div>').join('')
+      : '<div class="vuoto">In nessun film.</div>') + '</div>' +
+    (p.bloccato ? '' : '<button class="btn" onclick="scegliFilm(\'aggiungi\')">Aggiungi a un film</button>') +
+
+    '<div class="sez">Notifiche</div>' +
+    '<div class="card">' +
+      '<div class="kv"><span>Telefoni iscritti</span><span class="' + (tel ? '' : 'boh') + '">' + (tel ? tel + ' · ' + esc([...new Set(p.telefoni.map(t => t.tipo))].join(', ')) : 'nessuno') + '</span></div>' +
+      (prima ? '<div class="kv"><span>Ultima partita</span><span>' + esc(quando(prima.mandato, true)) + '</span></div>' +
+        '<div class="kv"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(prima.titolo) + '</span><span class="' + (prima.mostrato ? 'ok' : 'boh') + '">' +
+          (prima.mostrato ? 'mostrata' : (prima.dispositivi ? 'senza conferma' : 'nessun telefono')) + '</span></div>' +
+        '<div class="kv"><span>Ultime ' + ultime.length + '</span><span>' + mostrate + ' mostrate · ' + senza + ' senza conferma</span></div>'
+        : '<div class="kv"><span>Notifiche partite</span><span>nessuna</span></div>') +
+    '</div>' +
+    '<div id="esito"></div>' +
+    (p.bloccato ? '' : '<button class="btn y" id="bProva" onclick="prova()">Manda una notifica di prova</button>' +
+      '<button class="btn" id="bRimanda" onclick="rimanda()">Rimanda l\'ultimo ordine del giorno</button>') +
+
+    '<div class="sez">Uso</div>' +
+    '<div class="card"><div class="kv"><span>Ultimi 7 giorni</span><span>' + Math.round((p.uso7 || 0) / 60) + ' min</span></div>' +
+      (consumi.length ? consumi.map(([scopo, c]) => '<div class="kv"><span>' + esc(scopo) + ' · ' + c.chiamate + '</span><span>' +
+        Math.round((c.entrata + c.uscita) / 1000) + 'k token</span></div>').join('') : '<div class="kv"><span>Chiamate al modello</span><span>nessuna</span></div>') + '</div>' +
+
+    '<div class="sez">Account</div>' +
+    (p.bloccato ? '<button class="btn" onclick="sblocca()">Sblocca</button>'
+                : '<button class="btn r" onclick="blocca()">Blocca dall\'app</button>');
+  window.SCHEDA = p;
+}
+
+/* ── Il foglio per scegliere e per confermare ── */
+function apriFoglio(html) { document.getElementById('foglio').innerHTML = html; document.getElementById('velo').classList.add('on'); }
+function chiudiFoglio() { document.getElementById('velo').classList.remove('on'); }
+function conferma(titolo, sotto, tasto, rosso) {
+  return new Promise(si => {
+    apriFoglio('<h3>' + esc(titolo) + '</h3><div class="sotto">' + esc(sotto || '') + '</div>' +
+      '<div class="due"><button class="btn" id="cNo">Annulla</button><button class="btn ' + (rosso ? 'r' : 'y') + '" id="cSi">' + esc(tasto) + '</button></div>');
+    document.getElementById('cNo').onclick = () => { chiudiFoglio(); si(false); };
+    document.getElementById('cSi').onclick = () => { chiudiFoglio(); si(true); };
+  });
+}
+async function fai(azione, dati, fatto) {
+  try { await chiedi(azione, { id: aperta, ...(dati || {}) }); avvisa(fatto); await caricaPersone(); if (aperta) await apriScheda(aperta); }
+  catch (e) { avvisa(e.message, true); }
+}
+function scegliFilm(cosa, da) {
+  const p = window.SCHEDA, dentro = new Set((p.film || []).map(f => f.id));
+  const scelte = FILM.filter(f => !dentro.has(f.id));
+  apriFoglio('<h3>' + (cosa === 'sposta' ? 'Sposta in un altro film' : 'Aggiungi a un film') + '</h3>' +
+    '<div class="sotto">' + esc(nomeDi(p)) + (cosa === 'sposta' ? ' esce da questo film ed entra in quello che scegli.' : ' resta nei film in cui è già.') + '</div>' +
+    '<div class="card" style="margin-top:12px">' + (scelte.length ? scelte.map(f =>
+      '<button class="riga" onclick="filmScelto(\'' + cosa + '\',\'' + f.id + '\',\'' + (da || '') + '\')"><span class="c"><span class="t">' + esc(f.titolo) + '</span></span>' +
+      (f.sigla ? '<span class="tag">' + esc(f.sigla) + '</span>' : '') + '</button>').join('') : '<div class="vuoto">Non ci sono altri film.</div>') + '</div>' +
+    '<button class="btn" onclick="chiudiFoglio()">Annulla</button>');
+}
+function filmScelto(cosa, film, da) {
+  chiudiFoglio();
+  if (cosa === 'sposta') fai('sposta', { da, a: film }, 'Spostato');
+  else fai('aggiungi', { film }, 'Aggiunto');
+}
+async function togli(film) {
+  const p = window.SCHEDA, f = (p.film || []).find(x => x.id === film);
+  if (await conferma('Togliere ' + nomeDi(p) + ' da ' + (f ? f.titolo : 'questo film') + '?', 'Non vedrà più niente di questo film. Potrà rientrare con il codice.', 'Togli', true))
+    fai('togli', { film }, 'Tolto dal film');
+}
+async function blocca() {
+  const p = window.SCHEDA;
+  if (await conferma('Bloccare ' + nomeDi(p) + '?', 'Esce da tutti i film, non riceve più notifiche e non può più entrare nell\'app. Si può sbloccare da qui.', 'Blocca', true))
+    fai('blocca', null, 'Bloccato');
+}
+function sblocca() { fai('sblocca', null, 'Sbloccato'); }
+
+/* ── La prova di notifica: partita, accettata, mostrata ── */
+let giro = 0;
+function disegnaEsito(titolo, e, secondi, fine) {
+  const partita = !!e.mandato, tel = e.dispositivi || 0;
+  const terza = e.mostrato ? ['sì · ' + quando(e.mostrato, true), 'ok']
+              : !fine ? ['aspetto… ' + secondi + ' s', '']
+              : ['no, dopo ' + secondi + ' s', 'no'];
+  let nota = '';
+  if (e.mostrato) nota = 'Il telefono ha confermato di averla mostrata. Le notifiche di questa persona funzionano.';
+  else if (partita && !tel) nota = 'Non ha nessun telefono iscritto: deve aprire Campobase dalla schermata Home e accendere "Avvisi sul telefono" nelle impostazioni.';
+  else if (fine) nota = 'Accettata ma non confermata dal telefono. Può averla mostrata senza dirlo (app non aperta da prima del 16 novembre), oppure non l\'ha mostrata: notifiche spente nelle impostazioni dell\'iPhone, o una Full immersion attiva.';
+  document.getElementById('esito').innerHTML = '<div class="sez">' + esc(titolo) + '</div><div class="card">' +
+    '<div class="kv"><span>Partita</span><span class="' + (partita ? 'ok' : '') + '">' + (partita ? quando(e.mandato, true) : 'in partenza…') + '</span></div>' +
+    '<div class="kv"><span>Accettata</span><span class="' + (tel ? 'ok' : partita ? 'no' : '') + '">' + (partita ? (tel ? 'sì · ' + tel + (tel === 1 ? ' telefono' : ' telefoni') : 'nessun telefono') : '—') + '</span></div>' +
+    '<div class="kv"><span>Mostrata sul telefono</span><span class="' + terza[1] + '">' + (partita && tel ? terza[0] : '—') + '</span></div>' +
+    '</div>' + (nota ? '<div class="nota">' + esc(nota) + '</div>' : '');
+}
+async function segui(titolo, appuntamento) {
+  const mio = ++giro, inizio = Date.now();
+  for (let i = 0; i < 40; i++) {
+    if (mio !== giro) return;
+    let e = {}; try { e = await chiedi('esito', { appuntamento }); } catch (_) {}
+    if (mio !== giro) return;
+    const s = Math.round((Date.now() - inizio) / 1000), fine = s >= 60 || !!e.mostrato || (!!e.mandato && !(e.dispositivi || 0));
+    disegnaEsito(titolo, e, s, fine);
+    if (fine) return;
+    await new Promise(r => setTimeout(r, 2000));
+  }
+}
+async function conTasto(idTasto, f) {
+  const t = document.getElementById(idTasto); if (t) t.disabled = true;
+  try { await f(); } catch (e) { avvisa(e.message, true); } finally { if (t) t.disabled = false; }
+}
+function prova() { return conTasto('bProva', async () => { const d = await chiedi('prova', { id: aperta }); await segui('Prova di notifica', d.appuntamento); }); }
+async function rimanda() {
+  const p = window.SCHEDA;
+  if (!(await conferma('Rimandare l\'ultimo ordine del giorno a ' + nomeDi(p) + '?', 'Riceve di nuovo la stessa notifica, solo lui.', 'Rimanda'))) return;
+  return conTasto('bRimanda', async () => { const d = await chiedi('rimanda', { id: aperta }); await segui(d.titolo || 'Ordine del giorno', d.appuntamento); });
+}
+
+entra();
+</script>
+</body>
+</html>

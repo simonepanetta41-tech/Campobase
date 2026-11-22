@@ -11,6 +11,7 @@
 
 import { json, readJson, requireUser, consumeQuota, callAnthropic, CORS } from './shared.js';
 import { handleWrap } from './wrap.js';
+import { handleAdmin } from './admin.js';
 import { riceviPosta } from './posta.js';
 import { handleIscrivi, handleTogli, handleAppuntamenti, handleMessaggio, mandaScadute } from './push.js';
 import { handleAttore } from './attore.js';
@@ -274,6 +275,7 @@ async function handleMappa(request, env) {
 const ROUTES = {
   '/api/analyze': handleAnalyze,
   '/api/chat':    handleChat,
+  '/api/admin':   handleAdmin,
   '/api/pdl':     handlePdl,
   '/api/wrap':    handleWrap,
   '/api/mappa':   handleMappa,

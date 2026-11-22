@@ -41,6 +41,12 @@ deve(!!vApp, 'index.html non ha più CB_VERSIONE');
 deve(!vSw || !vApp || vSw === vApp, `versioni diverse: app 1.${vApp}, service worker ${vSw} — i telefoni non si aggiornerebbero`);
 deve(html.includes("serviceWorker"), 'index.html non registra più il service worker');
 
+// La pagina di amministrazione: c'e', e' intera, e parla col server.
+let admin = '';
+try { admin = leggi('admin.html'); } catch (_) {}
+deve(admin.length > 10000 && /<\/html>\s*$/.test(admin), 'admin.html manca o è troncata');
+deve(admin.includes("'/api/admin'"), 'admin.html non chiama più /api/admin');
+
 try { JSON.parse(leggi('manifest.json')); } catch (e) { guasti.push('manifest.json non è JSON valido: ' + e.message); }
 
 // ── Il Worker: un errore di sintassi lo spegne tutto, posta compresa ────────
