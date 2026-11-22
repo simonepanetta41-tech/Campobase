@@ -91,7 +91,7 @@ body.aperta #scheda{display:block}
   </div>
 </div>
 <div id="piede" style="max-width:1040px;margin:34px auto 0;padding-top:14px;border-top:1px solid var(--bd);text-align:center;font-size:11px;color:var(--m);line-height:1.7">
-  <b style="color:var(--d);font-weight:500">Campobase</b> · amministrazione<br><span id="versione" style="font-family:'DM Mono',monospace">v —</span>
+  <span id="versione" style="font-family:'DM Mono',monospace">Admin —</span>
   <div id="esciRiga" style="display:none;margin-top:10px"><button class="mini" style="margin:0" onclick="esci()">Esci</button></div></div>
 <div id="velo" onclick="if(event.target===this)chiudiFoglio()"><div id="foglio"></div></div>
 <div id="avviso"></div>
@@ -102,6 +102,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const ADMIN_VERSIONE = '3';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -156,8 +157,7 @@ async function entra() {
       /* Aggiunta alla Home dell'iPhone, questa pagina ha una memoria sua,
          separata da quella di Campobase: l'accesso fatto nell'app qui non
          c'e'. Quindi si entra da qui, con lo stesso account. */
-      porta.innerHTML = '<div class="card" style="padding:16px"><div style="font-size:15px;font-weight:700;margin-bottom:4px">Entra</div>' +
-        '<div class="sotto" style="margin-bottom:12px">Con lo stesso account di Campobase.</div>' +
+      porta.innerHTML = '<div style="max-width:340px;margin:18vh auto 0">' +
         '<input class="cerca" id="aMail" type="email" placeholder="Email" autocomplete="username" autocapitalize="off">' +
         '<input class="cerca" id="aPass" type="password" placeholder="Password" autocomplete="current-password">' +
         '<button class="btn y" id="aEntra" style="margin-top:0" onclick="accedi()">Entra</button>' +
@@ -373,17 +373,9 @@ async function rimanda() {
   return conTasto('bRimanda', async () => { const d = await chiedi('rimanda', { id: aperta }); await segui(d.titolo || 'Ordine del giorno', d.appuntamento); });
 }
 
-/* La versione online, quella vera: si legge dal service worker pubblicato,
-   che porta lo stesso numero dell'app. Cosi' dopo un deploy si vede qui
-   se e' arrivato, senza aprire Campobase. */
-async function versione() {
-  try {
-    const t = await (await fetch('/sw.js', { cache: 'no-store' })).text();
-    const m = /campobase-v(\d+)/.exec(t);
-    if (m) document.getElementById('versione').textContent = 'v 1.' + m[1];
-  } catch (_) {}
-}
-versione();
+/* Il numero di questa pagina, separato da quello dell'app: si alza a ogni
+   modifica di admin.html, cosi' si vede se il deploy e' arrivato. */
+document.getElementById('versione').textContent = 'Admin ' + ADMIN_VERSIONE;
 entra();
 </script>
 </body>

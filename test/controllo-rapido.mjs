@@ -46,6 +46,7 @@ let admin = '';
 try { admin = leggi('admin.html'); } catch (_) {}
 deve(admin.length > 10000 && /<\/html>\s*$/.test(admin), 'admin.html manca o è troncata');
 deve(admin.includes("'/api/admin'"), 'admin.html non chiama più /api/admin');
+deve(/const ADMIN_VERSIONE = '\d+';/.test(admin), 'admin.html non ha più il suo numero (ADMIN_VERSIONE)');
 for (const f of ['admin.webmanifest', 'admin-180.png', 'admin-192.png', 'admin-512.png', 'admin.svg']) {
   let lungo = 0; try { lungo = fs.readFileSync(path.join(RADICE, f)).length; } catch (_) {}
   deve(lungo > 200, `${f} manca: l'icona dell'amministrazione sulla Home resterebbe vuota`);

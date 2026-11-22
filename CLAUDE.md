@@ -9,6 +9,8 @@
   comparire nell'app; se non compare, il controllo ha fermato il deploy.
 - A ogni modifica di `index.html` o `sw.js` si alzano insieme `CB_VERSIONE`
   (index.html) e `CACHE` (sw.js): devono avere lo stesso numero.
+- A ogni modifica di `admin.html` si alza `ADMIN_VERSIONE` (admin.html): e' il
+  numero in fondo alla pagina di amministrazione, separato da quello dell'app.
 - **Mai riscrivere un file leggendolo nella stessa espressione**
   (`open(f,'w').write(open(f).read()...)` lo tronca prima di leggerlo: e'
   cosi' che `sw.js` e' andato online vuoto). Leggere, poi scrivere.

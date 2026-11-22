@@ -51,6 +51,7 @@ const azioni=p=>p.evaluate(()=>CHIESTE.filter(c=>!/^(io|persone|persona|esito)$/
 
 console.log('\n── ⚠ chi non può non vede niente ──');
 let p=await apri('fuori');
+ok('l\'ingresso è nudo: due campi e due tasti, niente spiegazioni', await p.evaluate(()=>document.getElementById('porta').innerText.replace(/\s+/g,' ').trim()), 'Entra Entra con Google');
 ok('senza accesso: si entra da qui, e non chiede niente al server', [await p.evaluate(()=>!!document.getElementById('aMail')&&!!document.getElementById('aPass')), await p.evaluate(()=>CHIESTE.length), await p.evaluate(()=>document.getElementById('corpo').style.display)], [true,0,'none']);
 await p.fill('#aMail',' simone@x.it '); await p.fill('#aPass','sbagliata'); await p.click('#aEntra'); await p.waitForTimeout(150);
 ok('⚠ password sbagliata: lo dice e resta fuori', [await p.evaluate(()=>document.getElementById('aErrore').textContent), await p.evaluate(()=>document.getElementById('corpo').style.display), await p.evaluate(()=>CHIESTE.length)], ['Email o password sbagliate.','none',0]);
@@ -73,7 +74,7 @@ p=await apri('admin');
 const righe=()=>p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>[r.querySelector('.t').textContent, r.querySelector('.s').textContent.split(' · ').slice(0,2).join(' · '), r.querySelector('.tag')?.textContent||'']));
 ok('tutti, con film e stato', await righe(), [['Anna Riva','Regia · MSG',''],['Luca Berti','Fotografia · nessun film',''],['bloccato@x.it','nessun film','bloccato']]);
 ok('⚠ sulla Home ha la sua icona e il suo nome', await p.evaluate(()=>[document.querySelector('link[rel="apple-touch-icon"]').getAttribute('href'), document.querySelector('meta[name="apple-mobile-web-app-title"]').content, document.querySelector('link[rel="manifest"]').getAttribute('href')]), ['/admin-180.png','Admin','/admin.webmanifest']);
-ok('⚠ in fondo, la versione che è online', await p.evaluate(()=>document.getElementById('versione').textContent), 'v 1.175');
+ok('⚠ in fondo, il numero di questa pagina, non quello dell\'app', await p.evaluate(()=>[document.getElementById('versione').textContent, 'Admin '+ADMIN_VERSIONE, /^\d+$/.test(ADMIN_VERSIONE)]), [await p.evaluate(()=>'Admin '+ADMIN_VERSIONE), await p.evaluate(()=>document.getElementById('versione').textContent), true]);
 ok('il conto in fondo', await p.evaluate(()=>document.getElementById('conta').textContent), '3 persone · 1 film con una troupe · 1 di una persona sola');
 await p.fill('#cerca','gennaro');
 ok('si cerca anche per film', (await righe()).map(r=>r[0]), ['Anna Riva']);
