@@ -22,6 +22,7 @@
 import { db, firma, ragionamento, genereDalNome } from './ombra.js';
 import { rilascia } from './scrive.js';
 import { genereDi } from './smista.js';
+import { segnaConsumo } from './consumi.js';
 
 const MODELLO = 'claude-sonnet-5-5';
 const FINESTRA_ORE = 36;
@@ -509,6 +510,8 @@ export async function leggiPiano(env) {
     const j = testo.slice(testo.indexOf('{'), testo.lastIndexOf('}') + 1);
     const coda = { modello, ms: Date.now() - inizio, stop: d.stop_reason || null,
       token_entrata: d.usage && d.usage.input_tokens, token_uscita: d.usage && d.usage.output_tokens, file: pdl.nome };
+    await segnaConsumo(env, { origine: 'server', scopo: 'piano', project_id: riga.project_id, posta_id: riga.id,
+      modello, usage: d.usage, ms: coda.ms, esito: d.stop_reason });
     const fatta = d.stop_reason === 'max_tokens' ? 'tronca' : 'fatta';
     if (!j) throw new Error('nella risposta non c\'è un oggetto JSON (' + (d.stop_reason || '?') + ')');
 

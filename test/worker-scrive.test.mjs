@@ -132,9 +132,9 @@ function mondo() {
         film_membri: [{ project_id: 'f1', user_id: 'u1' }, { project_id: 'f1', user_id: 'u2' }, { project_id: 'f1', user_id: 'u3' }],
         profiles: [{ id: 'u1', nome: 'Simone', cognome: 'Panetta' }, { id: 'u2', nome: 'Valerio', cognome: 'Leone' },
                    { id: 'u3', nome: 'Rossella', cognome: 'Aprea' }],
-        posta: [], odg: [], push_appuntamenti: [], push_iscrizioni: [] };
+        posta: [], odg: [], push_appuntamenti: [], push_iscrizioni: [], consumi: [] };
   rotto = null;
-  modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: {}, content: [{ type: 'text', text: JSON.stringify(LETTO) }] }), { status: 200 });
+  modello = () => new Response(JSON.stringify({ stop_reason: 'end_turn', usage: { input_tokens: 15900, output_tokens: 10400 }, content: [{ type: 'text', text: JSON.stringify(LETTO) }] }), { status: 200 });
 }
 function passa(r, params) {
   for (const [k, v] of params) {
@@ -362,6 +362,9 @@ console.log('\n── ⚠ un\'errata dall\'inizio alla fine ──');
 mondo();
 await posta.riceviPosta(mail([ODG, GIRI], 'I: MSG - ODG #25 del 14.11.2026', 'Cari tutti,\r\nInvio in allegato ODG e giri.\r\nSet\r\nChiesa del paese\r\nGrazie'), ACCESO, {});
 await leggiInOmbra(ACCESO);
+// (nel finto database i numeri dei film non sono veri uuid, e il contatore li lascia vuoti: e' giusto cosi')
+ok('⚠ la lettura lascia la sua riga nel contatore', T.consumi.map(c => [c.origine, c.scopo, c.modello, c.token_entrata, c.token_uscita, c.esito]),
+   [['server', 'odg', T.posta[0].ombra.info.modello, 15900, 10400, 'end_turn']]);
 ok('il primo foglio non è un\'errata', [T.odg[0].dati.errata, T.posta[0].ombra.scritto.errata], [undefined, null]);
 ok('la sigla trovata nell\'oggetto è scritta sul film', T.projects[0].sigla, 'MSG');
 T.posta[0].ricevuta = new Date(Date.now() - 3600000).toISOString();

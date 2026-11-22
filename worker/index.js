@@ -47,6 +47,13 @@ function effortCompatibile(richiesto) {
   return (e === 'xhigh' || e === 'max') ? 'high' : e;
 }
 
+/* Per il contatore dei consumi: chi chiede, per quale film, a che scopo.
+   Lo scopo e il film li dichiara il telefono: sono un'etichetta per fare i
+   conti, non un controllo. Al modello non arrivano. */
+function chi(user, body, rotta) {
+  return { user_id: user && user.id, rotta, scopo: body && body.scopo, project_id: body && body.film };
+}
+
 // ── /api/analyze ─────────────────────────────────────────────────────────────
 async function handleAnalyze(request, env, ctx) {
   const { user, error: authError } = await requireUser(request, env);
@@ -67,13 +74,13 @@ async function handleAnalyze(request, env, ctx) {
     output_config: { effort: effortCompatibile(body.effort) },
     system: body.system,
     messages: body.messages
-  }, ctx);
+  }, ctx, chi(user, body, 'analyze'));
 }
 
 // ── /api/chat ────────────────────────────────────────────────────────────────
 // Niente quota: la chat e' leggera e nell'originale non la consumava.
 async function handleChat(request, env, ctx) {
-  const { error: authError } = await requireUser(request, env);
+  const { user, error: authError } = await requireUser(request, env);
   if (authError) return authError;
 
   const { body, error } = await readJson(request);
@@ -84,7 +91,7 @@ async function handleChat(request, env, ctx) {
     max_tokens: body.max_tokens || 1024,
     system: body.system,
     messages: body.messages
-  }, ctx);
+  }, ctx, chi(user, body, 'chat'));
 }
 
 // ── /api/pdl ─────────────────────────────────────────────────────────────────
@@ -107,7 +114,7 @@ async function handlePdl(request, env, ctx) {
     output_config: { effort: effortCompatibile(body.effort) },
     system: body.system,
     messages: body.messages
-  }, ctx);
+  }, ctx, chi(user, body, 'pdl'));
 }
 
 /* ── /api/mappa ───────────────────────────────────────────────────────────────

@@ -3452,10 +3452,14 @@ async function getAuthToken() {
 async function callApi(endpoint, body) {
   const token = await getAuthToken();
   if (!token) throw new Error('Non sei autenticato');
+  /* Per il contatore dei consumi: di che film si parla. Lo scopo lo dice
+     chi chiama ("spoglio", "assistente"…). Al modello non arrivano. */
+  let conFilm = body;
+  try { const f = filmCorrente(); if (f && f.id && body && typeof body === 'object' && !body.film) conFilm = { ...body, film: f.id }; } catch (_) {}
   const resp = await fetch('/' + endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify(body)
+    body: JSON.stringify(conFilm)
   });
   let data;
   try { data = await resp.json(); } catch(_) { throw new Error('Errore API ' + resp.status); }
@@ -4581,7 +4585,7 @@ async function startAnalysis() {
     let resp;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const apiData = await callApi('api/analyze', { model:'claude-sonnet-5-5', max_tokens:20000, system:SYSPROMPT, messages:[{ role:'user', content:blocks }] });
+        const apiData = await callApi('api/analyze', { scopo:'spoglio', model:'claude-sonnet-5-5', max_tokens:20000, system:SYSPROMPT, messages:[{ role:'user', content:blocks }] });
         resp = { ok: true, _data: apiData };
         break;
       } catch(e) {
@@ -5279,7 +5283,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.174';
+const CB_VERSIONE = '1.175';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -5375,7 +5379,7 @@ async function startSerieAnalysis() {
       const serieCtx = `Stai analizzando l'episodio ${i+1} di ${total} della serie. La numerazione scene include il numero episodio (es. SC.${String(i+1).padStart(2,'0')}01 = episodio ${i+1}, scena 1).`;
       const sysPromptSerie = SYSPROMPT + `\n\nCONTESTO SERIE TV: ${serieCtx}`;
 
-      const apiData = await callApi('api/analyze', {
+      const apiData = await callApi('api/analyze', { scopo:'spoglio',
         model: 'claude-sonnet-5-5', max_tokens: 16000,
         system: sysPromptSerie,
         messages: [{ role: 'user', content: [{ type: 'text', text: text.slice(0, 120000) }] }]
@@ -5790,7 +5794,7 @@ Rispondi SOLO con JSON valido:
 }`;
 
   try {
-    const resp = await callApi('api/analyze', {
+    const resp = await callApi('api/analyze', { scopo:'confronto',
       model: 'claude-sonnet-5-5',
       max_tokens: 4000,
       messages: [{ role: 'user', content: prompt }]
@@ -5868,7 +5872,7 @@ async function runNewAnalysisBackground(b64, newText) {
     const sysprompt = getSysprompt();
     console.log('[NewAnalysis] SYSPROMPT length:', sysprompt.length);
     if (!sysprompt) { console.log('[NewAnalysis] SYSPROMPT vuoto!'); return; }
-    const resp = await callApi('api/analyze', {
+    const resp = await callApi('api/analyze', { scopo:'spoglio',
       model: 'claude-sonnet-5-5',
       max_tokens: 16000,
       system: sysprompt,
@@ -6351,7 +6355,7 @@ async function fetchScenePages(startPage) {
 async function classifyMessageIntent(text) {
   const recent = chatHistory.slice(-4).map(m => `${m.role}: ${typeof m.content === 'string' ? m.content : ''}`).join('\n');
   try {
-    const data = await callApi('api/chat', {
+    const data = await callApi('api/chat', { scopo:'assistente',
       model: 'claude-haiku-5-5',
       max_tokens: 60,
       system: 'Sei un classificatore di intento. Rispondi SOLO con JSON valido, nessun testo aggiuntivo.',
@@ -6533,7 +6537,7 @@ async function sendChat() {
   let reply = '';
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const data = await callApi('api/chat', { model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:chatHistory });
+      const data = await callApi('api/chat', { scopo:'assistente', model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:chatHistory });
       reply = data.content.map(b=>b.text||'').join('').trim();
       break;
     } catch(err) {
@@ -7624,7 +7628,7 @@ async function handleCastUpload(input) {
     } else {
       // Image (JPEG/PNG) — use Claude Vision
       const mediaType = file.type || 'image/jpeg';
-      const data = await callApi('api/chat', {
+      const data = await callApi('api/chat', { scopo:'cast',
         model: 'claude-haiku-5-5',
         max_tokens: 4000,
         system: 'Sei un estrattore di dati. Rispondi ESCLUSIVAMENTE con un array JSON. Zero testo extra. Zero markdown. Zero backtick. Solo il JSON grezzo che inizia con [ e finisce con ].',
@@ -8333,7 +8337,7 @@ async function pdlSceneDalModello(giorni) {
 
   const risposte = await Promise.all(blocchi.map(gruppo => {
     const testo = gruppo.map(g => '### GIORNATA ' + g.numero_giorno + '\n' + g._seg.trim()).join('\n\n');
-    return callApi('api/pdl', {
+    return callApi('api/pdl', { scopo:'piano',
       system: PDL_SYS_SCENE, max_tokens: 16000,
       messages: [{ role: 'user', content: [{ type: 'text', text: testo }] }]
     }).catch(e => { console.warn('[Pdl] blocco fallito: ' + e.message); return null; });
@@ -8511,7 +8515,7 @@ async function pdlTuttoAlModello(text) {
   for (let i = 0; i < text.length; i += PDL_CARATTERI_PER_BLOCCO) {
     blocchi.push(text.slice(i, i + PDL_CARATTERI_PER_BLOCCO));
   }
-  const risposte = await Promise.all(blocchi.map(b => callApi('api/pdl', {
+  const risposte = await Promise.all(blocchi.map(b => callApi('api/pdl', { scopo:'piano',
     system: PDL_SYS_INTERO, max_tokens: 16000,
     messages: [{ role: 'user', content: [{ type: 'text', text: b }] }]
   }).catch(e => { console.warn('[Pdl] blocco fallito: ' + e.message); return null; })));
@@ -9987,7 +9991,7 @@ async function odgTabelle(testo) {
   let tab = { scene: [], domani: null, cast: [], troupe: [], contatti: [] };
   let r = null, grezzo = '';
   try {
-    r = await callApi('api/pdl', {
+    r = await callApi('api/pdl', { scopo:'odg',
       system: ODG_SYS, max_tokens: 16000,
       messages: [{ role: 'user', content: [{ type: 'text', text: String(testo || '').slice(0, 40000) }] }]
     });
@@ -15059,7 +15063,7 @@ async function sendGennaroDrawer() {
     const ragText = await buildRagContext(text);
     const SYS = buildGennaroSys(ragText);
 
-    const data = await callApi('api/chat', { model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:gennaroDrawerHistory });
+    const data = await callApi('api/chat', { scopo:'assistente', model:'claude-sonnet-5-5', max_tokens:1024, system:SYS, messages:gennaroDrawerHistory });
     const reply = data.content.map(b=>b.text||'').join('').trim();
     gennaroDrawerHistory.push({ role: 'assistant', content: reply });
     document.getElementById('gennaroDrawerTyping')?.remove();

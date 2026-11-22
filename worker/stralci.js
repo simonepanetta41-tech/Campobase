@@ -16,6 +16,7 @@
  * Se la chiamata fallisce l'ordine del giorno si scrive lo stesso.
  */
 import { firma } from './ombra.js';
+import { segnaConsumo } from './consumi.js';
 
 const MODELLO = 'claude-haiku-5-5';
 
@@ -56,7 +57,7 @@ export function indicePulito(grezzo) {
 }
 
 /* Torna l'indice ([{n,p,testa}]) o null. Non lancia mai. */
-export async function indiceStralci(env, allegati) {
+export async function indiceStralci(env, allegati, riga) {
   if (String(env.STRALCI || '').toLowerCase() !== 'si') return null;
   const a = allegatoStralci(allegati);
   if (!a || (a.byte || 0) > 8000000) return null;
@@ -76,6 +77,8 @@ export async function indiceStralci(env, allegati) {
     const d = JSON.parse(grezzo);
     const testo = (d.content || []).filter(b => b && b.type === 'text').map(b => b.text || '').join('');
     const indice = indicePulito(JSON.parse(testo.slice(testo.indexOf('['), testo.lastIndexOf(']') + 1)));
+    await segnaConsumo(env, { origine: 'server', scopo: 'stralci', project_id: riga && riga.project_id, posta_id: riga && riga.id,
+      modello, usage: d.usage, ms: Date.now() - inizio, esito: d.stop_reason });
     console.log('stralci:', JSON.stringify({ modello, ms: Date.now() - inizio,
       token_entrata: d.usage && d.usage.input_tokens, token_uscita: d.usage && d.usage.output_tokens,
       scene: indice.map(x => x.n + '@' + x.p).join(' ') }));

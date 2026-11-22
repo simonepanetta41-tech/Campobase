@@ -38,6 +38,7 @@ import { avvisiDalServer } from './avvisi.js';
 import { scriviTutto, rilascia, rilasciaInRitardo, pianoInSospeso } from './scrive.js';
 import { smista, daSmistare, genereDi, toccaAlServer } from './smista.js';
 import { indiceStralci } from './stralci.js';
+import { segnaConsumo } from './consumi.js';
 
 const SECCHIO = 'posta';
 const MODELLO = 'claude-sonnet-5-5';
@@ -323,6 +324,8 @@ export async function leggiInOmbra(env) {
       token_entrata: d.usage && d.usage.input_tokens, token_uscita: d.usage && d.usage.output_tokens,
       file: [odg.nome].concat(giri ? [giri.nome] : [])
     };
+    await segnaConsumo(env, { origine: 'server', scopo: 'odg', project_id: riga.project_id, posta_id: riga.id,
+      modello, usage: d.usage, ms: coda.ms, esito: d.stop_reason });
     /* Quello che ha letto il modello si incolla com'e' dentro il corpo,
        senza passarlo da JSON.parse: sono decine di migliaia di caratteri
        e il conto della CPU e' stretto. Se non e' JSON valido lo dice
@@ -342,7 +345,7 @@ export async function leggiInOmbra(env) {
       /* A che pagina comincia ogni scena negli stralci (stralci.js). Si
          chiede a parte, a un modello piccolo, e non ferma niente: se non
          riesce l'ordine del giorno si scrive senza. */
-      const stralciIndice = fatta === 'fatta' ? await indiceStralci(env, riga.allegati) : null;
+      const stralciIndice = fatta === 'fatta' ? await indiceStralci(env, riga.allegati, riga) : null;
       if (stralciIndice) coda.stralci = stralciIndice;
       if (mia(riga) && !prova) {
         /* La troupe aspetta questa lettura. Intera: si scrive l'ordine del

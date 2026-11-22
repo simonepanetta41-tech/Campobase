@@ -6,6 +6,8 @@
  * meno che puo' rompersi in fase di build.
  */
 
+import { segnaConsumo } from './consumi.js';
+
 export const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -132,7 +134,7 @@ export async function consumeQuota(env, userId, limit) {
  * Deserializzare e riserializzare 20.000 token sarebbe l'unico punto del
  * flusso a consumare CPU davvero, quindi il corpo si gira cosi' com'e'.
  */
-export async function callAnthropic(env, payload, ctx) {
+export async function callAnthropic(env, payload, ctx, chi) {
   if (!env.ANTHROPIC_API_KEY) {
     return json({
       error: 'Configurazione incompleta: manca ANTHROPIC_API_KEY. ' +
@@ -144,6 +146,7 @@ export async function callAnthropic(env, payload, ctx) {
   // model"). Si toglie qui una volta sola, cosi' nessuna rotta puo'
   // reintrodurlo e un client che lo mandasse non fa fallire la richiesta.
   const { temperature, ...corpo } = payload;
+  const partenza = Date.now();
 
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -187,6 +190,9 @@ export async function callAnthropic(env, payload, ctx) {
       try {
         const d = JSON.parse(await new Response(toLog).text());
         const u = d.usage || {};
+        // Il contatore: chi, per quale film, a che scopo, quanti token.
+        if (chi) await segnaConsumo(env, { origine: 'telefono', scopo: chi.scopo || chi.rotta, user_id: chi.user_id,
+          project_id: chi.project_id, modello: payload.model, usage: u, ms: Date.now() - partenza, esito: d.stop_reason });
         const pensiero = u.output_tokens_details?.thinking_tokens;
         console.log('anthropic', JSON.stringify({
           model: payload.model,

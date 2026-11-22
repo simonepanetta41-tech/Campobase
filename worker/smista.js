@@ -19,6 +19,7 @@
  * Se lo smistamento fallisce non succede niente: restano i nomi.
  */
 import { db, firma, genereDalNome, daIgnorare } from './ombra.js';
+import { segnaConsumo } from './consumi.js';
 
 const MODELLO = 'claude-haiku-5-5';
 const MASSIMO = 4;                    // quanti allegati dubbi si guardano
@@ -110,6 +111,8 @@ export async function smista(env, riga) {
     });
     await db(env, `posta?id=eq.${riga.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ allegati: nuovi }) });
+    await segnaConsumo(env, { origine: 'server', scopo: 'smistamento', project_id: riga.project_id, posta_id: riga.id,
+      modello, usage: d.usage, ms: Date.now() - inizio, esito: d.stop_reason });
     console.log('smista:', JSON.stringify({ modello, ms: Date.now() - inizio,
       token_entrata: d.usage && d.usage.input_tokens, token_uscita: d.usage && d.usage.output_tokens,
       esito: nuovi.filter(a => a && a.smistato).map(a => a.nome + ' → ' + a.genere) }));
