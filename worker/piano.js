@@ -363,7 +363,7 @@ export async function scriviPiano(env, riga, letto, opz = {}) {
   try {
     const mm = await db(env, `film_membri?select=user_id&project_id=eq.${riga.project_id}`);
     const ids = [...new Set((mm || []).map(x => x.user_id).filter(Boolean))];
-    if (ids.length) {
+    if (ids.length && !opz.muta) {       // muta: rilettura senza avvisare (admin.js)
       const minuto = new Date(adesso).toISOString();
       const testo = notificaPiano(piano);
       await db(env, 'push_appuntamenti?on_conflict=chiave', {
@@ -442,17 +442,39 @@ async function scrivi(env, id, corpo) {
 
 /* Un passaggio: al massimo un piano. Torna una parola che dice com'e' andata. */
 export async function leggiPiano(env) {
+  /* Come per l'ordine del giorno (ombra.js): una rilettura chiesta
+     dall'amministrazione sta in 'rilettura piano', e comunque vada alla
+     fine la mail torna 'fatta'. */
+  const giro = {};
+  let esito;
+  try { esito = await leggiUnPiano(env, giro); return esito; }
+  finally {
+    if (giro.rilettura && esito !== 'presa da un altro passaggio') {
+      try {
+        await db(env, `posta?id=eq.${giro.rilettura.id}&stato=eq.rilettura%20piano`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ stato: 'fatta', nota: ('rilettura del piano: ' + (esito || 'interrotta')).slice(0, 300) }) });
+      } catch (_) {}
+    }
+  }
+}
+async function leggiUnPiano(env, giro) {
   if (String(env.PIANO || '').toLowerCase() === 'no') return 'spento';
   if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return 'non configurato';
   const scrive = String(env.PIANO_SCRIVE || '').toLowerCase() === 'si';
-  const campi = 'posta?select=id,project_id,oggetto,allegati,stato,ombra_stato';
+  const campi = 'posta?select=id,project_id,oggetto,allegati,stato,nota,ombra_stato';
 
   /* Le prove a mano prima, come per l'ordine del giorno: righe 'prova' con
      "pdl" nell'oggetto, messe apposta per far leggere al Worker dei piani
      gia' passati. Non scrivono mai niente. */
-  let righe = await db(env, campi + '&piano_stato=is.null&stato=eq.prova&oggetto=ilike.*pdl*&order=oggetto.asc&limit=1');
+  let righe = scrive ? await db(env, campi + '&piano_stato=is.null&stato=eq.rilettura%20piano&order=ricevuta.desc&limit=1') : [];
   let riga = righe && righe[0];
-  const prova = !!riga;
+  const rilettura = !!riga;
+  if (rilettura) giro.rilettura = riga;
+  if (!riga) {
+    righe = await db(env, campi + '&piano_stato=is.null&stato=eq.prova&oggetto=ilike.*pdl*&order=oggetto.asc&limit=1');
+    riga = righe && righe[0];
+  }
+  const prova = !!riga && !rilettura;
   const da = new Date(Date.now() - FINESTRA_ORE * 3600000).toISOString();
   if (!riga) {
     righe = await db(env, campi + '&piano_stato=is.null&stato=in.(nuova,%22in%20analisi%22,fatta,%22al%20server%22)'
@@ -465,14 +487,14 @@ export async function leggiPiano(env) {
       { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ piano_stato: 'saltata' }) });
   }
   if (!riga) return 'niente da leggere';
-  const mia = scrive && !prova && riga.stato === 'al server';        // la troupe aspetta questo
+  const mia = scrive && !prova && (riga.stato === 'al server' || rilettura);        // questo va scritto
 
   const pdl = (riga.allegati || []).find(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
   if (!pdl) { await scrivi(env, riga.id, JSON.stringify({ piano_stato: 'saltata' })); return 'saltata: nessun piano'; }
 
   // Lo stesso piano inoltrato due volte si legge una volta sola.
   let doppione = false;
-  if (!prova) {
+  if (!prova && !rilettura) {
     const altre = await db(env, `posta?select=id,allegati&project_id=eq.${riga.project_id}&id=neq.${riga.id}`
       + `&piano_stato=in.(fatta,%22in%20corso%22)&ricevuta=gte.${encodeURIComponent(da)}&limit=20`);
     doppione = (altre || []).some(r => (r.allegati || []).some(a => a && a.nome === pdl.nome && a.byte === pdl.byte));
@@ -522,7 +544,7 @@ export async function leggiPiano(env) {
     if (mia) {
       try {
         if (fatta !== 'fatta') throw new Error('lettura troncata');
-        scritto = await scriviPiano(env, riga, JSON.parse(j));
+        scritto = await scriviPiano(env, riga, JSON.parse(j), { muta: rilettura && /senza notifiche/.test(riga.nota || '') });
         await chiudi(env, riga, scritto.vecchio ? 'piano più vecchio di quello in uso: lasciato stare' : 'piano scritto dal server');
       } catch (e) {
         scritto = { scritto: false, errore: String(e.message).slice(0, 200) };

@@ -446,7 +446,10 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
     // Solo fra due fogli letti qui: uno letto dal telefono ha un'altra forma,
     // e confrontarli darebbe differenze che non esistono.
     try { if (vecchio && vecchio.daServer) perChi = cambiPer(vecchio, d, membri, adesso); } catch (_) {}
-    d.errata = (d.errata || []).concat([{ quando: new Date(adesso).toISOString(), tipo, righe: righeE, perChi }]);
+    /* La stessa errata riletta a mano non si aggiunge una seconda volta:
+       nel foglio c'e' gia', e il riquadro giallo la mostrerebbe doppia. */
+    const giaDetta = opz.rilettura && vecchio && vecchio.mail === riga.id && Array.isArray(vecchio.errata) && vecchio.errata.length;
+    if (!giaDetta) d.errata = (d.errata || []).concat([{ quando: new Date(adesso).toISOString(), tipo, righe: righeE, perChi }]);
   }
 
   // 1. L'ordine del giorno, dove i telefoni lo cercano.
@@ -475,7 +478,11 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
       const { righe, chi } = avvisiPer(lettoPerAvvisi, membri, adesso);
       const pickDi = new Map(chi.filter(c => c.pickup).map(c => [c.user_id, { ora: c.pickup, luogo: c.luogo }]));
       const minuto = new Date(adesso).toISOString();
-      const tutte = membri.map(m => ({
+      /* Una rilettura "senza avvisare" (admin.js) non manda a nessuno la
+         notifica dell'ordine del giorno. I promemoria di pick-up e
+         catering si riscrivono lo stesso: se la rilettura corregge un
+         orario, il promemoria deve suonare all'ora giusta. */
+      const tutte = (opz.muta ? [] : membri).map(m => ({
         user_id: m.user_id, project_id: riga.project_id, quando: minuto, genere: 'posta',
         testo: tipo ? notificaErrata(d, m, pickDi.get(m.user_id), tipo, righeE)
                     : notificaOdg(d, m, pickDi.get(m.user_id)),
@@ -483,9 +490,9 @@ export async function scriviTutto(env, riga, letto, opz = {}) {
       })).concat(righe.map(x => ({
         user_id: x.user_id, project_id: riga.project_id, quando: x.quando, genere: x.genere, testo: x.testo,
         chiave: `${x.user_id}:${x.genere}:${x.giorno}`, mandato: null, mostrato: null })));
-      await db(env, 'push_appuntamenti?on_conflict=chiave', {
+      if (tutte.length) await db(env, 'push_appuntamenti?on_conflict=chiave', {
         method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(tutte) });
-      notifiche = membri.length; avvisi = righe.length;
+      notifiche = opz.muta ? 0 : membri.length; avvisi = righe.length;
     }
   } catch (e) { errore = String(e && e.message || e).slice(0, 200); }
 

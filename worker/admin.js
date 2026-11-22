@@ -114,6 +114,7 @@ const CAMPI_POSTA = 'id,project_id,oggetto,ricevuta,stato,nota,allegati,mittente
 export function esitoMail(r) {
   const s = r.scritto || null, ps = r.pscritto || null;
   if (r.stato === 'prova') return ['prova', 'm'];
+  if (/^rilettura/.test(r.stato || '')) return ['in rilettura', 'y'];
   if (r.ombra_stato === 'errore' || r.piano_stato === 'errore' || r.stato === 'errore' || (s && s.scritto === false) || (ps && ps.scritto === false))
     return ['errore', 'r'];
   if (r.stato === 'al server' || r.ombra_stato === 'in corso' || r.piano_stato === 'in corso') return ['in coda', 'y'];
@@ -311,7 +312,7 @@ const AZIONI = {
     const lettura = async (nome, stato, il, info, scritto, errore) => {
       if (!il || !stato || stato === 'saltata') return;
       const fine = new Date(Date.parse(il) + (+((info || {}).ms) || 0)).toISOString();
-      const c = (cons || []).find(x => x.scopo === (nome === 'Piano' ? 'piano' : 'odg'));
+      const c = (cons || []).filter(x => x.scopo === (nome === 'Piano' ? 'piano' : 'odg')).pop();     // l'ultima: una rilettura ne aggiunge una
       if (stato === 'in corso') return passo(il, nome + ': lettura in corso', '', 'y');
       if (stato === 'errore') return passo(fine, nome + ': lettura fallita', errore || '', 'r');
       passo(fine, nome + (stato === 'tronca' ? ': lettura troncata' : ': letto') + (info && info.ms ? ' in ' + Math.round(info.ms / 1000) + ' s' : ''),
@@ -334,6 +335,7 @@ const AZIONI = {
     const [esito, colore] = esitoMail(r);
     return { ...rigaMail(r, F, new Map([[r.id, cons || []]])), esito, colore, nota: r.nota || r.onota || null, mittente: r.mittente_vero || null,
       allegati: (r.allegati || []).map(a => ({ nome: a.nome, byte: a.byte || 0, tenuto: !!a.tenuto, genere: a.tenuto ? (genereDi(a) || null) : null })),
+      rileggibile: { odg: tenuti.some(a => genereDi(a) === 'odg'), piano: tenuti.some(a => genereDi(a) === 'pdl') },
       passi, haOdg: /^(fatta|tronca|errore)$/.test(r.ombra_stato || ''), haPiano: /^(fatta|tronca|errore)$/.test(r.piano_stato || '') };
   },
 
@@ -346,6 +348,32 @@ const AZIONI = {
     const r = ((await db(env, `posta?select=letto:${col}->letto,testo:${col}->>testo&id=eq.${m}&limit=1`)) || [])[0];
     if (!r || (r.letto == null && !r.testo)) throw new Error('di questa mail non c\'è una lettura salvata');
     return { letto: r.letto != null ? r.letto : null, testo: r.letto != null ? null : r.testo };
+  },
+
+  /* Far rileggere una mail. Non la si rimette 'al server': quello stato
+     ha una scadenza di pochi minuti, e una mail di ieri verrebbe subito
+     passata ai telefoni con una notifica a tutti. Ha uno stato suo, che
+     il cron (ombra.js, piano.js) prende per primo; se avvisare o no la
+     troupe lo decide chi chiede, e viaggia nella nota. */
+  async rileggi(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const piano = b.cosa === 'piano';
+    const r = ((await db(env, `posta?select=id,stato,allegati,ombra_stato,piano_stato&id=eq.${m}&limit=1`)) || [])[0];
+    if (!r) throw new Error('mail non trovata');
+    if (r.stato === 'prova') throw new Error('è una mail di prova: non si rilegge da qui');
+    if (r.stato === 'al server' || /^rilettura/.test(r.stato || '') || r.ombra_stato === 'in corso' || r.piano_stato === 'in corso')
+      throw new Error('il server la sta già leggendo');
+    const cerco = piano ? 'pdl' : 'odg';
+    if (!(r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === cerco))
+      throw new Error(piano ? 'in questa mail non c\'è un piano' : 'in questa mail non c\'è un ordine del giorno');
+    if (piano ? (!si(env.PIANO_SCRIVE) || String(env.PIANO || '').toLowerCase() === 'no')
+              : (!si(env.OMBRA_SCRIVE) || String(env.OMBRA || '').toLowerCase() === 'no'))
+      throw new Error('il server non sta scrivendo ' + (piano ? 'i piani' : 'gli ordini del giorno') + ': l\'interruttore è spento');
+    const nota = 'rilettura: ' + (b.notifiche === true ? 'con notifiche' : 'senza notifiche');
+    await db(env, `posta?id=eq.${m}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(piano ? { stato: 'rilettura piano', nota, piano_stato: null, piano: null, piano_il: null }
+                                 : { stato: 'rilettura', nota, ombra_stato: null, ombra: null, ombra_il: null }) });
+    return { fatto: true, avvisa: b.notifiche === true };
   },
 
   /* ── Il server ── */
@@ -366,7 +394,7 @@ const AZIONI = {
     const interruttore = (nome, v, spentoSe) => ({ nome, acceso: spentoSe ? String(v || '').toLowerCase() !== 'no' : si(v) });
     return {
       stato: { ultima: ultima ? { quando: ultima.il, esito: ultima.e[0], colore: ultima.e[1], oggetto: ultima.r.oggetto } : null,
-        coda: (posta || []).filter(r => esitoMail(r)[0] === 'in coda').length,
+        coda: (posta || []).filter(r => /^in (coda|rilettura)$/.test(esitoMail(r)[0])).length,
         errori: (posta || []).filter(r => esitoMail(r)[1] === 'r').length, mail: (posta || []).length,
         secondi: tempi.length ? Math.round(tempi.reduce((a, c) => a + c, 0) / tempi.length / 1000) : null,
         notifiche: { partite: partite.length, senza: partite.filter(n => !n.mostrato).length } },

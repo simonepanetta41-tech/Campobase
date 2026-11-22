@@ -409,5 +409,33 @@ mondo(); T.posta.push({ id: 'pr', project_id: 'f1', stato: 'prova', oggetto: 'pr
 await leggiInOmbra(ACCESO);
 ok('una prova non scrive niente', [T.posta[0].ombra_stato, T.odg.length, T.push_appuntamenti.length], ['fatta', 0, 0]);
 
+console.log('\n── ⚠ una rilettura chiesta dall\'amministrazione ──');
+/* Come la lascia admin.js ('rileggi'): stato suo, lettura azzerata, e
+   nella nota se avvisare o no. La mail e' di tre giorni fa. */
+const daRileggere = (nota) => { const m = T.posta[0];
+  Object.assign(m, { stato: 'rilettura', nota, ombra_stato: null, ombra: null, ombra_il: null, ricevuta: new Date(Date.now() - 3 * 86400000).toISOString() });
+  T.push_appuntamenti = []; T.odg[0].dati.convocazione = 'vecchia'; };
+mondo();
+await posta.riceviPosta(mail([ODG, GIRI]), ACCESO, {}); await leggiInOmbra(ACCESO);
+daRileggere('rilettura: senza notifiche');
+ok('⚠ non viene passata ai telefoni perché è vecchia', [await rilasciaInRitardo(ACCESO), T.posta[0].stato, T.push_appuntamenti.length], [0, 'rilettura', 0]);
+ok('il server la rilegge, anche se è di tre giorni fa', await leggiInOmbra(ACCESO), 'fatta');
+ok('l\'ordine del giorno è riscritto', [T.odg.length, T.odg[0].dati.convocazione !== 'vecchia'], [1, true]);
+ok('⚠ senza avvisare: a nessuno la notifica dell\'ordine del giorno', [titoli(), T.posta[0].ombra.scritto.notifiche], [[], 0]);
+ok('i promemoria di pick-up restano, all\'ora giusta', T.push_appuntamenti.filter(a => a.genere !== 'posta').length, T.posta[0].ombra.scritto.avvisi);
+ok('la mail torna chiusa', [T.posta[0].stato, T.posta[0].ombra_stato], ['fatta', 'fatta']);
+ok('e non viene riletta a ogni giro', await leggiInOmbra(ACCESO), 'niente da leggere');
+daRileggere('rilettura: con notifiche');
+await leggiInOmbra(ACCESO);
+ok('⚠ avvisando: una notifica a testa, come la prima volta', [titoli().length, T.posta[0].ombra.scritto.notifiche, T.posta[0].stato], [3, 3, 'fatta']);
+ok('⚠ rileggere la stessa mail non è un\'errata', [T.odg[0].dati.errata, T.posta[0].ombra.scritto.errata], [undefined, null]);
+daRileggere('rilettura: senza notifiche');
+modello = () => new Response('{"error":"sovraccarico"}', { status: 529 });
+ok('se la rilettura fallisce lo dice', /^errore/.test(await leggiInOmbra(ACCESO)), true);
+ok('⚠ e non sveglia nessuno: niente avviso di riserva, mail chiusa', [T.push_appuntamenti.length, T.posta[0].stato, /^rilettura: errore/.test(T.posta[0].nota), T.posta[0].ombra_stato], [0, 'fatta', true, 'errore']);
+ok('l\'ordine del giorno di prima resta dov\'era', T.odg.length, 1);
+daRileggere('rilettura: senza notifiche');
+ok('⚠ con la scrittura spenta non si rilegge niente', [await leggiInOmbra(BASE), T.posta[0].stato], ['niente da leggere', 'rilettura']);
+
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);

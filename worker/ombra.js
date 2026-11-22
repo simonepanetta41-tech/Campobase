@@ -161,6 +161,24 @@ async function scrivi(env, id, corpo) {
 /* Un passaggio: al massimo una mail. Torna una parola che dice com'e'
    andata, per i log e per i controlli. */
 export async function leggiInOmbra(env) {
+  /* Una rilettura chiesta dall'amministrazione (admin.js, 'rileggi') sta
+     in uno stato suo, 'rilettura', che ne' i telefoni ne' il rilascio in
+     ritardo guardano: una mail di ieri rimessa 'al server' verrebbe
+     rilasciata subito, con una notifica a tutta la troupe. Comunque
+     vada la lettura, alla fine la mail torna 'fatta'. */
+  const giro = {};
+  let esito;
+  try { esito = await leggi(env, giro); return esito; }
+  finally {
+    if (giro.rilettura && esito !== 'già presa') {
+      try {
+        await db(env, `posta?id=eq.${giro.rilettura.id}&stato=eq.rilettura`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ stato: 'fatta', nota: ('rilettura: ' + (esito || 'interrotta')).slice(0, 300) }) });
+      } catch (_) {}
+    }
+  }
+}
+async function leggi(env, giro) {
   if (String(env.OMBRA || '').toLowerCase() === 'no') return 'spenta';
   if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return 'non configurata';
 
@@ -173,7 +191,7 @@ export async function leggiInOmbra(env) {
   if (scrive || String(env.PIANO_SCRIVE || '').toLowerCase() === 'si') {
     try { await rilasciaInRitardo(env); } catch (e) { console.error('ombra: rilascio in ritardo', e.message); }
   }
-  const mia = (r) => scrive && r && r.stato === 'al server';     // la troupe sta aspettando questa
+  const mia = (r) => scrive && r && (r.stato === 'al server' || r.stato === 'rilettura');   // questa va scritta
 
   const da = new Date(Date.now() - FINESTRA_ORE * 3600000).toISOString();
   const recenti = `&stato=in.(nuova,%22in%20analisi%22,fatta,%22al%20server%22)&ricevuta=gte.${encodeURIComponent(da)}`
@@ -183,10 +201,17 @@ export async function leggiInOmbra(env) {
      Worker dieci ordini del giorno gia' passati in un quarto d'ora,
      invece di aspettare dieci sere. L'app non le vede: prende solo
      'nuova' e 'in analisi'. */
-  let righe = await db(env, 'posta?select=id,project_id,oggetto,testo,allegati,stato,ombra_il,ombra'
-    + '&ombra_stato=is.null&stato=eq.prova&order=oggetto.asc&limit=1');
+  /* Prima di tutto le riletture chieste a mano: senza scadenza, e solo
+     se il server scrive (altrimenti rileggere non cambierebbe niente). */
+  const CAMPI = 'posta?select=id,project_id,oggetto,testo,allegati,stato,nota,ombra_il,ombra';
+  let righe = scrive ? await db(env, CAMPI + '&ombra_stato=is.null&stato=eq.rilettura&order=ricevuta.desc&limit=1') : [];
   let riga = righe && righe[0];
-  const prova = !!riga;
+  let rilettura = !!riga;
+  if (!riga) {
+    righe = await db(env, CAMPI + '&ombra_stato=is.null&stato=eq.prova&order=oggetto.asc&limit=1');
+    riga = righe && righe[0];
+  }
+  const prova = !!riga && !rilettura;
   if (!riga) {
     righe = await db(env, 'posta?select=id,project_id,oggetto,testo,allegati,stato,ombra_il,ombra&ombra_stato=is.null' + recenti);
     riga = righe && righe[0];
@@ -198,6 +223,13 @@ export async function leggiInOmbra(env) {
      alla seconda si scrive che il tempo non basta — che e' una cosa da
      sapere, non da nascondere riprovando all'infinito. */
   let ripresa = false;
+  if (!riga && scrive) {
+    // Una rilettura rimasta a meta': la finestra delle 36 ore per lei non vale.
+    const vecchia = new Date(Date.now() - TEMPO_PERSO * 60000).toISOString();
+    righe = await db(env, CAMPI + '&ombra_stato=eq.in%20corso&stato=eq.rilettura' + `&ombra_il=lt.${encodeURIComponent(vecchia)}&limit=1`);
+    riga = righe && righe[0];
+    ripresa = rilettura = !!riga;
+  }
   if (!riga) {
     const vecchia = new Date(Date.now() - TEMPO_PERSO * 60000).toISOString();
     righe = await db(env, 'posta?select=id,project_id,oggetto,testo,allegati,stato,ombra_il,ombra&ombra_stato=eq.in%20corso'
@@ -206,6 +238,8 @@ export async function leggiInOmbra(env) {
     ripresa = !!riga;
   }
   if (!riga) return 'niente da leggere';
+  if (rilettura) giro.rilettura = riga;
+  const senzaAvvisare = rilettura && /senza notifiche/.test(riga.nota || '');
   const tentativi = ((riga.ombra && riga.ombra.tentativi) || 0) + 1;
 
   /* Prima di tutto, se serve, si capisce cosa sono gli allegati dal nome
@@ -237,7 +271,7 @@ export async function leggiInOmbra(env) {
      automatico, poi quello a mano dal telefono. Leggerlo una volta basta,
      e ogni lettura e' una chiamata al modello che si paga. */
   let doppione = false;
-  if (odg && !ripresa && !prova) {
+  if (odg && !ripresa && !prova && !rilettura) {
     const altre = await db(env, `posta?select=id,allegati&project_id=eq.${riga.project_id}`
       + `&id=neq.${riga.id}&ombra_stato=in.(fatta,tronca,%22in%20corso%22)&ricevuta=gte.${encodeURIComponent(da)}&limit=20`);
     /* Stesso nome E stessa grandezza: un ordine del giorno corretto e
@@ -353,7 +387,7 @@ export async function leggiInOmbra(env) {
            scrittura non riesce: si rilascia e ci pensa il telefono. */
         try {
           if (fatta !== 'fatta') throw new Error('lettura troncata');
-          scritto = await scriviTutto(env, riga, letto, { stralciIndice });
+          scritto = await scriviTutto(env, riga, letto, { stralciIndice, rilettura, muta: senzaAvvisare });
         } catch (e) {
           scritto = { scritto: false, errore: String(e.message).slice(0, 200) };
           await rilascia(env, riga, scritto.errore);

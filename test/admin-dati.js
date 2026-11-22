@@ -20,7 +20,7 @@ module.exports = function dati() {
       consumi:[{scopo:'piano',origine:'server',...somma(20,543190,197104,3.06)},{scopo:'odg',origine:'server',...somma(22,340000,221000,2.89)},
                {scopo:'spoglio',origine:'telefono',...somma(3,150000,30000,0.45)},{scopo:'stralci',origine:'server',...somma(18,60000,9000,0.02)}]},
     posta:{mail,lette:2,errori:1},
-    mail:{...mail[0],nota:null,mittente:'produzione@esempio.it',haOdg:true,haPiano:false,
+    mail:{...mail[0],nota:null,mittente:'produzione@esempio.it',haOdg:true,haPiano:false,rileggibile:{odg:true,piano:false},
       allegati:[{nome:'MSG - ODG _30 del 21.11.2026.pdf',byte:732000,tenuto:true,genere:'odg'},{nome:'30 MSG - GIRI AUTO di Sabato.pdf',byte:217000,tenuto:true,genere:'giri'},
                 {nome:'STRALCI #30.pdf',byte:1468000,tenuto:true,genere:'stralci'},{nome:'logo.png',byte:9000,tenuto:false,genere:null}],
       passi:[{quando:fa(60*17),titolo:'Arrivata',testo:'3 allegati · da produzione@esempio.it',colore:''},

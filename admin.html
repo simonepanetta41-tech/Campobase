@@ -124,7 +124,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.5';
+const ADMIN_VERSIONE = '1.6';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -512,9 +512,11 @@ async function apriFilm(id) {
         '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>';
   } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
 }
-async function apriMail(id) {
+async function apriMail(id, zitta) {
   if (LING !== 'posta') { mostraLing('posta'); if (!POSTA) caricaElenco(); }
-  const mia = apriDettaglio(id), s = document.getElementById('scheda');
+  // zitta: e' il giro che riguarda da solo durante una rilettura, e non
+  // deve far lampeggiare "Carico…" ne' riportare la pagina in cima.
+  const s = document.getElementById('scheda'), mia = zitta ? ++corsa : apriDettaglio(id);
   try {
     const m = await chiedi('mail', { id }); if (mia !== corsa) return;
     const ora = iso => { const d = new Date(iso); return isNaN(d) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':'); };
@@ -529,8 +531,32 @@ async function apriMail(id) {
         ({ g: 'ok', r: 'no', y: 'boh' }[p.colore] || '') + '">' + esc(p.titolo) + '</span>' + (p.testo ? '<div class="d">' + esc(p.testo) + '</div>' : '') + '</div></div>').join('') + '</div>' +
       (m.nota ? '<div class="nota">' + esc(m.nota) + '</div>' : '') +
       (m.haOdg ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'odg\')">Vedi la lettura dell\'ordine del giorno</button>' : '') +
-      (m.haPiano ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'piano\')">Vedi la lettura del piano</button>' : '');
+      (m.haPiano ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'piano\')">Vedi la lettura del piano</button>' : '') +
+      (m.esito === 'in rilettura' ? '<div class="nota boh">Il server la sta rileggendo: di solito ci mette un minuto o due.</div>' :
+        ((m.rileggibile || {}).odg ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'odg\')">Fai rileggere l\'ordine del giorno</button>' : '') +
+        ((m.rileggibile || {}).piano ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'piano\')">Fai rileggere il piano</button>' : ''));
+    /* Mentre rilegge si torna a guardare da soli, finche' non ha finito. */
+    if (m.esito === 'in rilettura') { const g = ++giro; setTimeout(() => { if (g === giro && aperta === id && LING === 'posta') apriMail(id, true); }, 6000); }
+    else if (zitta) caricaElenco();
   } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+/* Far rileggere una mail: il server riapre gli allegati e riscrive. Se
+   avvisare la troupe lo si sceglie ogni volta, e chiudere il foglio senza
+   scegliere non fa partire niente. */
+function rileggi(id, cosa) {
+  const che = cosa === 'piano' ? 'il piano' : 'l\'ordine del giorno';
+  apriFoglio('<h3>Far rileggere ' + che + '?</h3>' +
+    '<div class="sotto">Il server riapre gli allegati e riscrive ' + che + ' nell\'app di tutti. Costa come una lettura nuova.</div>' +
+    '<button class="btn y" id="rMuta">Rileggi senza avvisare</button>' +
+    '<button class="btn" id="rAvvisa">Rileggi e manda la notifica a tutta la troupe</button>' +
+    '<button class="btn" onclick="chiudiFoglio()">Annulla</button>');
+  const vai = async (notifiche) => {
+    chiudiFoglio();
+    try { await chiedi('rileggi', { id, cosa, notifiche }); avvisa(notifiche ? 'In rilettura, con notifica' : 'In rilettura, senza notifica'); apriMail(id); caricaElenco(); }
+    catch (e) { avvisa(e.message, true); }
+  };
+  document.getElementById('rMuta').onclick = () => vai(false);
+  document.getElementById('rAvvisa').onclick = () => vai(true);
 }
 async function vediLettura(id, cosa) {
   try {
