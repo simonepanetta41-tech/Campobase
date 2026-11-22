@@ -2919,8 +2919,10 @@ async function showApp() {
      la legge solo l'amministrazione, per sapere chi e' rimasto indietro.
      In un passo suo: se le colonne non ci sono ancora fallisce da sola,
      senza portarsi dietro l'upsert qui sopra. */
-  sb.from('profiles').update({ app_versione: CB_VERSIONE, app_vista: new Date().toISOString() })
-    .eq('id', currentUser.id).then(() => {}, () => {});
+  try {
+    sb.from('profiles').update({ app_versione: CB_VERSIONE, app_vista: new Date().toISOString() })
+      .eq('id', currentUser.id).then(() => {}, () => {});
+  } catch (_) {}
   if (!profiloBenvenuto()) loadHistory();
   else loadHistory();
   /* Le notifiche si chiedono qui, appena fatto l'accesso.

@@ -176,8 +176,15 @@ export async function leggiInOmbra(env) {
          piano mai letto: allora non si chiude, passa alla lettura del
          piano (piano.js) con la stessa scelta sulle notifiche. */
       const r = giro.rilettura;
-      const ancheIlPiano = r.piano_stato == null && String(env.PIANO_SCRIVE || '').toLowerCase() === 'si'
-        && (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl');
+      /* Lo stato del piano si chiede a parte e solo qui: la lettura
+         dell'ordine del giorno non deve dipendere dalle colonne del piano
+         (sql/piano.sql), che possono non esserci. */
+      let ancheIlPiano = false;
+      if (String(env.PIANO_SCRIVE || '').toLowerCase() === 'si'
+          && (r.allegati || []).some(a => a && a.tenuto && a.percorso && genereDi(a) === 'pdl')) {
+        try { const p = await db(env, `posta?select=piano_stato&id=eq.${r.id}&limit=1`); ancheIlPiano = !!(p && p[0] && p[0].piano_stato == null); }
+        catch (_) {}
+      }
       try {
         await db(env, `posta?id=eq.${r.id}&stato=eq.rilettura`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
           body: JSON.stringify(ancheIlPiano ? { stato: 'rilettura piano' }
@@ -215,7 +222,7 @@ async function leggi(env, giro) {
      'nuova' e 'in analisi'. */
   /* Prima di tutto le riletture chieste a mano: senza scadenza, e solo
      se il server scrive (altrimenti rileggere non cambierebbe niente). */
-  const CAMPI = 'posta?select=id,project_id,oggetto,testo,allegati,stato,nota,ombra_il,ombra,piano_stato';
+  const CAMPI = 'posta?select=id,project_id,oggetto,testo,allegati,stato,nota,ombra_il,ombra';
   let righe = scrive ? await db(env, CAMPI + '&ombra_stato=is.null&stato=eq.rilettura&order=ricevuta.desc&limit=1') : [];
   let riga = righe && righe[0];
   let rilettura = !!riga;
