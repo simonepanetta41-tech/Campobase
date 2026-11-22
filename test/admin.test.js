@@ -15,6 +15,7 @@ const b=await chromium.launch();
 const apri=async(scena, larghezza=390)=>{
   const p=await b.newPage({viewport:{width:larghezza,height:844}});
   p.errori=[]; p.on('pageerror',e=>p.errori.push(e.message));
+  await p.addInitScript((D)=>{ window.D=D; }, require('./admin-dati.js')());
   await p.addInitScript((scena)=>{
     window.CHIESTE=[]; window.SCENA=scena; window.ESITI=[];
     window.DENTRO = scena!=='fuori'; window.ACCESSI=[];
@@ -36,6 +37,7 @@ const apri=async(scena, larghezza=390)=>{
       const R=(d,s=200)=>({ok:s<400,status:s,json:async()=>d});
       if(SCENA==='estraneo') return R({error:'Non sei amministratore',admin:false,id:'il-mio-numero'},403);
       if(c.azione==='io') return R({admin:true});
+      if(D[c.azione]) return R(D[c.azione]);
       if(c.azione==='persone') return R({persone,film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',membri:9},{id:FB,titolo:'Separazioni',sigla:null,membri:1}]});
       if(c.azione==='persona') return R(scheda);
       if(c.azione==='prova') return R({appuntamento:'n1'});
@@ -118,6 +120,39 @@ console.log('\n── un no del server si vede ──');
 p=await apri('rifiuta'); await p.click('#lista .riga'); await p.waitForTimeout(200);
 await p.evaluate(()=>{ togli('f1f1f1f1-1111-4111-8111-111111111111'); }); await p.waitForTimeout(80); await p.click('#cSi'); await p.waitForTimeout(200);
 ok('il motivo compare, in rosso', await p.evaluate(()=>[document.getElementById('avviso').className, document.getElementById('avviso').textContent]), ['on r','è la persona che ha aperto il film: non si può togliere']);
+await p.close();
+
+console.log('\n── le altre linguette ──');
+p=await apri('admin');
+const testo=sel=>p.evaluate(s=>document.querySelector(s).innerText.replace(/\s+/g,' ').trim(), sel);
+ok('quattro linguette, parte da Persone', await p.evaluate(()=>[...document.querySelectorAll('#ling button')].map(b=>b.textContent+(b.classList.contains('on')?'*':''))), ['Persone*','Film','Posta','Server']);
+await p.click('#ling [data-l=film]'); await p.waitForTimeout(150);
+ok('Film: ogni film con persone, ultima mail e spesa', await p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>[r.querySelector('.t').textContent, r.querySelector('.s').textContent.replace(/ultima mail [^·]+ ·/,'ultima mail X ·')])),
+  [['Missione San Gennaro','16 persone · ultima mail X · $6,42'],['Separazioni','1 persona']]);
+ok('la ricerca delle persone qui non c\'è', await p.evaluate(()=>getComputedStyle(document.getElementById('cerca')).display), 'none');
+await p.click('#lista .riga'); await p.waitForTimeout(150);
+ok('un film: indirizzo della posta, troupe, costi', [await p.evaluate(()=>/84956e3c3046df55@campobase\.dev/.test(document.querySelector('#scheda .sotto').textContent)), await p.evaluate(()=>document.querySelectorAll('#scheda .card')[0].querySelectorAll('.riga').length), await p.evaluate(()=>[...document.querySelectorAll('#scheda .sez')].pop().textContent)], [true,3,"Costi dall'inizio · $6,42"]);
+await p.click('#scheda .card .riga'); await p.waitForTimeout(200);
+ok('da una persona della troupe si va alla sua scheda', [await p.evaluate(()=>document.querySelector('#ling .on').textContent), await p.evaluate(()=>document.querySelector('#scheda .nome').textContent), await p.evaluate(()=>CHIESTE.slice(-1)[0].azione)], ['Persone','Anna Riva','persona']);
+await p.evaluate(()=>vaiA('posta')); await p.waitForTimeout(150);
+ok('Posta: le mail con il loro esito', await p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>(r.querySelector('.tag')||{}).textContent||'ok')), ['ok','errata','senza allegati','errore']);
+ok('e in fondo il conto', await p.evaluate(()=>document.getElementById('conta').textContent), 'ultime 4 mail · 2 lette dal server · 1 errore');
+await p.click('#lista .riga'); await p.waitForTimeout(150);
+ok('una mail: allegati come li ha capiti', await p.evaluate(()=>[...document.querySelectorAll('#scheda .card')[0].querySelectorAll('.tag')].map(t=>t.textContent)), ['ordine del giorno','giri auto','stralci','scartato']);
+ok('e i passi, in ordine, con l\'ora', await p.evaluate(()=>[...document.querySelectorAll('#scheda .passo')].map(x=>x.querySelector('span').textContent)), ['Arrivata','Ordine del giorno: letto in 44 s','Ordine del giorno: scritto','10 notifiche','Indice stralci']);
+ok('⚠ da qui non si rimanda niente a nessuno: si può solo guardare', await p.evaluate(()=>[...document.querySelectorAll('#scheda .btn')].map(b=>b.textContent)), ["Vedi la lettura dell'ordine del giorno"]);
+await p.click('#scheda .btn'); await p.waitForTimeout(150);
+ok('la lettura si apre com\'è', await p.evaluate(()=>[document.getElementById('velo').classList.contains('on'), /"numero": 30/.test(document.querySelector('#foglio pre').textContent)]), [true,true]);
+await p.evaluate(()=>chiudiFoglio()); await p.evaluate(()=>chiudiScheda());
+await p.evaluate(()=>vaiA('server')); await p.waitForTimeout(150);
+ok('Server: stato, costi, interruttori', await p.evaluate(()=>[...document.querySelectorAll('#lista .sez')].map(x=>x.textContent)), ['Stato, ultimi 7 giorni','Costi','Interruttori']);
+ok('i tre totali', await p.evaluate(()=>[...document.querySelectorAll('#lista .tre b')].map(x=>x.textContent)), ['$0,17','$3,80','$6,42']);
+ok('⚠ dice che è una stima e con quale listino', await p.evaluate(()=>/Stima dai token, al listino: sonnet-5-5 \$2 \/ \$10 · haiku-5-5 \$0,1 \/ \$0,5/.test(document.querySelector('#lista').innerText)), true);
+ok('⚠ gli interruttori si leggono soltanto', await p.evaluate(()=>[document.querySelectorAll('#lista button, #lista input').length, /variabili di Cloudflare/.test(document.querySelector('#lista').innerText)]), [0,true]);
+ok('⚠ in tutto il giro, al server solo domande', await p.evaluate(()=>[...new Set(CHIESTE.map(c=>c.azione))].sort()), ['film','filmUno','io','lettura','mail','persona','persone','posta','server']);
+await p.evaluate(()=>vaiA('persone')); await p.waitForTimeout(150);
+ok('tornando a Persone c\'è di nuovo l\'elenco', [await p.evaluate(()=>document.querySelectorAll('#lista .riga').length), await p.evaluate(()=>document.getElementById('lista').className)], [3,'card']);
+ok('nessun errore di pagina', p.errori, []);
 await p.close();
 
 console.log('\n── su uno schermo largo ──');

@@ -20,6 +20,8 @@
 import { json, readJson, requireUser } from './shared.js';
 import { db } from './ombra.js';
 import { mandaScadute } from './push.js';
+import { genereDi } from './smista.js';
+import { costo, PREZZI } from './consumi.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const id = x => (UUID.test(String(x || '')) ? String(x).toLowerCase() : null);
@@ -67,6 +69,91 @@ async function film(env) {
   try { return await db(env, 'projects?select=id,titolo,sigla,user_id&order=titolo.asc') || []; }
   catch (_) { return await db(env, 'projects?select=id,titolo,user_id&order=titolo.asc') || []; }
 }
+
+/* Supabase da' al massimo mille righe per volta: i consumi (una riga per
+   ogni chiamata al modello) e le notifiche li superano presto. Si legge a
+   pagine, con un tetto: oltre, il conto direbbe meno del vero, e allora
+   lo si dice (troncato). */
+async function tutte(env, percorso, pagine = 15) {
+  const out = [];
+  for (let i = 0; i < pagine; i++) {
+    const r = await db(env, `${percorso}&limit=1000&offset=${i * 1000}`) || [];
+    out.push(...r);
+    if (r.length < 1000) return { righe: out, troncato: false };
+  }
+  return { righe: out, troncato: true };
+}
+const CAMPI_CONSUMI = 'quando,origine,scopo,project_id,posta_id,modello,token_entrata,token_uscita,token_cache_letti,token_cache_scritti';
+
+/* Una somma di righe dei consumi. senzaPrezzo conta le chiamate a un
+   modello che nel listino non c'e': i loro dollari mancano dal totale. */
+function somma(righe) {
+  const t = { chiamate: 0, entrata: 0, uscita: 0, dollari: 0, senzaPrezzo: 0 };
+  for (const r of righe || []) {
+    t.chiamate++; t.entrata += (+r.token_entrata || 0) + (+r.token_cache_letti || 0) + (+r.token_cache_scritti || 0);
+    t.uscita += +r.token_uscita || 0;
+    const c = costo(r); if (c == null) t.senzaPrezzo++; else t.dollari += c;
+  }
+  t.dollari = Math.round(t.dollari * 10000) / 10000;
+  return t;
+}
+function perScopo(righe) {
+  const g = new Map();
+  for (const r of righe || []) { const k = r.scopo || 'altro'; if (!g.has(k)) g.set(k, []); g.get(k).push(r); }
+  return [...g].map(([scopo, rr]) => ({ scopo, origine: rr[0].origine || null, ...somma(rr) })).sort((a, b) => b.dollari - a.dollari);
+}
+const giornoRoma = t => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(new Date(t));
+
+/* Le mail: i campi che servono a dire com'e' andata, senza tirarsi dietro
+   la lettura intera (decine di migliaia di caratteri per riga). */
+const CAMPI_POSTA = 'id,project_id,oggetto,ricevuta,stato,nota,allegati,mittente_vero,ombra_stato,ombra_il,piano_stato,piano_il,'
+  + 'info:ombra->info,scritto:ombra->scritto,oerrore:ombra->>errore,onota:ombra->>nota,'
+  + 'pinfo:piano->info,pscritto:piano->scritto,perrore:piano->>errore';
+
+/* Com'e' andata una mail, in una parola e un colore. */
+export function esitoMail(r) {
+  const s = r.scritto || null, ps = r.pscritto || null;
+  if (r.stato === 'prova') return ['prova', 'm'];
+  if (r.ombra_stato === 'errore' || r.piano_stato === 'errore' || r.stato === 'errore' || (s && s.scritto === false) || (ps && ps.scritto === false))
+    return ['errore', 'r'];
+  if (r.stato === 'al server' || r.ombra_stato === 'in corso' || r.piano_stato === 'in corso') return ['in coda', 'y'];
+  if (r.stato === 'da verificare') return ['da verificare', 'y'];
+  if (r.ombra_stato === 'tronca') return ['troncata', 'r'];
+  if (s && s.scritto) return [s.errata ? 'errata' : 'letta', s.errata ? 'y' : 'g'];
+  if (ps && ps.scritto) return ['letta', 'g'];
+  if (r.stato === 'senza allegati') return ['senza allegati', 'm'];
+  if (r.stato === 'scartata') return ['scartata', 'm'];
+  if (r.ombra_stato === 'fatta' || r.piano_stato === 'fatta') return ['letta in ombra', 'm'];
+  if (/doppione/.test(String(r.nota || '') + String(r.onota || ''))) return ['doppione', 'm'];
+  return ['al telefono', 'm'];
+}
+function rigaMail(r, F, spese) {
+  const f = F.get(r.project_id) || {}, [esito, colore] = esitoMail(r);
+  const info = r.info || {}, pinfo = r.pinfo || {};
+  const ms = (+info.ms || 0) + (+pinfo.ms || 0);
+  return { id: r.id, film: { id: r.project_id, titolo: f.titolo || '', sigla: f.sigla || null },
+    oggetto: r.oggetto || '(senza oggetto)', ricevuta: r.ricevuta, esito, colore,
+    secondi: ms ? Math.round(ms / 1000) : null,
+    notifiche: r.scritto && r.scritto.scritto ? (r.scritto.notifiche || 0) : null,
+    allegati: (r.allegati || []).filter(a => a && a.tenuto).length,
+    dollari: spese ? somma(spese.get(r.id) || []).dollari : null };
+}
+async function speseDelleMail(env, ids) {
+  const m = new Map();
+  if (!ids.length) return m;
+  const righe = await db(env, `consumi?select=${CAMPI_CONSUMI}&posta_id=in.(${ids.join(',')})&limit=1000`).catch(() => []);
+  for (const c of righe || []) { if (!m.has(c.posta_id)) m.set(c.posta_id, []); m.get(c.posta_id).push(c); }
+  return m;
+}
+/* I film con tutto quello che serve qui; le colonne aggiunte col tempo
+   possono non esserci ancora, e allora si fa senza. */
+async function filmPieni(env) {
+  try { return await db(env, 'projects?select=id,titolo,sigla,user_id,casella,codice,mittente&order=titolo.asc') || []; }
+  catch (_) { return await film(env); }
+}
+const si = v => String(v || '').toLowerCase() === 'si';
+const k = n => (n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (Math.round(n / 100) / 10 + 'k').replace('.', ',') : String(n));
+const usd = n => '$' + (n < 0.1 ? n.toFixed(3) : n.toFixed(2)).replace('.', ',');
 
 const AZIONI = {
   // Chi sono: la pagina lo chiede per prima cosa.
@@ -136,6 +223,162 @@ const AZIONI = {
       uso7: (uso || []).filter(x => Date.parse(x.giorno) > Date.now() - 7 * 86400000)
               .reduce((t, x) => t + (x.secondi || 0), 0),
       consumi: perScopo
+    };
+  },
+
+  /* ── I film ── */
+  async film(env) {
+    const [ff, membri, prof, posta, cons] = await Promise.all([
+      filmPieni(env), db(env, 'film_membri?select=project_id,user_id,ruolo'), db(env, 'profiles?select=id,nome,cognome'),
+      db(env, 'posta?select=project_id,ricevuta,oggetto&stato=neq.prova&order=ricevuta.desc&limit=1000').catch(() => []),
+      tutte(env, `consumi?select=${CAMPI_CONSUMI}&order=id.asc`).catch(() => ({ righe: [], troncato: false }))
+    ]);
+    const P = new Map((prof || []).map(p => [p.id, p]));
+    const quanti = new Map(), ultima = new Map(), mail = new Map(), spesa = new Map();
+    for (const m of membri || []) quanti.set(m.project_id, (quanti.get(m.project_id) || 0) + 1);
+    for (const m of posta || []) { mail.set(m.project_id, (mail.get(m.project_id) || 0) + 1); if (!ultima.has(m.project_id)) ultima.set(m.project_id, m); }
+    for (const c of cons.righe) { if (!c.project_id) continue; if (!spesa.has(c.project_id)) spesa.set(c.project_id, []); spesa.get(c.project_id).push(c); }
+    return { troncato: cons.troncato, film: (ff || []).map(f => {
+      const c = P.get(f.user_id) || {}, u = ultima.get(f.id);
+      return { id: f.id, titolo: f.titolo, sigla: f.sigla || null, membri: quanti.get(f.id) || 0,
+        capo: [c.nome, c.cognome].filter(Boolean).join(' ') || null, casella: f.casella || null,
+        mail: mail.get(f.id) || 0, ultimaMail: u ? u.ricevuta : null, dollari: somma(spesa.get(f.id) || []).dollari };
+    }).sort((x, y) => y.membri - x.membri || String(y.ultimaMail || '').localeCompare(String(x.ultimaMail || '')) || String(x.titolo).localeCompare(String(y.titolo))) };
+  },
+
+  async filmUno(env, b) {
+    const f = id(b.id); if (!f) throw new Error('manca il film');
+    const [ff, membri, prof, iscr, esclusi, posta, cons] = await Promise.all([
+      filmPieni(env),
+      db(env, `film_membri?select=user_id,ruolo,segna,created_at&project_id=eq.${f}`)
+        .catch(() => db(env, `film_membri?select=user_id,ruolo,created_at&project_id=eq.${f}`)),
+      db(env, 'profiles?select=id,nome,cognome,reparto'), db(env, 'push_iscrizioni?select=user_id'),
+      db(env, `film_esclusi?select=user_id&project_id=eq.${f}`).catch(() => []),
+      db(env, `posta?select=${CAMPI_POSTA}&project_id=eq.${f}&order=ricevuta.desc&limit=8`).catch(() => []),
+      tutte(env, `consumi?select=${CAMPI_CONSUMI}&project_id=eq.${f}&order=id.asc`).catch(() => ({ righe: [], troncato: false }))
+    ]);
+    const x = (ff || []).find(y => y.id === f); if (!x) throw new Error('film non trovato');
+    const P = new Map((prof || []).map(p => [p.id, p])), F = new Map([[x.id, x]]);
+    const tel = new Set((iscr || []).map(i => i.user_id));
+    return { id: x.id, titolo: x.titolo, sigla: x.sigla || null, casella: x.casella || null, codice: x.codice || null,
+      mittente: x.mittente || null, esclusi: (esclusi || []).length,
+      membri: (membri || []).map(m => { const p = P.get(m.user_id) || {};
+        return { id: m.user_id, nome: [p.nome, p.cognome].filter(Boolean).join(' ') || 'Senza nome', reparto: p.reparto || '',
+                 ruolo: m.ruolo, segna: !!m.segna, telefono: tel.has(m.user_id) }; })
+        .sort((a, c) => (c.ruolo === 'capo') - (a.ruolo === 'capo') || a.nome.localeCompare(c.nome)),
+      posta: (posta || []).map(r => rigaMail(r, F, null)),
+      totale: somma(cons.righe), consumi: perScopo(cons.righe), troncato: cons.troncato };
+  },
+
+  /* ── La posta ── */
+  async posta(env) {
+    const [ff, righe] = await Promise.all([film(env), db(env, `posta?select=${CAMPI_POSTA}&order=ricevuta.desc&limit=40`)]);
+    const F = new Map((ff || []).map(f => [f.id, f]));
+    const spese = await speseDelleMail(env, (righe || []).map(r => r.id));
+    const mail = (righe || []).map(r => rigaMail(r, F, spese));
+    return { mail, lette: mail.filter(m => /^(letta|errata)$/.test(m.esito)).length, errori: mail.filter(m => m.colore === 'r').length };
+  },
+
+  /* Una mail, passo per passo: quando e' arrivata, cosa ne ha fatto il
+     server, quanto e' costata, a quanti e' arrivata la notifica. */
+  async mail(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const r = ((await db(env, `posta?select=${CAMPI_POSTA}&id=eq.${m}&limit=1`)) || [])[0];
+    if (!r) throw new Error('mail non trovata');
+    const [ff, cons] = await Promise.all([film(env),
+      db(env, `consumi?select=${CAMPI_CONSUMI},ms,esito&posta_id=eq.${m}&order=id.asc&limit=100`).catch(() => [])]);
+    const F = new Map((ff || []).map(f => [f.id, f]));
+    const passi = [], passo = (quando, titolo, testo, colore) => { if (quando) passi.push({ quando, titolo, testo: testo || '', colore: colore || '' }); };
+    const tenuti = (r.allegati || []).filter(a => a && a.tenuto);
+    passo(r.ricevuta, 'Arrivata', [tenuti.length === 1 ? '1 allegato' : tenuti.length + ' allegati', r.mittente_vero ? 'da ' + r.mittente_vero : ''].filter(Boolean).join(' · '));
+    const spesa = c => { const d = costo(c); return [k((+c.token_entrata || 0)) + ' token in', k(+c.token_uscita || 0) + ' out', d == null ? '' : usd(d)].filter(Boolean).join(' · '); };
+    for (const c of cons || []) {
+      if (c.scopo === 'smistamento') passo(c.quando, 'Smistata', 'allegati dal nome incerto guardati dentro · ' + spesa(c));
+      if (c.scopo === 'stralci') passo(c.quando, 'Indice stralci', spesa(c));
+    }
+    /* Le notifiche partite per questa lettura: sono quelle del film, di
+       genere posta, scritte nei minuti subito dopo. Il registro tiene
+       sette giorni: per una mail piu' vecchia non c'e' piu' niente da contare. */
+    const notifiche = async (da) => {
+      if (!da) return null;
+      const a = new Date(Date.parse(da) - 60000).toISOString(), z = new Date(Date.parse(da) + 10 * 60000).toISOString();
+      const nn = await db(env, `push_appuntamenti?select=mandato,mostrato,dispositivi&project_id=eq.${r.project_id}&genere=eq.posta`
+        + `&quando=gte.${encodeURIComponent(a)}&quando=lte.${encodeURIComponent(z)}&limit=500`).catch(() => []);
+      if (!nn || !nn.length) return null;
+      const partite = nn.filter(n => (n.dispositivi || 0) > 0);
+      return { tutte: nn.length, partite: partite.length, mostrate: partite.filter(n => n.mostrato).length };
+    };
+    const lettura = async (nome, stato, il, info, scritto, errore) => {
+      if (!il || !stato || stato === 'saltata') return;
+      const fine = new Date(Date.parse(il) + (+((info || {}).ms) || 0)).toISOString();
+      const c = (cons || []).find(x => x.scopo === (nome === 'Piano' ? 'piano' : 'odg'));
+      if (stato === 'in corso') return passo(il, nome + ': lettura in corso', '', 'y');
+      if (stato === 'errore') return passo(fine, nome + ': lettura fallita', errore || '', 'r');
+      passo(fine, nome + (stato === 'tronca' ? ': lettura troncata' : ': letto') + (info && info.ms ? ' in ' + Math.round(info.ms / 1000) + ' s' : ''),
+        c ? spesa(c) : (info && info.token_entrata != null ? [k(+info.token_entrata || 0) + ' token in', k(+info.token_uscita || 0) + ' out'].join(' · ') : ''), stato === 'tronca' ? 'r' : '');
+      if (scritto && scritto.scritto === false) return passo(fine, nome + ': non scritto', (scritto.errore || '') + ' · passata ai telefoni', 'r');
+      if (scritto && scritto.scritto) {
+        passo(fine, nome + ': scritto', [scritto.data ? 'giorno ' + scritto.data : '', scritto.errata ? 'errata corrige (' + scritto.errata + ')' : '',
+          scritto.avvisi != null ? scritto.avvisi + ' avvisi di pick-up e catering' : '', scritto.vecchio ? 'più vecchio di quello in uso: lasciato stare' : '',
+          scritto.errore ? 'ma: ' + scritto.errore : ''].filter(Boolean).join(' · '), scritto.errore ? 'y' : 'g');
+        const n = await notifiche(fine);
+        if (n) passo(fine, n.tutte + (n.tutte === 1 ? ' notifica' : ' notifiche'),
+          n.mostrate + (n.mostrate === 1 ? ' mostrata' : ' mostrate') + (n.partite - n.mostrate ? ', ' + (n.partite - n.mostrate) + ' senza conferma' : '')
+          + (n.tutte - n.partite ? ', ' + (n.tutte - n.partite) + ' senza telefono' : ''), n.partite - n.mostrate ? 'y' : 'g');
+        else if (scritto.notifiche) passo(fine, scritto.notifiche + ' notifiche', 'partite; il registro di chi l\'ha vista dura sette giorni');
+      } else if (stato === 'fatta') passo(fine, nome + ': non scritto', 'lettura di prova, in ombra: la mail è andata ai telefoni');
+    };
+    await lettura('Ordine del giorno', r.ombra_stato, r.ombra_il, r.info, r.scritto, r.oerrore);
+    await lettura('Piano', r.piano_stato, r.piano_il, r.pinfo, r.pscritto, r.perrore);
+    passi.sort((x, y) => String(x.quando).localeCompare(String(y.quando)));
+    const [esito, colore] = esitoMail(r);
+    return { ...rigaMail(r, F, new Map([[r.id, cons || []]])), esito, colore, nota: r.nota || r.onota || null, mittente: r.mittente_vero || null,
+      allegati: (r.allegati || []).map(a => ({ nome: a.nome, byte: a.byte || 0, tenuto: !!a.tenuto, genere: a.tenuto ? (genereDi(a) || null) : null })),
+      passi, haOdg: /^(fatta|tronca|errore)$/.test(r.ombra_stato || ''), haPiano: /^(fatta|tronca|errore)$/.test(r.piano_stato || '') };
+  },
+
+  /* Quello che il modello ha letto, com'e': serve quando l'app mostra una
+     cosa strana e si vuole sapere se l'ha letta male lui o l'ha girata
+     male il server. */
+  async lettura(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const col = b.cosa === 'piano' ? 'piano' : 'ombra';
+    const r = ((await db(env, `posta?select=letto:${col}->letto,testo:${col}->>testo&id=eq.${m}&limit=1`)) || [])[0];
+    if (!r || (r.letto == null && !r.testo)) throw new Error('di questa mail non c\'è una lettura salvata');
+    return { letto: r.letto != null ? r.letto : null, testo: r.letto != null ? null : r.testo };
+  },
+
+  /* ── Il server ── */
+  async server(env) {
+    const adesso = Date.now(), sette = new Date(adesso - 7 * 86400000).toISOString();
+    const [posta, push, cons] = await Promise.all([
+      db(env, `posta?select=${CAMPI_POSTA}&stato=neq.prova&ricevuta=gte.${encodeURIComponent(sette)}&order=ricevuta.desc&limit=300`).catch(() => []),
+      tutte(env, `push_appuntamenti?select=mandato,mostrato,dispositivi&mandato=gte.${encodeURIComponent(sette)}&order=mandato.asc`, 5).catch(() => ({ righe: [] })),
+      tutte(env, `consumi?select=${CAMPI_CONSUMI}&order=id.asc`).catch(() => ({ righe: [], troncato: false, manca: true }))
+    ]);
+    const lette = (posta || []).map(r => ({ r, il: [r.ombra_il, r.piano_il].filter(Boolean).sort().pop(), e: esitoMail(r) }))
+      .filter(x => x.il && /^(letta|errata|errore|troncata|letta in ombra)$/.test(x.e[0]));
+    const ultima = lette.slice().sort((a, b) => String(b.il).localeCompare(String(a.il)))[0];
+    const tempi = (posta || []).map(r => +((r.info || {}).ms) || 0).filter(Boolean);
+    const partite = push.righe.filter(n => (n.dispositivi || 0) > 0);
+    const oggi = giornoRoma(adesso), ieri = giornoRoma(adesso - 86400000);
+    const di = g => cons.righe.filter(c => giornoRoma(c.quando) === g);
+    const interruttore = (nome, v, spentoSe) => ({ nome, acceso: spentoSe ? String(v || '').toLowerCase() !== 'no' : si(v) });
+    return {
+      stato: { ultima: ultima ? { quando: ultima.il, esito: ultima.e[0], colore: ultima.e[1], oggetto: ultima.r.oggetto } : null,
+        coda: (posta || []).filter(r => esitoMail(r)[0] === 'in coda').length,
+        errori: (posta || []).filter(r => esitoMail(r)[1] === 'r').length, mail: (posta || []).length,
+        secondi: tempi.length ? Math.round(tempi.reduce((a, c) => a + c, 0) / tempi.length / 1000) : null,
+        notifiche: { partite: partite.length, senza: partite.filter(n => !n.mostrato).length } },
+      costi: { oggi: somma(di(oggi)), ieri: somma(di(ieri)), sette: somma(cons.righe.filter(c => Date.parse(c.quando) >= adesso - 7 * 86400000)), sempre: somma(cons.righe),
+        dal: cons.righe.length ? cons.righe.map(c => c.quando).sort()[0] : null,
+        scopi: perScopo(cons.righe), troncato: !!cons.troncato, manca: !!cons.manca },
+      prezzi: Object.entries(PREZZI).map(([modello, p]) => ({ modello, entrata: p.entrata, uscita: p.uscita })),
+      interruttori: [
+        interruttore('Legge gli ordini del giorno', env.OMBRA, true), interruttore('Scrive gli ordini del giorno', env.OMBRA_SCRIVE),
+        interruttore('Legge i piani', env.PIANO, true), interruttore('Scrive i piani', env.PIANO_SCRIVE),
+        interruttore('Smistamento allegati', env.SMISTA), interruttore('Indice degli stralci', env.STRALCI),
+        interruttore('Avvisi dalla lettura in ombra', env.OMBRA_AVVISI) ]
     };
   },
 
@@ -222,7 +465,7 @@ export async function handleAdmin(request, env) {
   if (!azione) return json({ error: 'Azione sconosciuta' }, 400);
   try {
     const esito = await azione(env, body || {}, user);
-    if (!/^(io|persone|persona|esito)$/.test(body.azione)) {
+    if (!/^(io|persone|persona|esito|film|filmUno|posta|mail|lettura|server)$/.test(body.azione)) {
       console.log('[admin]', JSON.stringify({ chi: user.id, azione: body.azione, id: body.id || null,
         film: body.film || null, da: body.da || null, a: body.a || null }));
     }

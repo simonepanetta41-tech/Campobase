@@ -35,7 +35,7 @@ button{font-family:inherit;cursor:pointer}
 .riga{display:flex;align-items:center;gap:10px;padding:12px 14px;width:100%;background:none;border:none;color:inherit;text-align:left}
 .riga + .riga{border-top:1px solid var(--bd)}
 .riga.sel{background:var(--card2)}
-.riga .c{flex:1;min-width:0}.riga .t{font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.riga .c{flex:1;min-width:0}.riga .t{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .riga .s{font-size:11.5px;color:var(--m);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pall{width:8px;height:8px;border-radius:50%;flex:none}
 .fr{color:var(--m)}
@@ -66,10 +66,29 @@ button{font-family:inherit;cursor:pointer}
 /* Sul telefono si vede una cosa alla volta; su uno schermo largo l'elenco
    resta a sinistra e la scheda si apre a destra. */
 #scheda{display:none}
+.ling{display:flex;gap:6px;margin-bottom:14px}
+.ling button{flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--bd);background:none;color:var(--d);font-size:13px}
+.ling button.on{background:var(--y);border-color:var(--y);color:#111;font-weight:700}
+body.aperta .ling{display:none}
+.tre{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tre .card{padding:12px 12px 11px}
+.tre b{display:block;font-family:'DM Mono',monospace;font-size:19px;font-weight:400;letter-spacing:-.02em}
+.tre span{display:block;font-size:11px;color:var(--m);margin-top:3px}
+.passo{display:flex;gap:12px;padding:11px 14px;font-size:13px;line-height:1.45}
+.passo + .passo{border-top:1px solid var(--bd)}
+.passo time{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--m);flex:none;width:58px;padding-top:1px}
+.passo .d{color:var(--d);font-size:12.5px;word-break:break-word}
+.riga .t.due-righe{white-space:normal}
+#foglio pre{font-family:'DM Mono',monospace;font-size:11px;line-height:1.5;color:var(--d);white-space:pre-wrap;word-break:break-word;margin:10px 0 0;user-select:text;-webkit-user-select:text}
+#foglio.largo{max-width:760px}
+body.sola #scheda{display:none !important}
 body.aperta #elenco{display:none}
 body.aperta #scheda{display:block}
 @media (min-width:900px){
   #corpo{display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start}
+  body.sola #corpo{display:block;max-width:560px}
+  body.aperta .ling{display:flex}
+  .ling{max-width:380px}
   body.aperta #elenco{display:block}
   #scheda{display:block}
   .indietro{display:none}
@@ -81,6 +100,9 @@ body.aperta #scheda{display:block}
 <div class="pagina">
   <div class="top"><button class="indietro" id="indietro" onclick="chiudiScheda()" style="display:none" aria-label="Indietro">‹</button><b>CAMPOBASE</b><span class="ad">ADMIN</span></div>
   <div id="porta"></div>
+  <div class="ling" id="ling" style="display:none">
+    <button data-l="persone" class="on" onclick="vaiA('persone')">Persone</button><button data-l="film" onclick="vaiA('film')">Film</button><button data-l="posta" onclick="vaiA('posta')">Posta</button><button data-l="server" onclick="vaiA('server')">Server</button>
+  </div>
   <div id="corpo" style="display:none">
     <div id="elenco">
       <input class="cerca" id="cerca" placeholder="Cerca nome, mail, film…" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -102,8 +124,8 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.4';
-let PERSONE = [], FILM = [], aperta = null, corsa = 0;
+const ADMIN_VERSIONE = '1.5';
+let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
    se chi chiede puo'. La pagina da sola non vede niente. */
@@ -149,7 +171,8 @@ async function entra() {
     document.getElementById('corpo').style.display = 'none';
     document.getElementById('esciRiga').style.display = 'none';
     /* chi esce non lascia sullo schermo i dati di prima */
-    PERSONE = []; FILM = []; aperta = null; corsa++; giro++;
+    PERSONE = []; FILM = []; FILM_TUTTI = []; POSTA = null; aperta = null; corsa++; giro++; LING = 'persone';
+    document.getElementById('ling').style.display = 'none'; document.body.classList.remove('sola');
     document.body.classList.remove('aperta'); document.getElementById('indietro').style.display = 'none';
     document.getElementById('scheda').innerHTML = ''; document.getElementById('lista').innerHTML = '';
     document.getElementById('conta').textContent = '';
@@ -175,6 +198,7 @@ async function entra() {
   porta.innerHTML = '';
   document.getElementById('corpo').style.display = '';
   document.getElementById('esciRiga').style.display = '';
+  document.getElementById('ling').style.display = '';
   await caricaPersone();
 }
 
@@ -210,6 +234,7 @@ function statoDi(p) {
   return ['var(--g)', '<span class="fr">›</span>'];
 }
 function disegnaLista() {
+  if (LING !== 'persone') return disegnaElenco();
   const q = document.getElementById('cerca').value.trim().toLowerCase();
   const mostrate = PERSONE.filter(p => !q || [nomeDi(p), p.email, p.reparto, (p.film || []).map(f => f.titolo + ' ' + (f.sigla || '')).join(' ')]
     .join(' ').toLowerCase().includes(q));
@@ -231,6 +256,7 @@ document.getElementById('cerca').addEventListener('input', disegnaLista);
 
 /* ── La scheda di una persona ── */
 async function apriScheda(id) {
+  if (LING !== 'persone') mostraLing('persone');
   aperta = id; const mia = ++corsa;
   document.body.classList.add('aperta'); document.getElementById('indietro').style.display = '';
   const s = document.getElementById('scheda');
@@ -292,7 +318,7 @@ function disegnaScheda(p) {
 
 /* ── Il foglio per scegliere e per confermare ── */
 function apriFoglio(html) { document.getElementById('foglio').innerHTML = html; document.getElementById('velo').classList.add('on'); }
-function chiudiFoglio() { document.getElementById('velo').classList.remove('on'); }
+function chiudiFoglio() { document.getElementById('velo').classList.remove('on'); document.getElementById('foglio').classList.remove('largo'); }
 function conferma(titolo, sotto, tasto, rosso) {
   return new Promise(si => {
     apriFoglio('<h3>' + esc(titolo) + '</h3><div class="sotto">' + esc(sotto || '') + '</div>' +
@@ -371,6 +397,148 @@ async function rimanda() {
   const p = window.SCHEDA;
   if (!(await conferma('Rimandare l\'ultimo ordine del giorno a ' + nomeDi(p) + '?', 'Riceve di nuovo la stessa notifica, solo lui.', 'Rimanda'))) return;
   return conTasto('bRimanda', async () => { const d = await chiedi('rimanda', { id: aperta }); await segui(d.titolo || 'Ordine del giorno', d.appuntamento); });
+}
+
+/* ── Le linguette: Persone, Film, Posta, Server ── */
+const soldi = n => n == null ? '' : '$' + (n > 0 && n < 0.1 ? n.toFixed(3) : n.toFixed(2)).replace('.', ',');
+const mila = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n || 0);
+const peso = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round((b || 0) / 1024)) + ' KB';
+const COLORE = { g: 'var(--g)', r: 'var(--r)', y: 'var(--y)', m: 'var(--m)' };
+const SCOPI = { odg: 'Ordini del giorno', piano: 'Piani di lavorazione', smistamento: 'Smistamento allegati', stralci: 'Indice degli stralci',
+  spoglio: 'Spoglio sceneggiatura', confronto: 'Confronto versioni', assistente: 'Assistente', cast: 'Cast' };
+const GENERI = { odg: ['ordine del giorno', 'g'], giri: ['giri auto', 'g'], pdl: ['piano', 'g'], stralci: ['stralci', ''] };
+function mostraLing(l) {
+  LING = l;
+  document.querySelectorAll('#ling button').forEach(b => b.classList.toggle('on', b.dataset.l === l));
+  document.getElementById('cerca').style.display = l === 'persone' ? '' : 'none';
+  document.body.classList.toggle('sola', l === 'server');
+  document.getElementById('lista').className = l === 'server' ? '' : 'card';
+}
+function vaiA(l) {
+  aperta = null; corsa++; giro++;
+  document.body.classList.remove('aperta'); document.getElementById('indietro').style.display = 'none';
+  document.getElementById('scheda').innerHTML = ''; document.getElementById('conta').textContent = '';
+  mostraLing(l); window.scrollTo(0, 0); corsaL++;
+  if (l === 'persone') return caricaPersone();
+  caricaElenco();
+}
+async function caricaElenco() {
+  const lista = document.getElementById('lista'), mia = ++corsaL, l = LING;
+  const hoGia = l === 'film' ? FILM_TUTTI.length : l === 'posta' ? !!POSTA : false;
+  if (hoGia) disegnaElenco(); else lista.innerHTML = '<div class="vuoto">Carico…</div>';
+  try {
+    if (l === 'film') FILM_TUTTI = (await chiedi('film')).film || [];
+    else if (l === 'posta') POSTA = await chiedi('posta');
+    else if (l === 'server') { window.SERVER = null; window.SERVER = await chiedi('server'); }
+    if (mia !== corsaL || l !== LING) return;
+    disegnaElenco();
+  } catch (e) { if (mia === corsaL && l === LING) lista.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+function rigaMailHtml(m, conFilm) {
+  const sotto = [conFilm && (m.film.sigla || m.film.titolo), quando(m.ricevuta, true), m.secondi ? 'letta in ' + m.secondi + ' s' : '',
+    m.notifiche != null ? m.notifiche + (m.notifiche === 1 ? ' notifica' : ' notifiche') : '', m.dollari ? soldi(m.dollari) : ''].filter(Boolean).join(' · ');
+  const tag = m.colore === 'g' ? '<span class="fr">›</span>' : '<span class="tag ' + (m.colore === 'm' ? '' : m.colore) + '">' + esc(m.esito) + '</span>';
+  return '<button class="riga' + (aperta === m.id ? ' sel' : '') + '" onclick="apriMail(\'' + m.id + '\')"><span class="pall" style="background:' + COLORE[m.colore] + '"></span>' +
+    '<span class="c"><span class="t">' + esc(m.oggetto) + '</span><div class="s">' + esc(sotto) + '</div></span>' + tag + '</button>';
+}
+function disegnaElenco() {
+  const lista = document.getElementById('lista'), conta = document.getElementById('conta');
+  if (LING === 'film') {
+    lista.innerHTML = FILM_TUTTI.length ? FILM_TUTTI.map(f => {
+      const fresca = f.ultimaMail && Date.now() - Date.parse(f.ultimaMail) < 3 * 86400000;
+      const sotto = [(f.membri === 1 ? '1 persona' : f.membri + ' persone'), f.ultimaMail ? 'ultima mail ' + quando(f.ultimaMail) : (f.casella ? 'nessuna mail' : ''),
+        f.dollari ? soldi(f.dollari) : ''].filter(Boolean).join(' · ');
+      return '<button class="riga' + (aperta === f.id ? ' sel' : '') + '" onclick="apriFilm(\'' + f.id + '\')"><span class="pall" style="background:' + (fresca ? 'var(--g)' : 'var(--m)') + '"></span>' +
+        '<span class="c"><span class="t">' + esc(f.titolo || 'Senza titolo') + '</span><div class="s">' + esc(sotto) + '</div></span>' +
+        (f.sigla ? '<span class="tag">' + esc(f.sigla) + '</span>' : '<span class="fr">›</span>') + '</button>';
+    }).join('') : '<div class="vuoto">Nessun film.</div>';
+    const troupe = FILM_TUTTI.filter(f => f.membri > 1).length;
+    conta.textContent = FILM_TUTTI.length + ' film · ' + troupe + ' con una troupe';
+  } else if (LING === 'posta') {
+    if (!POSTA) return;
+    const mm = POSTA.mail || [];
+    lista.innerHTML = mm.length ? mm.map(m => rigaMailHtml(m, true)).join('') : '<div class="vuoto">Nessuna mail.</div>';
+    conta.textContent = 'ultime ' + mm.length + ' mail · ' + POSTA.lette + ' lette dal server · ' + POSTA.errori + (POSTA.errori === 1 ? ' errore' : ' errori');
+  } else if (LING === 'server') {
+    if (!window.SERVER) return;
+    conta.textContent = ''; lista.innerHTML = serverHtml(window.SERVER);
+  }
+}
+function serverHtml(s) {
+  const st = s.stato, c = s.costi, n = st.notifiche;
+  const kv = (a, b, cl) => '<div class="kv"><span>' + esc(a) + '</span><span class="' + (cl || '') + '">' + esc(b) + '</span></div>';
+  const cl = { g: 'ok', r: 'no', y: 'boh', m: '' };
+  return '<div class="sez" style="margin-top:0">Stato, ultimi 7 giorni</div><div class="card">' +
+    kv('Ultima lettura', st.ultima ? quando(st.ultima.quando, true) + ' · ' + st.ultima.esito : 'nessuna', st.ultima ? cl[st.ultima.colore] : '') +
+    kv('Mail arrivate', String(st.mail)) +
+    kv('In coda adesso', st.coda + ' mail', st.coda ? 'boh' : '') +
+    kv('Letture fallite', String(st.errori), st.errori ? 'no' : 'ok') +
+    (st.secondi ? kv('Tempo medio di lettura', st.secondi + ' s') : '') +
+    kv('Notifiche senza conferma', n.partite ? n.senza + ' su ' + n.partite : 'nessuna partita', n.senza ? 'boh' : '') + '</div>' +
+    '<div class="sez">Costi</div>' +
+    (c.manca ? '<div class="card"><div class="vuoto">La tabella dei consumi non risponde.</div></div>' :
+    '<div class="tre"><div class="card"><b>' + soldi(c.oggi.dollari) + '</b><span>oggi</span></div><div class="card"><b>' + soldi(c.sette.dollari) + '</b><span>7 giorni</span></div>' +
+      '<div class="card"><b>' + soldi(c.sempre.dollari) + '</b><span>' + (c.dal ? 'dal ' + quando(c.dal) : 'dall\'inizio') + '</span></div></div>' +
+    '<div class="card" style="margin-top:8px">' + (c.scopi.length ? c.scopi.map(x => '<div class="kv"><span>' + esc(SCOPI[x.scopo] || x.scopo) + ' · ' + x.chiamate +
+        '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Ancora nessuna chiamata registrata.</div>') + '</div>' +
+    '<div class="nota">Ieri ' + soldi(c.ieri.dollari) + '. Stima dai token, al listino: ' +
+      esc(s.prezzi.map(p => p.modello.replace('claude-', '') + ' $' + String(p.entrata).replace('.', ',') + ' / $' + String(p.uscita).replace('.', ',')).join(' · ')) + ' per milione (entrata / uscita).' +
+      (c.sempre.senzaPrezzo ? ' ' + c.sempre.senzaPrezzo + ' chiamate a un modello fuori listino non sono nel conto.' : '') +
+      (c.troncato ? ' Le righe sono troppe per leggerle tutte: il totale è per difetto.' : '') + '</div>') +
+    '<div class="sez">Interruttori</div><div class="card">' + s.interruttori.map(i => kv(i.nome, i.acceso ? 'acceso' : 'spento', i.acceso ? 'ok' : '')).join('') + '</div>' +
+    '<div class="nota">Si cambiano dalle variabili di Cloudflare, non da qui.</div>';
+}
+function apriDettaglio(id) {
+  aperta = id; const mia = ++corsa;
+  document.body.classList.add('aperta'); document.getElementById('indietro').style.display = '';
+  document.getElementById('scheda').innerHTML = '<div class="vuoto">Carico…</div>'; disegnaElenco(); window.scrollTo(0, 0);
+  return mia;
+}
+async function apriFilm(id) {
+  if (LING !== 'film') { mostraLing('film'); if (!FILM_TUTTI.length) caricaElenco(); }
+  const mia = apriDettaglio(id), s = document.getElementById('scheda');
+  try {
+    const f = await chiedi('filmUno', { id }); if (mia !== corsa) return;
+    s.innerHTML = '<div class="nome">' + esc(f.titolo || 'Senza titolo') + (f.sigla ? ' <span class="tag" style="vertical-align:middle">' + esc(f.sigla) + '</span>' : '') + '</div>' +
+      '<div class="sotto">' + esc([f.membri.length === 1 ? '1 persona' : f.membri.length + ' persone', f.esclusi ? f.esclusi + (f.esclusi === 1 ? ' esclusa' : ' escluse') : '',
+        f.codice ? 'codice ' + f.codice : ''].filter(Boolean).join(' · ')) +
+        (f.casella ? '<br>' + esc(f.casella + '@campobase.dev') : '') + (f.mittente ? '<br>mittente atteso: ' + esc(f.mittente) : '') + '</div>' +
+      '<div class="sez">Troupe</div><div class="card">' + f.membri.map(m => '<button class="riga" onclick="apriScheda(\'' + m.id + '\')">' +
+        '<span class="pall" style="background:' + (m.telefono ? 'var(--g)' : 'var(--y)') + '"></span><span class="c"><span class="t">' + esc(m.nome) + '</span><div class="s">' +
+        esc([m.reparto, m.ruolo === 'capo' ? 'ha aperto il film' : '', m.segna ? 'segna le scene' : '', m.telefono ? '' : 'senza notifiche'].filter(Boolean).join(' · ')) +
+        '</div></span><span class="fr">›</span></button>').join('') + '</div>' +
+      '<div class="sez">Ultime mail</div><div class="card">' + (f.posta.length ? f.posta.map(m => rigaMailHtml(m, false)).join('') : '<div class="vuoto">Nessuna mail arrivata.</div>') + '</div>' +
+      '<div class="sez">Costi dall\'inizio · ' + soldi(f.totale.dollari) + '</div><div class="card">' + (f.consumi.length ? f.consumi.map(x => '<div class="kv"><span>' + esc(SCOPI[x.scopo] || x.scopo) + ' · ' + x.chiamate +
+        '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>';
+  } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+async function apriMail(id) {
+  if (LING !== 'posta') { mostraLing('posta'); if (!POSTA) caricaElenco(); }
+  const mia = apriDettaglio(id), s = document.getElementById('scheda');
+  try {
+    const m = await chiedi('mail', { id }); if (mia !== corsa) return;
+    const ora = iso => { const d = new Date(iso); return isNaN(d) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map(x => String(x).padStart(2, '0')).join(':'); };
+    s.innerHTML = '<div class="nome" style="font-size:17px;line-height:1.3">' + esc(m.oggetto) + '</div>' +
+      '<div class="sotto">' + esc([m.film.titolo, quando(m.ricevuta, true), m.dollari ? soldi(m.dollari) : ''].filter(Boolean).join(' · ')) +
+        ' <span class="tag ' + (m.colore === 'm' ? '' : m.colore) + '" style="margin-left:4px">' + esc(m.esito) + '</span></div>' +
+      '<div class="sez">Allegati e come li ha capiti</div><div class="card">' + (m.allegati.length ? m.allegati.map(a => {
+        const g = a.tenuto ? (GENERI[a.genere] || ['non riconosciuto', '']) : ['scartato', ''];
+        return '<div class="riga"><span class="c"><span class="t due-righe">' + esc(a.nome) + '</span><div class="s">' + peso(a.byte) + '</div></span><span class="tag ' + g[1] + '">' + g[0] + '</span></div>';
+      }).join('') : '<div class="vuoto">Senza allegati.</div>') + '</div>' +
+      '<div class="sez">Cosa è successo</div><div class="card">' + m.passi.map(p => '<div class="passo"><time>' + ora(p.quando) + '</time><div><span class="' +
+        ({ g: 'ok', r: 'no', y: 'boh' }[p.colore] || '') + '">' + esc(p.titolo) + '</span>' + (p.testo ? '<div class="d">' + esc(p.testo) + '</div>' : '') + '</div></div>').join('') + '</div>' +
+      (m.nota ? '<div class="nota">' + esc(m.nota) + '</div>' : '') +
+      (m.haOdg ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'odg\')">Vedi la lettura dell\'ordine del giorno</button>' : '') +
+      (m.haPiano ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'piano\')">Vedi la lettura del piano</button>' : '');
+  } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+async function vediLettura(id, cosa) {
+  try {
+    const d = await chiedi('lettura', { id, cosa });
+    document.getElementById('foglio').classList.add('largo');
+    apriFoglio('<h3>' + (cosa === 'piano' ? 'Il piano, come l\'ha letto il modello' : 'L\'ordine del giorno, come l\'ha letto il modello') + '</h3>' +
+      '<button class="btn" onclick="chiudiFoglio()">Chiudi</button><pre>' + esc(d.letto != null ? JSON.stringify(d.letto, null, 1) : d.testo) + '</pre>');
+  } catch (e) { avvisa(e.message, true); }
 }
 
 /* Il numero di questa pagina, separato da quello dell'app: "A 1.4" e' la
