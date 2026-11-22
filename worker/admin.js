@@ -95,7 +95,13 @@ const AZIONI = {
                film: filmDi.get(a.id) || [], telefoni: telefoni.get(a.id) || 0,
                ultima: visto.get(a.id) || null, iscritto: a.created_at || null, bloccato: bloccato(a) };
     }).sort((x, y) => String(y.ultima || '').localeCompare(String(x.ultima || '')));
-    return { persone, film: (ff || []).map(f => ({ id: f.id, titolo: f.titolo, sigla: f.sigla || null })) };
+    /* Di ogni film, quante persone ha dentro: nella tabella dei film ci
+       sono anche quelli nati da una vecchia analisi e mai usati da una
+       troupe, e contarli tutti da' un numero che non dice niente. */
+    const quanti = new Map();
+    for (const m of membri || []) quanti.set(m.project_id, (quanti.get(m.project_id) || 0) + 1);
+    return { persone, film: (ff || []).map(f => ({ id: f.id, titolo: f.titolo, sigla: f.sigla || null, membri: quanti.get(f.id) || 0 }))
+      .sort((x, y) => y.membri - x.membri || String(x.titolo).localeCompare(String(y.titolo))) };
   },
 
   async persona(env, b) {

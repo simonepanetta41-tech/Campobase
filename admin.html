@@ -177,7 +177,11 @@ function disegnaLista() {
       '<span class="c"><span class="t">' + esc(nomeDi(p)) + '</span><div class="s">' + esc(sotto) + '</div></span>' + coda + '</button>';
   }).join('') : '<div class="vuoto">Nessuno trovato.</div>';
   const conFilm = new Set(); PERSONE.forEach(p => (p.film || []).forEach(f => conFilm.add(f.id)));
-  document.getElementById('conta').textContent = PERSONE.length + ' persone · ' + FILM.length + ' film';
+  // Un film e' di una troupe quando dentro c'e' piu' di una persona: gli
+  // altri sono analisi di una persona sola, o prove rimaste li'.
+  const troupe = FILM.filter(f => (f.membri || 0) > 1).length, soli = FILM.length - troupe;
+  document.getElementById('conta').textContent = PERSONE.length + ' persone · ' + troupe + ' film con una troupe' +
+    (soli ? ' · ' + soli + ' di una persona sola' : '');
 }
 document.getElementById('cerca').addEventListener('input', disegnaLista);
 
@@ -263,7 +267,8 @@ function scegliFilm(cosa, da) {
   apriFoglio('<h3>' + (cosa === 'sposta' ? 'Sposta in un altro film' : 'Aggiungi a un film') + '</h3>' +
     '<div class="sotto">' + esc(nomeDi(p)) + (cosa === 'sposta' ? ' esce da questo film ed entra in quello che scegli.' : ' resta nei film in cui è già.') + '</div>' +
     '<div class="card" style="margin-top:12px">' + (scelte.length ? scelte.map(f =>
-      '<button class="riga" onclick="filmScelto(\'' + cosa + '\',\'' + f.id + '\',\'' + (da || '') + '\')"><span class="c"><span class="t">' + esc(f.titolo) + '</span></span>' +
+      '<button class="riga" onclick="filmScelto(\'' + cosa + '\',\'' + f.id + '\',\'' + (da || '') + '\')"><span class="c"><span class="t">' + esc(f.titolo) + '</span>' +
+        '<div class="s">' + ((f.membri || 0) === 1 ? '1 persona' : (f.membri || 0) + ' persone') + '</div></span>' +
       (f.sigla ? '<span class="tag">' + esc(f.sigla) + '</span>' : '') + '</button>').join('') : '<div class="vuoto">Non ci sono altri film.</div>') + '</div>' +
     '<button class="btn" onclick="chiudiFoglio()">Annulla</button>');
 }

@@ -104,7 +104,7 @@ ok('un\'azione che non esiste', (await chiedi('tok-io', { azione: 'cancella_tutt
 console.log('\n── l\'elenco e la scheda ──');
 [st, d] = await chiedi('tok-io', { azione: 'persone' });
 const anna = d.persone.find(p => p.id === ANNA), luca = d.persone.find(p => p.id === LUCA);
-ok('tutte le persone e i film', [d.persone.length, d.film.map(f => f.sigla || f.titolo)], [3, ['MSG', 'Separazioni']]);
+ok('tutte le persone e i film, i più popolati per primi', [d.persone.length, d.film.map(f => [f.sigla || f.titolo, f.membri])], [3, [['MSG', 3], ['Separazioni', 1]]]);
 ok('di ognuno: reparto, film, telefoni', [anna.nome, anna.reparto, anna.film.map(f => f.sigla), anna.telefoni, luca.film.length, luca.telefoni], ['Anna', 'Regia', ['MSG'], 1, 2, 0]);
 ok('chi ha usato l\'app per ultimo sta in cima', d.persone[0].id, ANNA);
 [st, d] = await chiedi('tok-io', { azione: 'persona', id: ANNA });
