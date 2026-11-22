@@ -128,10 +128,22 @@ const testo=sel=>p.evaluate(s=>document.querySelector(s).innerText.replace(/\s+/
 ok('quattro linguette, parte da Persone', await p.evaluate(()=>[...document.querySelectorAll('#ling button')].map(b=>b.textContent+(b.classList.contains('on')?'*':''))), ['Persone*','Film','Posta','Server']);
 await p.click('#ling [data-l=film]'); await p.waitForTimeout(150);
 ok('Film: ogni film con persone, ultima mail e spesa', await p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>[r.querySelector('.t').textContent, r.querySelector('.s').textContent.replace(/ultima mail [^·]+ ·/,'ultima mail X ·')])),
-  [['Missione San Gennaro','16 persone · ultima mail X · $6,42'],['Separazioni','1 persona']]);
+  [['Missione San Gennaro','16 persone · ultima mail X · $6,42'],['Separazioni','solo Luca Berti']]);
 ok('la ricerca delle persone qui non c\'è', await p.evaluate(()=>getComputedStyle(document.getElementById('cerca')).display), 'none');
 await p.click('#lista .riga'); await p.waitForTimeout(150);
-ok('un film: indirizzo della posta, troupe, costi', [await p.evaluate(()=>/84956e3c3046df55@campobase\.dev/.test(document.querySelector('#scheda .sotto').textContent)), await p.evaluate(()=>document.querySelectorAll('#scheda .card')[0].querySelectorAll('.riga').length), await p.evaluate(()=>[...document.querySelectorAll('#scheda .sez')].pop().textContent)], [true,3,"Costi dall'inizio · $6,42"]);
+ok('un film: indirizzo della posta, troupe, costi', [await p.evaluate(()=>/84956e3c3046df55@campobase\.dev/.test(document.querySelector('#scheda .sotto').textContent)), await p.evaluate(()=>document.querySelectorAll('#scheda .card')[0].querySelectorAll('.riga').length), await p.evaluate(()=>[...document.querySelectorAll('#scheda .sez')].slice(-2)[0].textContent)], [true,3,"Costi dall'inizio · $6,42"]);
+const eliminati=()=>p.evaluate(()=>CHIESTE.filter(c=>c.azione==='eliminaFilm'));
+await p.click('#scheda .btn.r'); await p.waitForTimeout(100);
+ok('⚠ eliminare dice cosa si perde e che non si torna indietro', await p.evaluate(()=>document.querySelector('#foglio .sotto').textContent), 'Si cancellano per sempre: lo spoglio e il piano di Simone Panetta, 30 ordini del giorno, 23 mail con gli allegati. Le 3 persone della troupe non lo vedranno più. Non si può annullare.');
+ok('⚠ con una troupe il tasto è spento finché non si scrive il titolo', await p.evaluate(()=>document.getElementById('eSi').disabled), true);
+await p.fill('#eParola','missione'); ok('un pezzo di titolo non basta', await p.evaluate(()=>document.getElementById('eSi').disabled), true);
+await p.evaluate(()=>chiudiFoglio()); ok('annullando non parte niente', await eliminati(), []);
+await p.click('#scheda .btn.r'); await p.waitForTimeout(100); await p.fill('#eParola','Missione San Gennaro'); await p.click('#eSi'); await p.waitForTimeout(250);
+ok('col titolo scritto parte, e il film esce dall\'elenco', [await eliminati(), await p.evaluate(()=>document.querySelector('#ling .on').textContent), await p.evaluate(()=>document.body.classList.contains('aperta'))], [[{azione:'eliminaFilm',id:'f1f1f1f1-1111-4111-8111-111111111111',conferma:'Missione San Gennaro'}],'Film',false]);
+await p.evaluate(()=>{ CHIESTE=CHIESTE.filter(c=>c.azione!=='eliminaFilm'); return apriFilm(D.FA); }); await p.waitForTimeout(200);
+await p.evaluate(()=>{ FILM_APERTO={...FILM_APERTO, membri:FILM_APERTO.membri.slice(0,1), dentro:{analisi:0,odg:0,mail:0}}; eliminaFilm(); }); await p.waitForTimeout(100);
+ok('un film vuoto di una persona sola: una conferma semplice', await p.evaluate(()=>[document.querySelector('#foglio .sotto').textContent, !!document.getElementById('eParola'), document.getElementById('eSi').disabled]), ["Dentro non c'è niente. Non si può annullare.", false, false]);
+await p.evaluate(()=>chiudiFoglio());
 await p.click('#scheda .card .riga'); await p.waitForTimeout(200);
 ok('da una persona della troupe si va alla sua scheda', [await p.evaluate(()=>document.querySelector('#ling .on').textContent), await p.evaluate(()=>document.querySelector('#scheda .nome').textContent), await p.evaluate(()=>CHIESTE.slice(-1)[0].azione)], ['Persone','Anna Riva','persona']);
 await p.evaluate(()=>vaiA('posta')); await p.waitForTimeout(150);

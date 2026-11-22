@@ -124,7 +124,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.6';
+const ADMIN_VERSIONE = '1.7';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -446,7 +446,7 @@ function disegnaElenco() {
   if (LING === 'film') {
     lista.innerHTML = FILM_TUTTI.length ? FILM_TUTTI.map(f => {
       const fresca = f.ultimaMail && Date.now() - Date.parse(f.ultimaMail) < 3 * 86400000;
-      const sotto = [(f.membri === 1 ? '1 persona' : f.membri + ' persone'), f.ultimaMail ? 'ultima mail ' + quando(f.ultimaMail) : (f.casella ? 'nessuna mail' : ''),
+      const sotto = [(f.membri === 1 ? (f.capo ? 'solo ' + f.capo : '1 persona') : f.membri + ' persone'), f.ultimaMail ? 'ultima mail ' + quando(f.ultimaMail) : (f.casella ? 'nessuna mail' : ''),
         f.dollari ? soldi(f.dollari) : ''].filter(Boolean).join(' · ');
       return '<button class="riga' + (aperta === f.id ? ' sel' : '') + '" onclick="apriFilm(\'' + f.id + '\')"><span class="pall" style="background:' + (fresca ? 'var(--g)' : 'var(--m)') + '"></span>' +
         '<span class="c"><span class="t">' + esc(f.titolo || 'Senza titolo') + '</span><div class="s">' + esc(sotto) + '</div></span>' +
@@ -509,8 +509,30 @@ async function apriFilm(id) {
         '</div></span><span class="fr">›</span></button>').join('') + '</div>' +
       '<div class="sez">Ultime mail</div><div class="card">' + (f.posta.length ? f.posta.map(m => rigaMailHtml(m, false)).join('') : '<div class="vuoto">Nessuna mail arrivata.</div>') + '</div>' +
       '<div class="sez">Costi dall\'inizio · ' + soldi(f.totale.dollari) + '</div><div class="card">' + (f.consumi.length ? f.consumi.map(x => '<div class="kv"><span>' + esc(SCOPI[x.scopo] || x.scopo) + ' · ' + x.chiamate +
-        '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>';
+        '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>' +
+      '<div class="sez">Film</div><button class="btn r" style="margin-top:0" onclick="eliminaFilm()">Elimina il film</button>';
+    window.FILM_APERTO = f;
   } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
+}
+/* Eliminare un film: si dice cosa va perso e di chi e', e per un film con
+   una troupe bisogna riscriverne il titolo. */
+function eliminaFilm() {
+  const f = window.FILM_APERTO, d = f.dentro || {}, n = f.membri.length, troupe = n > 1;
+  const parola = (f.titolo || '').trim() || 'elimina';
+  const cose = [d.analisi ? 'lo spoglio e il piano' + (f.capo ? ' di ' + f.capo : '') : '', d.odg ? d.odg + (d.odg === 1 ? ' ordine del giorno' : ' ordini del giorno') : '',
+    d.mail ? d.mail + ' mail con gli allegati' : ''].filter(Boolean);
+  apriFoglio('<h3>Eliminare «' + esc(f.titolo || 'Senza titolo') + '»?</h3>' +
+    '<div class="sotto">' + esc((cose.length ? 'Si cancellano per sempre: ' + cose.join(', ') + '. ' : 'Dentro non c\'è niente. ') +
+      (troupe ? 'Le ' + n + ' persone della troupe non lo vedranno più. ' : '') + 'Non si può annullare.') + '</div>' +
+    (troupe ? '<input class="cerca" id="eParola" style="margin:12px 0 0" placeholder="Scrivi il titolo per confermare" autocomplete="off" autocapitalize="off" spellcheck="false">' : '') +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn r" id="eSi"' + (troupe ? ' disabled' : '') + '>Elimina</button></div>');
+  const si = document.getElementById('eSi'), campo = document.getElementById('eParola');
+  if (campo) campo.oninput = () => { si.disabled = campo.value.trim().toLowerCase() !== parola.toLowerCase(); };
+  si.onclick = async () => {
+    const conferma = campo ? campo.value : ''; chiudiFoglio();
+    try { await chiedi('eliminaFilm', { id: f.id, conferma }); avvisa('Film eliminato'); FILM_TUTTI = FILM_TUTTI.filter(x => x.id !== f.id); POSTA = null; vaiA('film'); }
+    catch (e) { avvisa(e.message, true); }
+  };
 }
 async function apriMail(id, zitta) {
   if (LING !== 'posta') { mostraLing('posta'); if (!POSTA) caricaElenco(); }

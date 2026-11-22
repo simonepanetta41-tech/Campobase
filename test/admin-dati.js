@@ -13,7 +13,7 @@ module.exports = function dati() {
   return { FA, FB, A, M1,
     film:{film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',membri:16,capo:'Simone Panetta',casella:'84956e3c3046df55',mail:23,ultimaMail:fa(60*17),dollari:6.42},
                 {id:FB,titolo:'Separazioni',sigla:null,membri:1,capo:'Luca Berti',casella:null,mail:0,ultimaMail:null,dollari:0}]},
-    filmUno:{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',casella:'84956e3c3046df55',codice:'K7QM2X',mittente:'produzione@esempio.it',esclusi:1,
+    filmUno:{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',casella:'84956e3c3046df55',codice:'K7QM2X',mittente:'produzione@esempio.it',esclusi:1,capo:'Simone Panetta',dentro:{analisi:1,odg:30,mail:23},
       membri:[{id:A,nome:'Simone Panetta',reparto:'Suono',ruolo:'capo',segna:true,telefono:true},{id:A,nome:'Anna Riva',reparto:'Regia',ruolo:'membro',segna:true,telefono:true},
               {id:A,nome:'Luca Berti',reparto:'Fotografia',ruolo:'membro',segna:false,telefono:false}],
       posta:mail.slice(0,3),totale:somma(63,1100000,420000,6.42),

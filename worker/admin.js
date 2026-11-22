@@ -249,26 +249,75 @@ const AZIONI = {
 
   async filmUno(env, b) {
     const f = id(b.id); if (!f) throw new Error('manca il film');
-    const [ff, membri, prof, iscr, esclusi, posta, cons] = await Promise.all([
+    const [ff, membri, prof, iscr, esclusi, posta, cons, analisi, fogli, tutteLeMail] = await Promise.all([
       filmPieni(env),
       db(env, `film_membri?select=user_id,ruolo,segna,created_at&project_id=eq.${f}`)
         .catch(() => db(env, `film_membri?select=user_id,ruolo,created_at&project_id=eq.${f}`)),
       db(env, 'profiles?select=id,nome,cognome,reparto'), db(env, 'push_iscrizioni?select=user_id'),
       db(env, `film_esclusi?select=user_id&project_id=eq.${f}`).catch(() => []),
       db(env, `posta?select=${CAMPI_POSTA}&project_id=eq.${f}&order=ricevuta.desc&limit=8`).catch(() => []),
-      tutte(env, `consumi?select=${CAMPI_CONSUMI}&project_id=eq.${f}&order=id.asc`).catch(() => ({ righe: [], troncato: false }))
+      tutte(env, `consumi?select=${CAMPI_CONSUMI}&project_id=eq.${f}&order=id.asc`).catch(() => ({ righe: [], troncato: false })),
+      // Quanto c'e' dentro: serve a dire cosa si perde eliminandolo.
+      db(env, `analyses?select=id&project_id=eq.${f}&limit=1000`).catch(() => []),
+      db(env, `odg?select=id&project_id=eq.${f}&limit=1000`).catch(() => []),
+      db(env, `posta?select=id&project_id=eq.${f}&limit=1000`).catch(() => [])
     ]);
     const x = (ff || []).find(y => y.id === f); if (!x) throw new Error('film non trovato');
+    const padrone = (prof || []).find(p => p.id === x.user_id) || {};
     const P = new Map((prof || []).map(p => [p.id, p])), F = new Map([[x.id, x]]);
     const tel = new Set((iscr || []).map(i => i.user_id));
     return { id: x.id, titolo: x.titolo, sigla: x.sigla || null, casella: x.casella || null, codice: x.codice || null,
       mittente: x.mittente || null, esclusi: (esclusi || []).length,
+      capo: [padrone.nome, padrone.cognome].filter(Boolean).join(' ') || null,
+      dentro: { analisi: (analisi || []).length, odg: (fogli || []).length, mail: (tutteLeMail || []).length },
       membri: (membri || []).map(m => { const p = P.get(m.user_id) || {};
         return { id: m.user_id, nome: [p.nome, p.cognome].filter(Boolean).join(' ') || 'Senza nome', reparto: p.reparto || '',
                  ruolo: m.ruolo, segna: !!m.segna, telefono: tel.has(m.user_id) }; })
         .sort((a, c) => (c.ruolo === 'capo') - (a.ruolo === 'capo') || a.nome.localeCompare(c.nome)),
       posta: (posta || []).map(r => rigaMail(r, F, null)),
       totale: somma(cons.righe), consumi: perScopo(cons.righe), troncato: cons.troncato };
+  },
+
+  /* Eliminare un film, per sempre: serve a togliere le prove e le vecchie
+     analisi rimaste in elenco. Porta via tutto quello che il film ha
+     dentro — lo spoglio e il piano, gli ordini del giorno, la posta con
+     gli allegati — e chi c'era ne esce. Restano solo le righe dei
+     consumi, senza piu' il film: quello che e' stato speso e' stato speso.
+     Un film con una troupe non si elimina con un tocco: bisogna
+     riscriverne il titolo. */
+  async eliminaFilm(env, b) {
+    const f = id(b.id); if (!f) throw new Error('manca il film');
+    const x = ((await db(env, `projects?select=id,titolo,user_id&id=eq.${f}&limit=1`)) || [])[0];
+    if (!x) throw new Error('film non trovato');
+    const membri = await db(env, `film_membri?select=user_id&project_id=eq.${f}`) || [];
+    const parola = String(x.titolo || '').trim() || 'elimina';
+    if (membri.length > 1 && String(b.conferma || '').trim().toLowerCase() !== parola.toLowerCase())
+      throw new Error(`ha una troupe di ${membri.length} persone: per eliminarlo va scritto il titolo`);
+
+    // 1. I file della posta: nel database sparirebbero le righe, non loro.
+    const mail = await db(env, `posta?select=allegati&project_id=eq.${f}&limit=1000`).catch(() => []) || [];
+    const percorsi = [...new Set(mail.flatMap(m => (m.allegati || []).map(a => a && a.percorso).filter(Boolean)))];
+    let file = 0;
+    for (let i = 0; i < percorsi.length; i += 100) {
+      try {
+        const r = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, '')}/storage/v1/object/posta`, { method: 'DELETE',
+          headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefixes: percorsi.slice(i, i + 100) }) });
+        if (r.ok) file += percorsi.slice(i, i + 100).length;
+      } catch (_) {}
+    }
+    // 2. Lo spoglio, con il piano e il cast che gli stanno attaccati.
+    const analisi = (await db(env, `analyses?select=id&project_id=eq.${f}&limit=1000`).catch(() => []) || []).map(a => a.id).filter(id);
+    if (analisi.length) {
+      const dove = `analysis_id=in.(${analisi.join(',')})`;
+      for (const t of ['cast_list', 'pdl_versions']) { try { await db(env, `${t}?${dove}`, { method: 'DELETE' }); } catch (_) {} }
+      await db(env, `analyses?project_id=eq.${f}`, { method: 'DELETE' });
+    }
+    // 3. Il film: con lui vanno via posta, ordini del giorno, troupe, scene segnate, notifiche in coda.
+    await db(env, `projects?id=eq.${f}`, { method: 'DELETE' });
+    const rimasto = await db(env, `projects?select=id&id=eq.${f}&limit=1`);
+    if (rimasto && rimasto.length) throw new Error('il database non ha eliminato il film');
+    return { fatto: true, titolo: x.titolo || '', persone: membri.length, analisi: analisi.length, mail: mail.length, file, fileRimasti: percorsi.length - file };
   },
 
   /* ── La posta ── */

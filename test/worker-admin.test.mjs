@@ -48,6 +48,7 @@ globalThis.fetch = async (url, opz = {}) => {
     return R({ users: [IO, ANNA, LUCA].map(acc) });
   }
   if (url.startsWith('https://web.push.')) return R(null, 201);
+  if (url === 'https://db.test/storage/v1/object/posta' && metodo === 'DELETE') { (globalThis.TOLTI ||= []).push(...JSON.parse(opz.body).prefixes); return R([]); }
   const m = /^https:\/\/db\.test\/rest\/v1\/([a-z_]+)\??(.*)$/.exec(url);
   if (!m) throw new Error('chiamata inattesa: ' + url);
   const tavola = T[m[1]]; if (!tavola) return R({ message: 'tavola inesistente: ' + m[1] }, 404);
@@ -242,6 +243,33 @@ ok('con il sì, avvisa', mailUna().nota, 'rilettura: con notifiche');
 ENV.PIANO_SCRIVE = 'si'; ENV.PIANO = '';
 await chiedi('tok-io', { azione: 'rileggi', id: M2, cosa: 'piano' });
 ok('il piano ha il suo stato e tocca solo la sua lettura', [T.posta.find(x => x.id === M2).stato, T.posta.find(x => x.id === M2).piano_stato], ['rilettura piano', null]);
+
+console.log('\n── ⚠ eliminare un film ──');
+mondo();
+const FC = U('c');
+T.projects.push({ id: FC, titolo: 'Prova vecchia', sigla: null, user_id: ANNA });
+T.film_membri.push({ project_id: FC, user_id: ANNA, ruolo: 'capo' });
+T.analyses = [{ id: U(4), project_id: FC }, { id: U(5), project_id: FA }];
+T.cast_list = [{ analysis_id: U(4), nome: 'x' }, { analysis_id: U(5), nome: 'y' }];
+T.pdl_versions = [{ analysis_id: U(4) }, { analysis_id: U(5) }];
+T.odg = [{ id: 1, project_id: FA }];
+T.posta = [{ id: U(6), project_id: FC, allegati: [{ nome: 'a.pdf', tenuto: true, percorso: FC + '/m/a.pdf' }, { nome: 'logo.png', tenuto: false }] },
+           { id: U(7), project_id: FA, allegati: [{ nome: 'b.pdf', tenuto: true, percorso: FA + '/m/b.pdf' }] }];
+globalThis.TOLTI = [];
+ok('un membro qualsiasi non può', [(await chiedi('tok-anna', { azione: 'eliminaFilm', id: FC }))[0], T.projects.length], [403, 3]);
+[st, d] = await chiedi('tok-io', { azione: 'filmUno', id: FC });
+ok('prima si vede cosa c\'è dentro, e di chi è', [d.capo, d.dentro], ['Anna R', { analisi: 1, odg: 0, mail: 1 }]);
+[st, d] = await chiedi('tok-io', { azione: 'eliminaFilm', id: FA });
+ok('⚠ un film con una troupe non si elimina con un tocco', [st, /titolo/.test(d.error), T.projects.some(p => p.id === FA), T.analyses.length, globalThis.TOLTI], [400, true, true, 2, []]);
+ok('né scrivendo un\'altra cosa', [(await chiedi('tok-io', { azione: 'eliminaFilm', id: FA, conferma: 'elimina' }))[0], T.projects.length], [400, 3]);
+ok('un film che non c\'è', (await chiedi('tok-io', { azione: 'eliminaFilm', id: U(0) }))[0], 400);
+[st, d] = await chiedi('tok-io', { azione: 'eliminaFilm', id: FC });
+ok('il film di una persona sola va via', [st, d.titolo, T.projects.map(p => p.titolo)], [200, 'Prova vecchia', ['Missione San Gennaro', 'Separazioni']]);
+ok('con il suo spoglio, il piano e il cast', [T.analyses.map(a => a.project_id === FA), T.cast_list.map(c => c.nome), T.pdl_versions.length], [[true], ['y'], 1]);
+ok('⚠ e i suoi file, solo i suoi', [globalThis.TOLTI, d.file, d.fileRimasti], [[FC + '/m/a.pdf'], 1, 0]);
+ok('⚠ gli altri film non sono toccati', [T.film_membri.filter(m => m.project_id === FA).length, T.odg.length, T.posta.some(m => m.project_id === FA)], [3, 1, true]);
+[st, d] = await chiedi('tok-io', { azione: 'eliminaFilm', id: FA, conferma: '  missione san gennaro ' });
+ok('con il titolo scritto, anche quello con la troupe', [st, d.persone, T.projects.map(p => p.titolo)], [200, 3, ['Separazioni']]);
 
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);
