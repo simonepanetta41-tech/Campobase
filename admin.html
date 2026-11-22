@@ -81,6 +81,8 @@ body.aperta #scheda{display:block}
     <div id="scheda"></div>
   </div>
 </div>
+<div id="piede" style="max-width:1040px;margin:34px auto 0;padding-top:14px;border-top:1px solid var(--bd);text-align:center;font-size:11px;color:var(--m);line-height:1.7">
+  <b style="color:var(--d);font-weight:500">Campobase</b> · amministrazione<br><span id="versione" style="font-family:'DM Mono',monospace">v —</span></div>
 <div id="velo" onclick="if(event.target===this)chiudiFoglio()"><div id="foglio"></div></div>
 <div id="avviso"></div>
 
@@ -329,6 +331,17 @@ async function rimanda() {
   return conTasto('bRimanda', async () => { const d = await chiedi('rimanda', { id: aperta }); await segui(d.titolo || 'Ordine del giorno', d.appuntamento); });
 }
 
+/* La versione online, quella vera: si legge dal service worker pubblicato,
+   che porta lo stesso numero dell'app. Cosi' dopo un deploy si vede qui
+   se e' arrivato, senza aprire Campobase. */
+async function versione() {
+  try {
+    const t = await (await fetch('/sw.js', { cache: 'no-store' })).text();
+    const m = /campobase-v(\d+)/.exec(t);
+    if (m) document.getElementById('versione').textContent = 'v 1.' + m[1];
+  } catch (_) {}
+}
+versione();
 entra();
 </script>
 </body>

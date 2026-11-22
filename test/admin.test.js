@@ -26,6 +26,7 @@ const apri=async(scena, larghezza=390)=>{
       film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',ruolo:'membro',segna:true}],telefoni:[{tipo:'iPhone'}],
       notifiche:[{titolo:'MSG - OdG 30',mandato:new Date().toISOString(),mostrato:new Date().toISOString(),dispositivi:1}],uso7:420,consumi:{spoglio:{chiamate:2,entrata:30000,uscita:12000}}};
     window.fetch=async(url,opz)=>{
+      if(String(url).includes('sw.js')) return {ok:true,text:async()=>"const CACHE = 'campobase-v175';"};
       const c=JSON.parse(opz.body); CHIESTE.push(c);
       const R=(d,s=200)=>({ok:s<400,status:s,json:async()=>d});
       if(SCENA==='estraneo') return R({error:'Non sei amministratore',admin:false,id:'il-mio-numero'},403);
@@ -56,6 +57,7 @@ console.log('\n── l\'elenco ──');
 p=await apri('admin');
 const righe=()=>p.evaluate(()=>[...document.querySelectorAll('#lista .riga')].map(r=>[r.querySelector('.t').textContent, r.querySelector('.s').textContent.split(' · ').slice(0,2).join(' · '), r.querySelector('.tag')?.textContent||'']));
 ok('tutti, con film e stato', await righe(), [['Anna Riva','Regia · MSG',''],['Luca Berti','Fotografia · nessun film',''],['bloccato@x.it','nessun film','bloccato']]);
+ok('⚠ in fondo, la versione che è online', await p.evaluate(()=>document.getElementById('versione').textContent), 'v 1.175');
 ok('il conto in fondo', await p.evaluate(()=>document.getElementById('conta').textContent), '3 persone · 1 film con una troupe · 1 di una persona sola');
 await p.fill('#cerca','gennaro');
 ok('si cerca anche per film', (await righe()).map(r=>r[0]), ['Anna Riva']);
