@@ -91,7 +91,7 @@ body.aperta #scheda{display:block}
   </div>
 </div>
 <div id="piede" style="max-width:1040px;margin:34px auto 0;padding-top:14px;border-top:1px solid var(--bd);text-align:center;font-size:11px;color:var(--m);line-height:1.7">
-  <span id="versione" style="font-family:'DM Mono',monospace">Admin —</span>
+  <span id="versione" style="font-family:'DM Mono',monospace">A —</span>
   <div id="esciRiga" style="display:none;margin-top:10px"><button class="mini" style="margin:0" onclick="esci()">Esci</button></div></div>
 <div id="velo" onclick="if(event.target===this)chiudiFoglio()"><div id="foglio"></div></div>
 <div id="avviso"></div>
@@ -102,7 +102,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '3';
+const ADMIN_VERSIONE = '1.4';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -373,9 +373,11 @@ async function rimanda() {
   return conTasto('bRimanda', async () => { const d = await chiedi('rimanda', { id: aperta }); await segui(d.titolo || 'Ordine del giorno', d.appuntamento); });
 }
 
-/* Il numero di questa pagina, separato da quello dell'app: si alza a ogni
-   modifica di admin.html, cosi' si vede se il deploy e' arrivato. */
-document.getElementById('versione').textContent = 'Admin ' + ADMIN_VERSIONE;
+/* Il numero di questa pagina, separato da quello dell'app: "A 1.4" e' la
+   prima versione dell'amministrazione, quarto deploy. Il secondo numero si
+   alza a ogni modifica di admin.html, cosi' si vede se il deploy e'
+   arrivato; il primo scatta (2.0) solo con un rifacimento importante. */
+document.getElementById('versione').textContent = 'A ' + ADMIN_VERSIONE;
 entra();
 </script>
 </body>
