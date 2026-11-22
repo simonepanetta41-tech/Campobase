@@ -19,8 +19,10 @@ const codice = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
 function mondo(rete) {
   const ascolti = {}, dispense = { 'campobase-vecchia': new Map(), 'campobase-apri': new Map(), 'campobase-dati': new Map() };
   const apri = n => (dispense[n] = dispense[n] || new Map());
-  const R = (testo, status = 200) => ({ testo, status, ok: status >= 200 && status < 300, clone() { return this; } });
-  const ctx = { console, URL, Promise, setTimeout, clearTimeout, Response: { error: () => R('errore', 0) },
+  const R = (testo, status = 200, redirected = false) => ({ testo, body: testo, headers: {}, status, redirected, ok: status >= 200 && status < 300, clone() { return this; } });
+  // Una risposta rifatta a mano: non porta piu' la traccia del reindirizzamento.
+  class Risposta { constructor(body, init) { Object.assign(this, { testo: body, body, status: init.status, headers: init.headers, redirected: false, rifatta: true, ok: true }); } clone() { return this; } static error() { return R('errore', 0); } }
+  const ctx = { console: { log() {}, warn() {}, error() {} }, URL, Promise, setTimeout, clearTimeout, Response: Risposta, Request: function (u) { this.url = u; },
     self: { addEventListener: (t, f) => { ascolti[t] = f; }, skipWaiting() {}, clients: { claim() {} }, location: { origin: 'https://campobase.dev' } },
     caches: { open: async n => ({ put: async (k, v) => { apri(n).set(String(k.url || k), v); }, add: async () => {}, match: async k => apri(n).get(String(k.url || k)) }),
       match: async k => { for (const m of Object.values(dispense)) if (m.has(String(k.url || k))) return m.get(String(k.url || k)); },
@@ -31,7 +33,7 @@ function mondo(rete) {
   const chiedi = async (indirizzo = 'https://campobase.dev/') => {
     let risposta, t = Date.now(); const attese = [];
     ascolti.fetch({ request: { method: 'GET', url: indirizzo, mode: 'navigate' }, respondWith: p => { risposta = p; }, waitUntil: p => attese.push(p) });
-    try { const r = await risposta; return { testo: r.testo, ms: Date.now() - t, attese }; } catch (e) { return { errore: String(e.message || e), ms: Date.now() - t, attese }; }
+    try { const r = await risposta; return { testo: r.testo, redirected: r.redirected, ms: Date.now() - t, attese }; } catch (e) { return { errore: String(e.message || e), ms: Date.now() - t, attese }; }
   };
   return { chiedi, dispense, nome, apri, R, ascolti, attesa: vm.runInContext('ATTESA_RETE', ctx) };
 }
@@ -65,6 +67,20 @@ function mondo(rete) {
   m = mondo(() => Promise.reject(new TypeError('Failed to fetch')));
   m.apri(m.nome).set('/index.html', m.R('app')); m.apri(m.nome).set('/admin.html', m.R('admin'));
   ok('ogni pagina ha la sua copia', [(await m.chiedi('https://campobase.dev/admin.html')).testo, (await m.chiedi('https://campobase.dev/index.html')).testo], ['admin', 'app']);
+
+  console.log('\n── ⚠ Safari e le pagine arrivate con un reindirizzamento ──');
+  /* /index.html il server lo reindirizza a /. Safari rifiuta una pagina
+     salvata cosi': "Response served by service worker has redirections". */
+  m = mondo(() => Promise.reject(new TypeError('Failed to fetch')));
+  m.apri(m.nome).set('/index.html', m.R('salvata col giro', 200, true));
+  r = await m.chiedi();
+  ok('senza rete la copia si dà riconfezionata, senza il giro', [r.testo, r.redirected], ['salvata col giro', false]);
+  m = mondo(R => Promise.resolve(R('pagina', 200, true)));
+  let installata; m.ascolti.install({ waitUntil: p => { installata = p; } }); await installata;
+  ok('e all\'installazione si mette da parte già pulita', [m.dispense[m.nome].get('/index.html').redirected, m.dispense[m.nome].get('/index.html').testo, m.dispense[m.nome].get('/').redirected], [false, 'pagina', false]);
+  m = mondo(R => Promise.resolve(R('non trovata', 404)));
+  m.ascolti.install({ waitUntil: p => { installata = p; } }); await installata;
+  ok('un file che manca non si mette da parte al posto di quello buono', (m.dispense[m.nome] || new Map()).has('/index.html'), false);
 
   console.log('\n── ⚠ un errore del server ──');
   m = mondo(R => Promise.resolve(R('errore 500', 500)));

@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v177';
+const CACHE = 'campobase-v178';
 // Quanto si aspetta la rete prima di aprire la pagina salvata (millisecondi).
 const ATTESA_RETE = 3000;
 // Le cache che restano da una versione all'altra: il biglietto della
@@ -22,6 +22,17 @@ const STATIC = [
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
 ];
 
+/* Safari non apre una pagina salvata che e' arrivata passando per un
+   reindirizzamento ("Response served by service worker has redirections"),
+   e /index.html il server lo reindirizza a /: la copia messa da parte
+   all'installazione era proprio cosi', e senza rete l'app non partiva.
+   Una risposta cosi' si riconfeziona: stesso contenuto, senza la traccia
+   del giro che ha fatto. */
+function pulita(r) {
+  if (!r || !r.redirected) return r;
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: r.headers });
+}
+
 // ── INSTALL ──────────────────────────────────────────────────────────────────
 // Scarica tutto STATIC una risorsa per volta invece di addAll: con addAll un
 // singolo 404 fa fallire l'installazione intera e l'app resta senza offline.
@@ -30,7 +41,8 @@ self.addEventListener('install', e => {
     caches.open(CACHE).then(cache =>
       Promise.all(
         STATIC.map(url =>
-          cache.add(new Request(url, { cache: 'reload' }))
+          fetch(new Request(url, { cache: 'reload' }))
+            .then(r => { if (!r.ok && r.type !== 'opaque') throw new Error('risposta ' + r.status); return cache.put(url, pulita(r)); })
             .catch(err => console.warn('[SW] precache saltato:', url, err))
         )
       )
@@ -78,10 +90,10 @@ self.addEventListener('fetch', e => {
        salvata; la risposta, se poi arriva, aggiorna la copia per la volta
        dopo. Senza copia salvata si continua ad aspettare la rete. */
     const rete = fetch(e.request).then(r => {
-      if (r && r.ok) { const copy = r.clone(); caches.open(CACHE).then(cache => cache.put(chiave, copy)); }
+      if (r && r.ok) { const copy = pulita(r.clone()); caches.open(CACHE).then(cache => cache.put(chiave, copy)); }
       return r;
     });
-    const riserva = () => caches.match(chiave).then(c => c || caches.match('/index.html'));
+    const riserva = () => caches.match(chiave).then(c => c || caches.match('/index.html')).then(pulita);
     e.respondWith(new Promise((ris, no) => {
       let fatto = false;
       const dai = r => { if (!fatto && r) { fatto = true; ris(r); } };
