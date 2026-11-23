@@ -1345,6 +1345,24 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .settings-section { margin-bottom: 28px; }
 .settings-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
 .settings-title::after { content:''; flex:1; height:1px; background:var(--border); }
+/* ── I TITOLI DELLE SEZIONI ──
+   Un solo disegno in tutta l'app: al centro, gialli, fra due righe
+   sottili che arrivano ai bordi, con aria sopra. A colpo d'occhio si
+   vede dove finisce un blocco e ne comincia un altro. Sta qui in fondo,
+   dopo le regole di ogni pagina, perche' le deve superare tutte: chi
+   aggiunge una sezione usa una di queste classi e non ridisegna niente. */
+.odg-sez, .settings-title, .sec-label, .compare-section-title, .fab-g {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 0; border: 0; text-align: center;
+  font-family: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--yellow); }
+.odg-sez::before, .odg-sez::after, .settings-title::before, .settings-title::after,
+.sec-label::before, .sec-label::after, .compare-section-title::before, .compare-section-title::after,
+.fab-g::before, .fab-g::after { content: ''; display: block; flex: 1; height: 1px; background: var(--border); }
+.odg-sez { margin: 34px 0 6px; }
+.settings-title { margin-top: 6px; }
+.fab-g { margin: 34px 2px 12px; }
+.compare-count { letter-spacing: 0; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; gap: 16px; flex-wrap: wrap; }
 .settings-row + .settings-row { margin-top: 10px; }
 .settings-row-info { flex: 1; }
@@ -1791,7 +1809,7 @@ body.senza-rete #cbSenzaRete { display: block; }
         </div>
       </div>
 
-      <div class="odg-sez" style="margin-top:24px">Reparti</div>
+      <div class="odg-sez">Reparti</div>
       <div id="catsGrid" style="margin-top:9px"></div>
       <!-- Quello che il filtro tiene fuori: si dice, non si nasconde. -->
       <div id="spFuori" class="sp-fuori" style="display:none"></div>
@@ -2266,7 +2284,7 @@ body.senza-rete #cbSenzaRete { display: block; }
       <div id="analisiSection" style="display:none">
         <div class="sp-testa"><span class="t">Il tuo reparto</span></div>
         <div class="an-rep" id="anReparti"></div>
-        <div class="odg-sez" style="margin:0 0 9px">Cosa vedi nello spoglio</div>
+        <div class="odg-sez" style="margin:26px 0 9px">Cosa vedi nello spoglio</div>
         <div id="anSpunte" style="background:var(--surface);border:1px solid var(--border);border-radius:13px;overflow:hidden"></div>
         <p style="font-size:12.5px;color:var(--muted);line-height:1.55;margin:12px 2px 0">
           Lo spoglio le estrae tutte per tutti i reparti. Qui scegli quali
@@ -5450,7 +5468,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.179';
+const CB_VERSIONE = '1.180';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -7751,7 +7769,7 @@ function renderCastTab(rows, showAlert) {
         ${r.n ? `<span class="cast-n num">${r.n}<i>sc</i></span>` : ''}
         <span class="chev">\u203A</span>
       </div>`).join('')}</div>
-    ${(conta.restanti || []).length ? `<div class="odg-sez" style="margin-top:22px">NELLA SCENEGGIATURA, NON IN LISTA</div>
+    ${(conta.restanti || []).length ? `<div class="odg-sez">NELLA SCENEGGIATURA, NON IN LISTA</div>
     <div class="card" style="margin-top:9px;padding:13px 15px">
       <div class="at-elenco" style="margin:0">${conta.restanti.map(esc).join(' · ')}</div>
       <p class="cast-nota" style="margin:9px 0 0">Nomi che parlano nella sceneggiatura e che la lista ID non ha, o che ha scritti in un altro modo.</p>
@@ -11448,7 +11466,7 @@ async function troupeRender(){
         <button onclick="troupeCopia()">Copia il link</button>
       </div>` : ''}
     ${f.casella && f.mio ? `
-      <div class="odg-sez" style="margin-top:22px">LA POSTA DEL FILM</div>
+      <div class="odg-sez">LA POSTA DEL FILM</div>
       <div class="card tr-posta" style="margin-top:9px">
         <p>Metti questo indirizzo nella regola di inoltro della tua casella di
           lavoro. I pacchetti che arrivano qui si aprono da soli nel film, senza
@@ -11460,7 +11478,7 @@ async function troupeRender(){
         <p class="tr-avviso">È una chiave, non un nome: chi ce l'ha può infilare
           documenti nel film. Tienila fuori dai gruppi.</p>
       </div>` : ''}
-    <div class="odg-sez" style="margin-top:22px">IN QUESTO FILM</div>
+    <div class="odg-sez">IN QUESTO FILM</div>
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
   if (f.codice) troupeQr(f.codice);
   const m = await troupeMembri();
@@ -11493,7 +11511,7 @@ async function troupeRender(){
   document.getElementById('troupeEsclusi')?.remove();
   if (!esclusi.length || !document.getElementById('troupeElenco')) return;
   el.insertAdjacentHTML('afterend', `<div id="troupeEsclusi">
-    <div class="odg-sez" style="margin-top:22px">ESCLUSI</div>
+    <div class="odg-sez">ESCLUSI</div>
     <div class="card" style="margin-top:9px">${esclusi.map(x => `<div class="odg-att">
       <span class="c"><span class="t">${esc(nomeDi(x))}</span>
       ${x.reparto ? `<span class="s">${esc(x.reparto)}</span>` : ''}</span>
