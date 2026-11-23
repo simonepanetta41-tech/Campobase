@@ -5468,7 +5468,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.180';
+const CB_VERSIONE = '1.181';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12493,7 +12493,7 @@ async function pushAppuntamenti(d){
    e gli ordini del giorno gia' salvati si rileggono da soli. Senza, la
    correzione valeva solo sul prossimo OdG — e quello di domani sera uno
    ce l'ha gia' in tasca con il nome sbagliato. */
-const ODG_LUOGHI_V = 2;
+const ODG_LUOGHI_V = 3;
 
 function odgNonEUnPosto(t){
   return /pronti\s+a\s+girare|convocazion|fine\s+(riprese|lavorazione)|\bpausa\b|\bcatering\b|\bcestini\b/i.test(String(t || ''))
@@ -12539,6 +12539,7 @@ function odgRicalcola() {
        diventano quelli dell'app ("Mezzi tecnici"): da li' dipendono
        l'ordine nel Dove e quale posto si usa per il meteo. Una volta. */
     if (d.luoghiV !== ODG_LUOGHI_V) {
+      d.luoghi = odgLuoghiDivisi(d.luoghi);
       (d.luoghi || []).forEach(l => { l.nome = odgNomePosto(l.nome) || odgCap(l.nome); });
       d.luoghiV = ODG_LUOGHI_V;
     }
@@ -13153,6 +13154,26 @@ function odgCercabile(a) {
    libero vale meno dei dieci che vede Maps. */
 function odgMapsVicino(cosa, dove) { return odgMaps(cosa + ' vicino a ' + dove); }
 function odgCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
+
+/* Due posti scritti insieme perche' stanno allo stesso indirizzo
+   ("PREPARAZIONE ATTORI / MEZZI TECNICI 120q") diventano due righe del
+   Dove, ognuna con la sua mappa: chi cerca i mezzi da 120 quintali li
+   trova col loro nome, non in coda a quello di un altro posto.
+   Non si tocca un'etichetta che l'app conosce gia' per intero
+   ("CB/ MEZZI TECNICI" e' un posto solo, i mezzi tecnici), ne' una barra
+   che non separa due nomi ("c/o", "193/219"). */
+function odgLuoghiDivisi(luoghi) {
+  const out = [];
+  for (const l of luoghi || []) {
+    const nome = String(l && l.nome || '');
+    const parti = nome.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
+    const dueNomi = parti.length > 1 && !/\bc\/o\b/i.test(nome)
+      && parti.every(p => (p.match(/[a-zà-ú]/gi) || []).length >= 2);
+    if (!dueNomi || odgNomePosto(nome)) { out.push(l); continue; }
+    parti.forEach(p => out.push({ ...l, nome: p }));
+  }
+  return out;
+}
 
 /* Il giorno dopo, in forma di data. Serve al meteo delle notturne. */
 function odgDomani(iso) {
