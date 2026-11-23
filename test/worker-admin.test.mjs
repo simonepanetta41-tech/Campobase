@@ -334,7 +334,10 @@ T.posta = [{ id: U(4), project_id: FA, oggetto: 'MSG - ODG #30', stato: 'fatta',
            { id: U(5), project_id: FA, oggetto: 'MSG - ODG #29', stato: 'fatta', ricevuta: fam(1500), ombra_stato: 'fatta', ombra_il: fam(1499), info: { ms: 90000 } }];
 [st, d] = await chiedi('tok-io', { azione: 'server' });
 ok('⚠ chi spende: solo dai telefoni, dal più caro', d.costi.persone.map(x => [x.nome, x.chiamate, x.dollari]), [['Anna R', 2, 0.8], ['Luca B', 1, 0.03]]);
-ok('quattordici giorni, anche quelli a zero, fino a oggi', [d.costi.giorni.length, d.costi.giorni[13].dollari, d.costi.giorni[10].chiamate, d.costi.giorni.filter(g => g.chiamate).length], [14, 0.4, 2, 2]);
+/* La spesa di "mezz'ora fa" cade oggi, tranne nella mezz'ora dopo mezzanotte,
+   quando e' di ieri: si guarda la somma dei due giorni, e cosi' i tre di prima. */
+ok('quattordici giorni, anche quelli a zero, fino a oggi', [d.costi.giorni.length, Math.round((d.costi.giorni[13].dollari + d.costi.giorni[12].dollari) * 100) / 100,
+  d.costi.giorni[10].chiamate + d.costi.giorni[9].chiamate, d.costi.giorni.filter(g => g.chiamate).length], [14, 0.4, 2, 2]);
 ok('i tempi di lettura, dal più vecchio', d.tempi.map(t => t.secondi), [90, 44]);
 ok('⚠ le versioni si confrontano da numeri: 1.176 è dopo 1.98', [d.versioni.ultima, d.versioni.aggiornati, d.versioni.indietro.map(x => [x.nome, x.versione]), d.versioni.ignoti], ['1.176', 1, [['Anna R', '1.98']], 1]);
 [st, d] = await chiedi('tok-io', { azione: 'persona', id: ANNA });
