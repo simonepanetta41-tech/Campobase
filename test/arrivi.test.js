@@ -66,7 +66,7 @@ vm.runInContext([blocco('const FAB_NOMI = {', '};'), blocco('const ODG_ARRIVI_ME
   const d = datiPerApp({ numero: '31', data: '2026-11-23', luoghi: [
     { nome: 'MEZZI TECNICI', indirizzo: 'Via Duomo 193/219', arrivi: ['Gruppo ore 14.00', 'Suono ore 9.00'] },
     { nome: 'PREPARAZIONE FIGURAZIONI', indirizzo: 'Largo Donnaregina 22' }] }, { id: 'm1', testo: MAIL });
-  ok('nel foglio che va all\'app: gli arrivi veri, posto per posto', d.luoghi.map(l => [l.nome, l.arrivi]), [['MEZZI TECNICI', ['Gruppo ore 14.00']], ['PREPARAZIONE FIGURAZIONI', []]]);
+  ok('nel foglio che va all\'app: gli arrivi veri, posto per posto', d.luoghi.map(l => [l.nome, l.arrivi || null]), [['MEZZI TECNICI', ['Gruppo ore 14.00']], ['PREPARAZIONE FIGURAZIONI', null]]);
 
   console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
   process.exit(ko ? 1 : 0);

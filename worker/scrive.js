@@ -120,8 +120,13 @@ export function datiPerApp(letto, riga, adesso) {
          l'indirizzo. Senza quelli l'app non sa dove si gira, e non da'
          ne' la mappa ne' il meteo. Un link che non e' un link si butta,
          il posto resta. */
-      .map(l => ({ nome: testo(l && l.nome), url: linkVero(l && l.url),
-                   indirizzo: testo(l && l.indirizzo), arrivi: arriviDallaMail(l && l.arrivi, riga && riga.testo) }))
+      .map(l => {
+        const posto = { nome: testo(l && l.nome), url: linkVero(l && l.url), indirizzo: testo(l && l.indirizzo) };
+        // Chi arriva li' e quando, se la mail lo dice: solo allora il posto porta la voce.
+        const arrivi = arriviDallaMail(l && l.arrivi, riga && riga.testo);
+        if (arrivi.length) posto.arrivi = arrivi;
+        return posto;
+      })
       .filter(l => l.nome && (l.url || l.indirizzo)),
     avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo)
       .filter(a => !indicazioniDallaMail(L.indicazioni, riga && riga.testo).some(p => p.testo.includes(a) || a.includes(p.testo))),
