@@ -297,8 +297,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
    caselle, che e' l'unica cosa che si tocca ogni giorno. Chiusi mostrano
    una riga di riepilogo: cosa c'e' dentro, senza aprirli. */
 .tt-sez{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.tt-sez-t{display:flex;align-items:center;gap:10px;width:100%;min-height:50px;padding:13px 16px;
-  background:none;border:none;cursor:pointer;color:inherit;font-family:inherit;text-align:left}
+.tt-sez-t{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;padding:13px 16px;
+  background:none;border:none;cursor:pointer;color:inherit;font-family:inherit;text-align:center}
 /* Il titolo e' la cosa che si legge per prima, il riepilogo viene dopo.
    Era al contrario: titolo a 9px in grigio e riepilogo piu' grande e piu'
    chiaro, quindi l'occhio leggeva il contenuto senza sapere di cosa. */
@@ -306,10 +306,25 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-sez-t .r{flex:1;min-width:0;font-size:11px;color:var(--muted);text-align:right;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tt-sez-t .c{color:var(--muted);font-size:15px;transition:transform .18s;flex:0 0 auto}
-.tt-sez-c{display:none;padding:0 16px 16px}
-.tt-sez.aperta .tt-sez-c{display:block}
-.tt-sez.aperta .tt-sez-t .c{transform:rotate(90deg)}
-.tt-sez.aperta .tt-sez-t .r{display:none}
+/* Storico, intestazione e regole non si aprono piu' dentro la pagina: il
+   tasto apre una finestra a tutto schermo, come la scheda di una scena.
+   I campi restano gli stessi, con gli stessi id: cambia solo dove stanno. */
+.tt-sez-c{display:none}
+.tt-sez.aperta .tt-sez-c{display:flex;flex-direction:column;position:fixed;inset:0;z-index:300;background:var(--bg);
+  padding:calc(env(safe-area-inset-top) + 14px) 0 calc(env(safe-area-inset-bottom) + 16px);overscroll-behavior:contain}
+.tt-fin-testa{position:relative;padding:0 16px 12px}
+.tt-fin-via{position:absolute;left:6px;top:-9px;width:44px;height:44px;background:none;border:none;color:var(--white-dim);
+  font-size:26px;line-height:1;cursor:pointer;z-index:1}
+.tt-fin-testa .cb-titolo{padding:0 34px}
+.tt-fin-corpo{flex:1;overflow-y:auto;padding:4px 16px 20px}
+.tt-fin-corpo > div:first-child > .odg-sez:first-child,.tt-fin-corpo > .tt-campi:first-child{margin-top:8px}
+.tt-fin-fatto{margin:6px 16px 0;min-height:48px;border:none;border-radius:12px;background:var(--yellow);color:#111;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;cursor:pointer}
+.tt-scelte{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.tt-scelte .tt-tog,.tt-scelte .tt-tog-o{min-height:40px;padding:8px 16px;white-space:nowrap}
+.tt-campi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.tt-et{font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
+#tt-rdExtra .odg-sez{margin-top:22px}
 /* ── foglio giornata ─────────────────────────────────────────────────
  * La tabella a sette colonne resta per il computer e per la revisione di
  * fine settimana. Sul telefono non ci sta in larghezza, e scrivere un
@@ -2028,77 +2043,83 @@ body.senza-rete #cbSenzaRete { display: block; }
 
         <!-- Storico -->
         <div class="tt-sez" id="sez-storico">
-          <button class="tt-sez-t" onclick="ttPiega('storico')"><span class="n">Storico settimane</span><span class="r" id="sum-storico"></span><span class="c">›</span></button>
+          <button class="tt-sez-t" onclick="ttPiega('storico')"><span class="n">Storico settimane</span></button>
           <div class="tt-sez-c">
+          <div class="tt-fin-testa"><button class="tt-fin-via" onclick="ttPiega('storico')" aria-label="Chiudi">‹</button><div class="cb-titolo">Storico settimane</div></div>
+          <div class="tt-fin-corpo">
 
           <div id="tt-storico"><div style="font-size:11px;color:var(--muted)">Nessuna settimana salvata.</div></div>
-          </div></div>
+          </div><button class="tt-fin-fatto" onclick="ttPiega('storico')">Fatto</button></div></div>
 
         <!-- Intestazione -->
         <div class="tt-sez" id="sez-testa">
-          <button class="tt-sez-t" onclick="ttPiega('testa')"><span class="n">Intestazione</span><span class="r" id="sum-testa"></span><span class="c">›</span></button>
+          <button class="tt-sez-t" onclick="ttPiega('testa')"><span class="n">Intestazione</span></button>
           <div class="tt-sez-c">
+          <div class="tt-fin-testa"><button class="tt-fin-via" onclick="ttPiega('testa')" aria-label="Chiudi">‹</button><div class="cb-titolo">Intestazione</div></div>
+          <div class="tt-fin-corpo">
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Produzione</div><input id="tt-produzione" type="text" placeholder="Es. Indigo Film" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Film</div><input id="tt-film" type="text" placeholder="Da analisi..." style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'" oninput="this.dataset.manuallyEdited='1'"></div>
+          <div class="tt-campi">
+            <div><div class="tt-et">Produzione</div><input id="tt-produzione" type="text" placeholder="Es. Indigo Film" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
+            <div><div class="tt-et">Film</div><input id="tt-film" type="text" placeholder="Da analisi..." style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'" oninput="this.dataset.manuallyEdited='1'"></div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Reparto</div><select id="tt-reparto" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none"><option value="Suono">Suono</option><option value="Fotografia">Fotografia</option></select></div>
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Settimana N°</div><input id="tt-settimana" type="text" placeholder="Auto/PDL" style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
+          <div class="tt-campi">
+            <div><div class="tt-et">Reparto</div><select id="tt-reparto" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none"><option value="Suono">Suono</option><option value="Fotografia">Fotografia</option></select></div>
+            <div><div class="tt-et">Settimana N°</div><input id="tt-settimana" type="text" placeholder="Auto/PDL" style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Dal</div><input id="tt-dal" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
-            <div><div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">Al</div><input id="tt-al" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
+          <div class="tt-campi">
+            <div><div class="tt-et">Dal</div><input id="tt-dal" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
+            <div><div class="tt-et">Al</div><input id="tt-al" type="date" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;min-height:36px" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
           </div>
-          </div></div>
+          </div><button class="tt-fin-fatto" onclick="ttPiega('testa')">Fatto</button></div></div>
 
         <!-- Regole di calcolo -->
         <div class="tt-sez" id="sez-regole">
-          <button class="tt-sez-t" onclick="ttPiega('regole')"><span class="n">Regole di calcolo</span><span class="r" id="sum-regole"></span><span class="c">›</span></button>
+          <button class="tt-sez-t" onclick="ttPiega('regole')"><span class="n">Regole di calcolo</span></button>
           <div class="tt-sez-c">
+          <div class="tt-fin-testa"><button class="tt-fin-via" onclick="ttPiega('regole')" aria-label="Chiudi">‹</button><div class="cb-titolo">Regole di calcolo</div></div>
+          <div class="tt-fin-corpo">
 
-          <div style="margin-bottom:12px">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em">Tipo giornata</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div>
+            <div class="odg-sez">Tipo giornata</div>
+            <div class="tt-scelte">
               <button class="tt-tog active" id="tt-tg10" onclick="ttSetGiornata(10)">10h <span style="opacity:0.6;font-size:10px">9h+1h pausa</span></button>
               <button class="tt-tog" id="tt-tg8" onclick="ttSetGiornata(8)">8h <span style="opacity:0.6;font-size:10px">continuate</span></button>
             </div>
           </div>
-          <div style="margin-bottom:12px;padding-top:12px;border-top:1px solid var(--border)">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em">Raddoppio ore golden</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+          <div>
+            <div class="odg-sez">Raddoppio ore golden</div>
+            <div class="tt-scelte">
               <button class="tt-tog active" id="tt-rd0" onclick="ttSetRaddoppio(0)">Off</button>
               <button class="tt-tog" id="tt-rd1" onclick="ttSetRaddoppio(1)">Dopo 1h</button>
               <button class="tt-tog" id="tt-rd2" onclick="ttSetRaddoppio(2)">Dopo 2h</button>
               <button class="tt-tog" id="tt-rd3" onclick="ttSetRaddoppio(3)">Dopo 3h</button>
             </div>
             <div id="tt-rdExtra" style="display:none">
-              <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em">Applicazione</div>
-              <div style="display:flex;gap:6px">
+              <div class="odg-sez">Applicazione</div>
+              <div class="tt-scelte">
                 <button class="tt-tog-o active-o" id="tt-applG" onclick="ttSetApplicazione('giornaliero')">Giornaliero</button>
                 <button class="tt-tog-o" id="tt-applS" onclick="ttSetApplicazione('settimanale')">Settimanale</button>
               </div>
             </div>
           </div>
-          <div style="padding-top:12px;border-top:1px solid var(--border)">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em">Maggiorazioni notturne</div>
-            <div style="display:flex;gap:6px">
+          <div>
+            <div class="odg-sez">Maggiorazioni notturne</div>
+            <div class="tt-scelte">
               <button class="tt-tog" id="tt-nOff" onclick="ttSetNott(false)">Off</button>
               <button class="tt-tog active" id="tt-nOn" onclick="ttSetNott(true)">On — automatico</button>
             </div>
           </div>
-          <div style="padding-top:12px;border-top:1px solid var(--border);margin-top:12px">
-            <div style="font-size:10px;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:0.06em">Ore viaggio concesse / giorno</div>
-            <div style="display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px">
-              <button class="tt-tog tt-vtog" data-mins="0" onclick="ttSetViaggio(0)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">Nessuna</button>
-              <button class="tt-tog tt-vtog" data-mins="30" onclick="ttSetViaggio(30)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">30 min</button>
-              <button class="tt-tog tt-vtog active" data-mins="60" onclick="ttSetViaggio(60)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">1h</button>
-              <button class="tt-tog tt-vtog" data-mins="90" onclick="ttSetViaggio(90)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">1h 30</button>
-              <button class="tt-tog tt-vtog" data-mins="120" onclick="ttSetViaggio(120)" style="white-space:nowrap;flex-shrink:0;padding:6px 10px">2h</button>
+          <div>
+            <div class="odg-sez">Ore viaggio concesse al giorno</div>
+            <div class="tt-scelte">
+              <button class="tt-tog tt-vtog" data-mins="0" onclick="ttSetViaggio(0)">Nessuna</button>
+              <button class="tt-tog tt-vtog" data-mins="30" onclick="ttSetViaggio(30)">30 min</button>
+              <button class="tt-tog tt-vtog active" data-mins="60" onclick="ttSetViaggio(60)">1h</button>
+              <button class="tt-tog tt-vtog" data-mins="90" onclick="ttSetViaggio(90)">1h 30</button>
+              <button class="tt-tog tt-vtog" data-mins="120" onclick="ttSetViaggio(120)">2h</button>
             </div>
           </div>
-          </div></div>
+          </div><button class="tt-fin-fatto" onclick="ttPiega('regole')">Fatto</button></div></div>
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
@@ -5510,7 +5531,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.185';
+const CB_VERSIONE = '1.186';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -16090,8 +16111,9 @@ let ttSoloVista=false;
 /* Apre e chiude un pannello degli orari, e ricorda la scelta. */
 function ttPiega(chiave){
   const el=document.getElementById('sez-'+chiave); if(!el)return;
-  const aperta=el.classList.toggle('aperta');
-  try{ localStorage.setItem('cb_tt_sez_'+chiave, aperta?'1':'0'); }catch(_){}
+  // Una finestra alla volta.
+  for(const k of ['storico','testa','regole']) if(k!==chiave) document.getElementById('sez-'+k)?.classList.remove('aperta');
+  el.classList.toggle('aperta');
   ttSommari();
 }
 
@@ -16118,13 +16140,9 @@ function ttSommari(){
 /* All'apertura: tutto chiuso, tranne quello che non e' ancora compilato —
    alla prima settimana l'intestazione serve subito. */
 function ttPieghePrime(){
-  const stato={testa: !document.getElementById('tt-film')?.value, regole:false, storico:false};
-  for(const k of ['storico','testa','regole']){
-    let v=null;
-    try{ v=localStorage.getItem('cb_tt_sez_'+k); }catch(_){}
-    const aperta = v===null ? stato[k] : v==='1';
-    document.getElementById('sez-'+k)?.classList.toggle('aperta', aperta);
-  }
+  // Sono finestre: all'apertura della pagina nessuna e' aperta, qualunque
+  // cosa si fosse lasciato l'ultima volta.
+  for(const k of ['storico','testa','regole']) document.getElementById('sez-'+k)?.classList.remove('aperta');
   ttSommari();
 }
 
