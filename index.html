@@ -325,6 +325,26 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-campi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .tt-et{font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
 #tt-rdExtra .odg-sez{margin-top:22px}
+/* Quale settimana e' a schermo: sta sopra la tabella, si legge da lontano. */
+.tt-quale{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:4px 10px;width:100%;min-height:52px;padding:10px 16px;
+  background:none;border:1px solid var(--yellow-dim,var(--border-l));border-radius:12px;color:var(--white);font-family:inherit;cursor:pointer;text-align:center}
+.tt-quale .k{flex-basis:100%;font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow)}
+.tt-quale .n{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600}
+.tt-quale .p{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--white-dim)}
+/* Lo storico: una scheda per settimana. */
+.tt-st{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+.tt-st.questa{border-color:var(--yellow)}
+.tt-st-t{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.tt-st-t .n{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--white)}
+.tt-st-t .q{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.tt-st-s{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--white-dim);margin-top:5px}
+.tt-st-c{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.45}
+.tt-st-a{display:flex;gap:10px;margin-top:14px}
+.tt-st-a button{min-height:46px;border-radius:11px;font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer}
+.tt-st-a .via{flex:0 0 auto;padding:0 18px;background:none;border:1px solid var(--border-l);color:var(--white-dim)}
+.tt-st-a .apri{flex:1;border:none;background:var(--yellow);color:#111}
+.tt-st-a .apri:disabled{background:var(--surface2);color:var(--muted);cursor:default}
+#tt-storico .odg-sez:first-child{margin-top:8px}
 /* I due tasti sotto il titolo: sono le azioni della pagina, e a 11px si
    perdevano. Lo stile a mano che hanno addosso resta per i colori. */
 .tt-tasti button{flex:1;max-width:180px;min-height:46px;padding:0 8px !important;font-size:13px !important;border-radius:11px !important;white-space:nowrap}
@@ -2133,6 +2153,9 @@ body.senza-rete #cbSenzaRete { display: block; }
             </div>
           </div>
           </div><button class="tt-fin-fatto" onclick="ttPiega('regole')">Fatto</button></div></div>
+
+        <!-- Quale settimana e' a schermo -->
+        <button class="tt-quale" id="tt-quale" onclick="ttPiega('storico')"><span class="k">A schermo</span><span class="n">Settimana</span><span class="p"></span></button>
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
@@ -5544,7 +5567,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.187';
+const CB_VERSIONE = '1.188';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -15573,6 +15596,9 @@ function initTimetable(){
   ttInited=true;
   ttTabelle=[ttMkTab([])];
   ttRipristinaBozza();
+  // Le regole non sono della settimana ripresa: sono quelle scelte per
+  // ultime. La prima volta si tengono quelle che c'erano, da confermare.
+  if(!ttRegoleApplica()) ttRegoleSalva(true);
   ttAscoltaIntestazione();
   ttPieghePrime();
   // Se c'e' qualcosa da prendere dall'ordine del giorno il disegno deve
@@ -16126,12 +16152,14 @@ function ttPiega(chiave){
   const el=document.getElementById('sez-'+chiave); if(!el)return;
   // Una finestra alla volta.
   for(const k of ['storico','testa','regole']) if(k!==chiave) document.getElementById('sez-'+k)?.classList.remove('aperta');
-  el.classList.toggle('aperta');
+  // Aprendo lo storico lo si ridisegna: "a schermo" dev'essere quella di adesso.
+  if(el.classList.toggle('aperta') && chiave==='storico'){ try{ ttRenderStorico(); }catch(_){} }
   ttSommari();
 }
 
 /* Le righe di riepilogo: dicono cosa c'e' dentro senza aprire. */
 function ttSommari(){
+  try{ ttQuale(); }catch(_){}
   const t=id=>(document.getElementById(id)?.value||'').trim();
   const metti=(k,v)=>{const e=document.getElementById('sum-'+k); if(e)e.textContent=v;};
 
@@ -16506,6 +16534,49 @@ function ttGiorniCompilati(){
     a+[0,1,2,3,4,5].filter(i=>ttGiornoHaDati(t.orari,i)).length,0);
 }
 
+/* ── LE REGOLE DI CALCOLO SONO UNA SOLA ───────────────────────────────
+ *
+ * Prima viaggiavano dentro ogni settimana salvata: aprendone una vecchia
+ * tornavano le sue (8h invece di 10h, niente viaggio…) e i conti cambiavano
+ * senza che nessuno l'avesse chiesto. Ma su un film le regole sono quelle
+ * del contratto: non esistono settimane con regole diverse.
+ *
+ * Ora stanno a parte, sul telefono: valgono le ultime scelte, e si
+ * applicano a qualunque settimana si apra o si carichi dallo storico.
+ * Ogni settimana salvata se le porta ancora dietro (ttRecord), ma solo
+ * come ricordo: chi la riapre non le legge piu'.
+ *
+ * Su un telefono dove non sono mai state toccate si prendono dall'ultima
+ * settimana salvata sul cloud, una volta: e' il modo per ritrovarle
+ * cambiando telefono.
+ */
+const TT_REGOLE='cb_tt_regole';
+const TT_REGOLE_CAMPI=['tipoGiornata','raddoppio','applicazione','maggiorazioniNott','viaggioConcesso'];
+function ttRegoleLeggi(){
+  try{ const r=JSON.parse(localStorage.getItem(TT_REGOLE)||'null'); return r&&typeof r==='object'?r:null; }catch(_){ return null; }
+}
+function ttRegoleSalva(provvisorie){
+  const r={il:Date.now()};
+  TT_REGOLE_CAMPI.forEach(c=>{ r[c]=ttMeta[c]; });
+  if(provvisorie) r.provvisorie=true;
+  try{ localStorage.setItem(TT_REGOLE,JSON.stringify(r)); }catch(_){}
+}
+/* Mette in ttMeta le regole salvate. false se non ce ne sono. */
+function ttRegoleApplica(){
+  const r=ttRegoleLeggi(); if(!r)return false;
+  TT_REGOLE_CAMPI.forEach(c=>{ if(r[c]!=null) ttMeta[c]=r[c]; });
+  return true;
+}
+/* Le regole di una settimana salvata: servono solo a un telefono nuovo. */
+function ttRegoleDa(meta){
+  const r=ttRegoleLeggi();
+  if(!meta || (r && !r.provvisorie)) return false;
+  let cambiate=false;
+  TT_REGOLE_CAMPI.forEach(c=>{ if(meta[c]!=null && meta[c]!==ttMeta[c]){ ttMeta[c]=meta[c]; cambiate=true; } });
+  ttRegoleSalva(false);
+  return cambiate;
+}
+
 async function ttCambiaRegola(descrizione,applica){
   const n=ttGiorniCompilati();
   if(n>0){
@@ -16516,6 +16587,7 @@ async function ttCambiaRegola(descrizione,applica){
     if(!okgo){ ttSyncRegole(); return; }
   }
   applica();
+  ttRegoleSalva(false);            // da adesso valgono per ogni settimana
   ttRenderAll();
 }
 
@@ -16727,34 +16799,60 @@ async function ttRenderStorico(){
   if(!currentUser){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Accedi per vedere lo storico.</div>';return;}
   const{data:rows,error}=await sb.from('timetable_weeks').select('id,data,updated_at').eq('user_id',currentUser.id).order('updated_at',{ascending:false});
   if(error){console.log('[ttStorico] error:',error.message);el.innerHTML='<div style="font-size:11px;color:var(--danger)">Errore caricamento storico.</div>';return;}
-  ttStoricoCache=ttOrdinaStorico((rows||[]).map(r=>({dbId:r.id,salvataIl:r.updated_at,...r.data})));
+  // Dalla piu' recente: e' quella che si cerca quasi sempre.
+  ttStoricoCache=ttOrdinaStorico((rows||[]).map(r=>({dbId:r.id,salvataIl:r.updated_at,...r.data}))).reverse();
   const saved=ttStoricoCache;
   if(saved.length===0){el.innerHTML='<div style="font-size:11px;color:var(--muted)">Nessuna settimana salvata.</div>';return;}
+  // Su un telefono nuovo le regole si riprendono dall'ultima settimana salvata.
+  try{ if(rows&&rows[0]&&rows[0].data&&ttRegoleDa(rows[0].data.meta)){ ttSoloVista=true; ttRenderAll(); ttSoloVista=false; } }catch(_){}
+  /* Una scheda per settimana: quale, di quando, di chi, e due tasti
+     grandi. Quella a schermo e' segnata, e non si puo' eliminare da qui
+     senza volerlo: l'eliminazione chiede conferma. */
+  const film=x=>(x.meta.film||x.meta.produzione||'').trim();
+  const piuFilm=new Set(saved.map(film)).size>1;
+  let ultimo=null;
   el.innerHTML=saved.map((s,si)=>{
-    const m=s.meta;
-    const tabs=s.tabelle.map(t=>`<div class="tt-stor-tab">
-      <span style="font-size:11px;color:var(--white-dim)">${t.workers.length>0?t.workers.join(', '):'Nessun lavoratore'}</span>
-      <div style="display:flex;gap:5px">
-        <button onclick="ttLoad(${si})" style="padding:3px 9px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;border-radius:4px;cursor:pointer" onmouseover="this.style.borderColor='var(--yellow)';this.style.color='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">Carica</button>
-        <button onclick="ttDelS(${si})" style="padding:3px 9px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;border-radius:4px;cursor:pointer" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✕</button>
-      </div></div>`).join('');
-    return `<div style="margin-bottom:8px">
-      <div class="tt-stor-hdr" id="ttsh-${si}" onclick="ttTogS(${si})">
-        <div>
-          <div style="font-size:12px;font-weight:500;color:var(--white)">Sett. ${m.settimana||'?'} · ${m.reparto} · ${m.film||m.produzione||'—'}</div>
-          <div style="font-size:9px;color:var(--muted);margin-top:2px">${m.dal||'?'} → ${m.al||'?'} · ${s.tabelle.length} tabell${s.tabelle.length===1?'a':'e'}</div>
-        </div>
-        <span id="ttsa-${si}" style="font-size:11px;color:var(--muted);transition:transform 0.2s;display:inline-block">▾</span>
+    const m=s.meta, questa=ttEQuesta(m);
+    const chi=[...new Set(s.tabelle.flatMap(t=>t.workers||[]))];
+    const testa=piuFilm&&film(s)!==ultimo?`<div class="odg-sez">${esc(film(s)||'Senza film')}</div>`:'';
+    ultimo=film(s);
+    return `${testa}<div class="tt-st${questa?' questa':''}">
+      <div class="tt-st-t"><span class="n">Settimana ${esc(m.settimana||'?')}</span>${questa?'<span class="q">a schermo</span>':''}</div>
+      <div class="tt-st-s">${esc([ttPeriodo(m.dal,m.al), m.reparto, piuFilm?'':film(s)].filter(Boolean).join(' · '))}</div>
+      <div class="tt-st-c">${chi.length?esc(chi.join(', ')):'Nessun lavoratore'}</div>
+      <div class="tt-st-a">
+        <button class="via" onclick="ttDelS(${si})">Elimina</button>
+        <button class="apri" onclick="ttLoad(${si})"${questa?' disabled':''}>${questa?'È quella a schermo':'Apri'}</button>
       </div>
-      <div class="tt-stor-tabs" id="ttst-${si}">${tabs}</div>
     </div>`;
   }).join('');
 }
 
-function ttTogS(i){
-  document.getElementById(`ttsh-${i}`).classList.toggle('open');
-  document.getElementById(`ttst-${i}`).classList.toggle('open');
+/* "16–21 nov", o "30 nov – 5 dic" a cavallo di due mesi. */
+function ttPeriodo(dal,al){
+  const M=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const d=x=>{ const m=String(x||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?{g:+m[3],m:+m[2]-1}:null; };
+  const a=d(dal), b=d(al);
+  if(a&&b) return a.m===b.m?`${a.g}–${b.g} ${M[a.m]}`:`${a.g} ${M[a.m]} – ${b.g} ${M[b.m]}`;
+  const u=a||b; return u?`${u.g} ${M[u.m]}`:'';
 }
+/* La settimana a schermo e' questa dello storico? Stesso numero, stesso
+   film, stesso reparto: e' cosi' che il salvataggio le distingue. */
+function ttEQuesta(m){
+  const v=id=>(document.getElementById(id)?.value||'').trim().toLowerCase(), u=x=>String(x||'').trim().toLowerCase();
+  return !!m && !!v('tt-settimana') && u(m.settimana)===v('tt-settimana') && u(m.film)===v('tt-film') && u(m.reparto)===v('tt-reparto');
+}
+/* Sopra la tabella: quale settimana si sta guardando. Dopo averne caricate
+   due o tre dallo storico non si capiva piu' quale fosse a schermo. Il
+   tasto porta allo storico, che e' dove la si cambia. */
+function ttQuale(){
+  const el=document.getElementById('tt-quale'); if(!el)return;
+  const v=id=>(document.getElementById(id)?.value||'').trim();
+  const n=v('tt-settimana'), per=ttPeriodo(v('tt-dal'),v('tt-al'));
+  el.querySelector('.n').textContent=n?'Settimana '+n:'Settimana senza numero';
+  el.querySelector('.p').textContent=per;
+}
+
 function ttLoad(si){
   const s=ttStoricoCache[si];if(!s)return;
   const m=s.meta;
@@ -16765,16 +16863,18 @@ function ttLoad(si){
   document.getElementById('tt-dal').value=m.dal||'';
   document.getElementById('tt-al').value=m.al||'';
   document.getElementById('tt-note').value=m.note||'';
-  Object.assign(ttMeta,m);
+  // Della settimana si prendono orari, intestazione e note. Le regole no:
+  // valgono quelle di adesso, uguali per tutte le settimane.
+  ttMeta.note=m.note||'';
+  ttRegoleApplica();
   ttTabelle=JSON.parse(JSON.stringify(s.tabelle));
-  ttSetGiornata(ttMeta.tipoGiornata);
-  ttSetRaddoppio(ttMeta.raddoppio);
-  ttSetNott(ttMeta.maggiorazioniNott);
-  ttSetViaggio(ttMeta.viaggioConcesso||60);
-  ttRenderAll();showToast('Settimana caricata.');
+  ttGiornoSel=ttGiornoIniziale();
+  document.getElementById('sez-storico')?.classList.remove('aperta');
+  ttRenderAll();showToast('Settimana '+(m.settimana||'')+' caricata.');
 }
 async function ttDelS(si){
   const s=ttStoricoCache[si];if(!s)return;
+  if(!await askConfirm('Eliminare la settimana '+(s.meta.settimana||'?')+' dallo storico? I suoi orari non si recuperano.',{conferma:'Elimina'}))return;
   const{error}=await sb.from('timetable_weeks').delete().eq('id',s.dbId);
   if(error){console.log('[ttDelS] error:',error.message);showToast('Errore eliminazione: '+error.message);return;}
   ttRenderStorico();

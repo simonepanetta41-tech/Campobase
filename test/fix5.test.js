@@ -78,6 +78,49 @@ ok('"Fatto" la chiude', await aperte(), []);
 await p.evaluate(()=>ttPiega('storico')); await p.click('#sez-storico .tt-fin-via');
 ok('e anche la freccia in alto', await aperte(), []);
 
+console.log('\n── ⚠ le regole di calcolo sono una sola, per tutte le settimane ──');
+/* Prima ogni settimana salvata si portava le sue: riaprendone una vecchia
+   tornavano 8h invece di 10h, e i conti cambiavano da soli. */
+const sett=(n,dal,al,regole)=>({id:'w'+n,updated_at:'2026-11-0'+n+'T10:00:00Z',data:{meta:{produzione:'P',film:'Missione San Gennaro',reparto:'Suono',settimana:String(n),dal,al,note:'nota '+n,
+  tipoGiornata:10,raddoppio:0,applicazione:'giornaliero',maggiorazioniNott:true,viaggioConcesso:60,...regole},
+  tabelle:[{id:1,workers:['Simone Panetta','Anna Riva'],orari:{partenza:['','','','','',''],inizio:['08.00','','','','',''],pausa:['','','','','',''],stop:['','','','','',''],fine:['19.00','','','','',''],rientro:['','','','','','']}}]}});
+await p.evaluate((righe)=>{ window.RIGHE=righe; window.TOLTE=[]; currentUser={id:'u1'}; askConfirm=async()=>true;
+  sb.from=()=>{ const x={select(){return x},eq(v,id){ if(x.togli){ TOLTE.push(id); RIGHE=RIGHE.filter(r=>r.id!==id); } return x; },order:async()=>({data:RIGHE,error:null}),upsert:async()=>({error:null}),
+    delete(){ x.togli=true; return x; },then(g){return Promise.resolve({data:[],error:null}).then(g)}}; return x; }; },
+  [sett(4,'2026-10-26','2026-10-31',{tipoGiornata:8,viaggioConcesso:0,maggiorazioniNott:false}), sett(6,'2026-11-09','2026-11-14',{}), sett(5,'2026-11-02','2026-11-07',{raddoppio:2})]);
+const regole=()=>p.evaluate(()=>[ttMeta.tipoGiornata,ttMeta.raddoppio,ttMeta.maggiorazioniNott,ttMeta.viaggioConcesso]);
+await p.evaluate(async()=>{ localStorage.removeItem('cb_tt_regole'); Object.assign(ttMeta,{tipoGiornata:10,raddoppio:0,maggiorazioniNott:true,viaggioConcesso:60}); ttRegoleSalva(false); await ttRenderStorico(); });
+await p.evaluate(()=>ttSetViaggio(90)); await p.waitForTimeout(100);
+ok('cambiare una regola la salva a parte, sul telefono', await p.evaluate(()=>{ const r=JSON.parse(localStorage.getItem('cb_tt_regole')); return [r.viaggioConcesso, r.tipoGiornata, !!r.il, !!r.provvisorie]; }), [90,10,true,false]);
+await p.evaluate(()=>ttLoad(ttStoricoCache.findIndex(w=>w.meta.settimana==='4'))); await p.waitForTimeout(100);
+ok('⚠ aprendo una settimana salvata a 8h senza viaggio, le regole restano le mie', await regole(), [10,0,true,90]);
+ok('gli orari, le note e l\'intestazione invece sono i suoi', await p.evaluate(()=>[ttTabelle[0].orari.inizio[0], ttMeta.note, document.getElementById('tt-settimana').value, document.getElementById('tt-dal').value]), ['08.00','nota 4','4','2026-10-26']);
+ok('e i tasti delle regole dicono quelle vere', await p.evaluate(()=>[document.getElementById('tt-tg10').classList.contains('active'), document.getElementById('tt-tg8').classList.contains('active'), [...document.querySelectorAll('.tt-vtog.active')].map(b=>b.dataset.mins)]), [true,false,['90']]);
+await p.evaluate(()=>ttLoad(ttStoricoCache.findIndex(w=>w.meta.settimana==='5'))); await p.waitForTimeout(100);
+ok('lo stesso con un\'altra: nessuna settimana ha regole sue', await regole(), [10,0,true,90]);
+ok('⚠ chiudendo e riaprendo l\'app valgono ancora', await p.evaluate(()=>{ Object.assign(ttMeta,{tipoGiornata:8,viaggioConcesso:0}); ttRegoleApplica(); return [ttMeta.tipoGiornata, ttMeta.viaggioConcesso]; }), [10,90]);
+ok('una settimana salvata se le porta ancora dietro, come ricordo', await p.evaluate(()=>ttRecord().meta.viaggioConcesso), 90);
+ok('⚠ su un telefono nuovo si riprendono dall\'ultima settimana salvata, una volta sola', await p.evaluate(async()=>{ localStorage.removeItem('cb_tt_regole'); Object.assign(ttMeta,{tipoGiornata:10,raddoppio:0,maggiorazioniNott:true,viaggioConcesso:60}); ttRegoleSalva(true);
+  RIGHE[0].data.meta.viaggioConcesso=120; await ttRenderStorico(); const prima=ttMeta.viaggioConcesso; RIGHE[0].data.meta.viaggioConcesso=30; await ttRenderStorico(); return [prima, ttMeta.viaggioConcesso, !!JSON.parse(localStorage.getItem('cb_tt_regole')).provvisorie]; }), [120,120,false]);
+
+console.log('\n── lo storico e la settimana a schermo ──');
+await p.evaluate(async()=>{ ttLoad(ttStoricoCache.findIndex(w=>w.meta.settimana==='5')); await ttRenderStorico(); });
+ok('⚠ sopra la tabella c\'è scritto quale settimana si guarda', await p.evaluate(()=>[...document.querySelectorAll('#tt-quale span')].map(x=>x.textContent)), ['A schermo','Settimana 5','2–7 nov']);
+ok('a cavallo di due mesi, o senza date', await p.evaluate(()=>[ttPeriodo('2026-11-30','2026-12-05'), ttPeriodo('2026-11-16',''), ttPeriodo('','')]), ['30 nov – 5 dic','16 nov','']);
+await p.evaluate(()=>{ document.getElementById('tt-settimana').value=''; ttSommari(); });
+ok('senza numero lo dice, non resta vuoto', await p.evaluate(()=>document.querySelector('#tt-quale .n').textContent), 'Settimana senza numero');
+await p.evaluate(()=>{ document.getElementById('tt-settimana').value='5'; ttSommari(); });
+await p.click('#tt-quale'); await p.waitForTimeout(250);
+ok('toccandolo si apre lo storico', await aperte(), ['storico']);
+ok('una scheda per settimana, dalla più recente', await p.evaluate(()=>[...document.querySelectorAll('#tt-storico .tt-st .n')].map(x=>x.textContent)), ['Settimana 6','Settimana 5','Settimana 4']);
+ok('con le date, il reparto e chi c\'è', await p.evaluate(()=>{ const c=document.querySelector('#tt-storico .tt-st'); return [c.querySelector('.tt-st-s').textContent, c.querySelector('.tt-st-c').textContent]; }), ['9–14 nov · Suono · Missione San Gennaro','Simone Panetta, Anna Riva']);
+ok('⚠ quella a schermo è segnata, e non si riapre su se stessa', await p.evaluate(()=>[...document.querySelectorAll('#tt-storico .tt-st')].map(c=>[c.classList.contains('questa'), c.querySelector('.apri').disabled, c.querySelector('.apri').textContent])), [[false,false,'Apri'],[true,true,'È quella a schermo'],[false,false,'Apri']]);
+await p.click('#tt-storico .tt-st:first-child .apri'); await p.waitForTimeout(200);
+ok('"Apri" carica la settimana e chiude la finestra', [await p.evaluate(()=>document.getElementById('tt-settimana').value), await aperte(), await p.evaluate(()=>document.querySelector('#tt-quale .n').textContent)], ['6',[],'Settimana 6']);
+await p.evaluate(()=>{ askConfirm=async()=>false; return ttDelS(ttStoricoCache.findIndex(w=>w.meta.settimana==='4')); });
+ok('⚠ eliminare chiede conferma: detto di no, resta', await p.evaluate(()=>[TOLTE, RIGHE.length]), [[],3]);
+await p.evaluate(()=>{ askConfirm=async()=>true; return ttDelS(ttStoricoCache.findIndex(w=>w.meta.settimana==='4')); }); await p.waitForTimeout(150);
+ok('detto di sì, va via quella e solo quella', await p.evaluate(()=>[TOLTE, [...document.querySelectorAll('#tt-storico .tt-st .n')].map(x=>x.textContent)]), [['w4'],['Settimana 6','Settimana 5']]);
 console.log('\n── 3. il profilo si chiede all\'ingresso, non all\'OdG ──');
 await p.evaluate(()=>{localStorage.removeItem('cb_profilo');localStorage.removeItem('cb_odg_io');});
 ok('c\'è la schermata di benvenuto', await p.evaluate(()=>!!document.getElementById('benvenuto')), true);
