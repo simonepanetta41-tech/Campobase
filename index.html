@@ -325,6 +325,19 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-campi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .tt-et{font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
 #tt-rdExtra .odg-sez{margin-top:22px}
+/* I due tasti sotto il titolo: sono le azioni della pagina, e a 11px si
+   perdevano. Lo stile a mano che hanno addosso resta per i colori. */
+.tt-tasti button{flex:1;max-width:180px;min-height:46px;padding:0 8px !important;font-size:13px !important;border-radius:11px !important;white-space:nowrap}
+/* L'intestazione ha una finestra intera: campi alti, comodi da toccare e
+   da leggere, uno per riga dove il testo e' lungo. A 16px l'iPhone non
+   ingrandisce la pagina quando ci si scrive. */
+#sez-testa .tt-fin-corpo{padding-top:14px}
+#sez-testa .tt-campi{gap:14px;margin-bottom:20px}
+#sez-testa .tt-campi:first-child{grid-template-columns:1fr;gap:20px}
+#sez-testa .tt-et{font-size:11px;margin-bottom:8px;letter-spacing:.1em}
+#sez-testa .tt-campi > div{min-width:0}
+#sez-testa input,#sez-testa select{box-sizing:border-box;width:100%;min-width:0;height:54px;padding:0 15px !important;font-size:16px !important;border-radius:12px !important}
+#sez-testa input[type=date]{padding:0 10px !important;font-size:15px !important}
 /* ── foglio giornata ─────────────────────────────────────────────────
  * La tabella a sette colonne resta per il computer e per la revisione di
  * fine settimana. Sul telefono non ci sta in larghezza, e scrivere un
