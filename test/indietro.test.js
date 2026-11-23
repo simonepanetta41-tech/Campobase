@@ -78,9 +78,26 @@ ok('c\'è il segno di indietro',
 ok('ed è il primo, prima del nome',
    await p.evaluate(()=>{const b=document.querySelector('.cb-ident');
      return b.firstElementChild.className;}), 'cb-back');
-ok('riporta alla scelta del progetto',
+ok('il tasto è quello dell\'indietro',
    await p.evaluate(()=>document.querySelector('.cb-ident').getAttribute('onclick')),
-   "cbEsciDalFilm()");
+   "cbIndietro()");
+
+console.log('\n── ⚠ da Altro si torna da dove si era partiti, non fuori dal film ──');
+/* Entrando in Cast da Altro e premendo indietro si finiva alla scelta del
+   film, e bisognava rientrarci. */
+const dopo = async (passi) => p.evaluate((passi)=>{ let fuori=false; const vera=showPage; showPage=()=>{ fuori=true; };
+  rtAdesso = rtPrimaDiAltro = null;
+  for (const x of passi) { if (x==='<') cbIndietro(); else switchResultTab(x); }
+  showPage=vera; return fuori ? 'fuori dal film' : rtAdesso; }, passi);
+ok('OdG → Altro → Cast → indietro: di nuovo sull\'ordine del giorno', await dopo(['odg','altro','cast','<']), 'odg');
+ok('Spoglio → Altro → indietro: di nuovo sullo spoglio', await dopo(['spoglio','altro','<']), 'spoglio');
+ok('girando dentro Altro ci si ricorda sempre da dove si era entrati', await dopo(['piano','altro','cast','altro','troupe','analisi','<']), 'piano');
+ok('e da lì un altro indietro esce dal film, come sempre', await dopo(['odg','altro','cast','<','<']), 'fuori dal film');
+ok('⚠ dalle pagine del film l\'indietro esce subito', [await dopo(['odg','<']), await dopo(['spoglio','ore','<'])], ['fuori dal film','fuori dal film']);
+ok('si ricorda l\'ultima, non la prima', await dopo(['odg','altro','cast','spoglio','altro','troupe','<']), 'spoglio');
+ok('aperto direttamente su Cast (da una notifica): indietro esce', await dopo(['cast','<']), 'fuori dal film');
+ok('uscendo dal film non resta memoria per il prossimo', await p.evaluate(()=>{ const vera=showPage; showPage=()=>{}; switchResultTab('odg'); switchResultTab('altro'); cbEsciDalFilm(); showPage=vera; return [rtAdesso, rtPrimaDiAltro]; }), [null,null]);
+await p.evaluate(()=>{ document.getElementById('resultsPage').style.display=''; switchResultTab('odg'); });
 
 console.log('\n── sulla schermata di scelta non si torna da nessuna parte ──');
 await p.evaluate(()=>{

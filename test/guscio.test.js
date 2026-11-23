@@ -51,7 +51,7 @@ await p.evaluate(()=>{
 
 console.log('\n── la barra ha cinque schede ──');
 const et=await p.evaluate(()=>[...document.querySelectorAll('.result-tabs .result-tab')].map(b=>b.textContent.trim()));
-ok('etichette', et, ['OdG','Spoglio','Ore','Piano','Altro']);
+ok('etichette', et, ['OdG','Spoglio','Orari','Piano','Altro']);
 ok('una riga sola', await p.evaluate(()=>document.querySelectorAll('.result-tabs').length), 1);
 
 console.log('\n── ogni scheda apre la sua sezione ──');

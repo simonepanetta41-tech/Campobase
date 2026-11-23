@@ -1356,6 +1356,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .sugg { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 10px; color: var(--muted); cursor: pointer; transition: all 0.15s; font-family: 'DM Mono', monospace; }
 .sugg:hover { border-color: var(--yellow); color: var(--yellow); }
 
+/* ── IL TITOLO DELLA PAGINA ──
+   Lo stesso motivo dei titoli di sezione, un gradino sopra: al centro,
+   bianco e piu' grande, fra due righe sottili. Sotto, al centro, quello
+   che lo accompagna (la data, il conto, i tasti). Vale per ogni pagina:
+   chi ne aggiunge una mette la classe cb-titolo al suo titolo. */
+.cb-titolo, .odg-testa .h1, .sp-testa .t, .pdl-testa {
+  display: flex; align-items: center; justify-content: center; gap: 14px; text-align: center;
+  font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; letter-spacing: -.02em; color: var(--white); }
+.cb-titolo::before, .cb-titolo::after, .odg-testa .h1::before, .odg-testa .h1::after,
+.sp-testa .t::before, .sp-testa .t::after, .pdl-testa::before, .pdl-testa::after {
+  content: ''; display: block; flex: 1; min-width: 14px; height: 1px; background: var(--border); }
+.odg-testa .h1 { font-size: 17px; letter-spacing: 0; }
+.odg-testa, .pdl-sotto { text-align: center; }
+.sp-testa { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; text-align: center; }
+.tt-testa { display: flex; flex-direction: column; gap: 10px; }
+.tt-tasti { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 /* ── SETTINGS ── */
 .settings-section { margin-bottom: 28px; }
 .settings-title { font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
@@ -1531,7 +1547,7 @@ body.senza-rete #cbSenzaRete { display: block; }
          cambia. Il titolo riporta alla scelta del progetto, l'ingranaggio
          alle impostazioni. -->
     <header class="cb-testa">
-      <button class="cb-ident" onclick="cbEsciDalFilm()" title="Cambia progetto">
+      <button class="cb-ident" onclick="cbIndietro()" title="Indietro">
         <!-- La freccetta verso il basso diceva "qui si apre qualcosa", e
              qui invece si torna indietro. Il segno di indietro sta dove lo
              cerca la mano, tutto a sinistra, prima del nome del film. -->
@@ -1784,7 +1800,7 @@ body.senza-rete #cbSenzaRete { display: block; }
       <div class="result-tabs">
         <button class="result-tab active" id="tabOdg" onclick="switchResultTab('odg')"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h3"/></svg> OdG</button>
         <button class="result-tab" id="tabSpoglio" onclick="switchResultTab('spoglio')"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h16M9 9v11"/></svg> Spoglio</button>
-        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('ore')"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg> Ore</button>
+        <button class="result-tab" id="tabTimetable" onclick="switchResultTab('ore')"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg> Orari</button>
         <button class="result-tab" id="tabPdl" onclick="switchResultTab('piano')"><svg viewBox="0 0 24 24"><path d="M4 5h16v15H4zM4 9h16M9 3v4M15 3v4"/></svg> Piano</button>
         <button class="result-tab" id="tabAltro" onclick="switchResultTab('altro')"><svg viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></svg> Altro</button>
       </div>
@@ -1998,9 +2014,9 @@ body.senza-rete #cbSenzaRete { display: block; }
       <!-- TIMETABLE SECTION -->
       <div id="timetableSection" style="display:none;flex-direction:column;padding:12px 16px;gap:12px;overflow-y:auto;padding-bottom:96px">
 
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700">Ore</div>
-          <div style="display:flex;gap:8px">
+        <div class="tt-testa">
+          <div class="cb-titolo">Orari</div>
+          <div class="tt-tasti">
             <button onclick="ttNuovaSettimana()" style="padding:7px 14px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:11px;border-radius:7px;cursor:pointer">Nuova settimana</button>
             <!-- Il tasto Salva non c'e' piu': salvava la stessa cosa che l'app
                  salva gia' da sola a ogni orario scritto, ed era il tasto piu'
@@ -3230,7 +3246,7 @@ document.addEventListener('touchend', e => {
   const dx = t.clientX - cbTx, dy = t.clientY - cbTy;
   // Abbondante e chiaramente orizzontale: uno scorrimento in verticale
   // che sbanda non deve far cambiare schermata.
-  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) cbEsciDalFilm();
+  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) cbIndietro();
 }, { passive: true });
 
 /*
@@ -3837,7 +3853,18 @@ function ultimoRicorda(x){ try { localStorage.setItem(CB_ULTIMO, JSON.stringify(
 function ultimoDimentica(){ try { localStorage.removeItem(CB_ULTIMO); } catch (_) {} }
 function ultimoLeggi(){ try { return JSON.parse(localStorage.getItem(CB_ULTIMO) || 'null'); } catch (_) { return null; } }
 /* La freccia in alto e lo scorrimento: si esce dal film apposta. */
-function cbEsciDalFilm(){ ultimoDimentica(); showPage('home'); }
+function cbEsciDalFilm(){ ultimoDimentica(); rtAdesso = rtPrimaDiAltro = null; showPage('home'); }
+
+/* Il segno di indietro in alto. Da "Altro" e dalle pagine che ci stanno
+   sotto (cast, troupe, analisi…) riporta alla pagina del film da cui si
+   era partiti; da li', come sempre, alla scelta del film. Prima da Cast
+   si finiva dritti fuori dal film, e bisognava rientrarci. */
+let rtAdesso = null, rtPrimaDiAltro = null;
+const rtInAltro = t => t === 'altro' || RT_SOTTO_ALTRO.includes(t);
+function cbIndietro(){
+  if (rtInAltro(rtAdesso) && rtPrimaDiAltro) return switchResultTab(rtPrimaDiAltro);
+  cbEsciDalFilm();
+}
 
 /* Portare a una sezione, dentro il film gia' aperto. */
 function sezioneVai(vai){
@@ -5483,7 +5510,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.184';
+const CB_VERSIONE = '1.185';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -6897,6 +6924,9 @@ const RT_FLEX = ['ore','wrap','script'];      // sezioni a colonna
 const RT_SOTTO_ALTRO = ['cast','wrap','script','analisi','troupe'];
 
 function switchResultTab(tab) {
+  // Da dove si entra in "Altro": e' li' che riporta il tasto indietro.
+  if (rtInAltro(tab) && rtAdesso && !rtInAltro(rtAdesso)) rtPrimaDiAltro = rtAdesso;
+  rtAdesso = tab;
   for (const [k, id] of Object.entries(RT_SEZIONI)) {
     const el = document.getElementById(id); if (!el) continue;
     if (k === 'piano') { el.classList.toggle('on', tab === 'piano'); continue; }
@@ -7772,8 +7802,7 @@ function renderCastTab(rows, showAlert) {
   const conScene = righe.filter(x => x.n).length;
   wrap.innerHTML = `
     <div class="sp-testa"><span class="t">Cast</span>
-      <span class="s">${righe.length} personagg${righe.length===1?'io':'i'}${ufficiale?' · lista ufficiale':''}${
-        righe.some(x => x.interprete) ? ' · ' + righe.filter(x => x.interprete).length + ' con l’interprete' : ''}</span></div>
+      <span class="s">${ufficiale ? 'lista ufficiale' : 'lista provvisoria'}</span></div>
     ${conScene ? `<div class="cal-vista" style="margin-bottom:11px">
       <button class="${castOrdine==='id'?'on':''}" onclick="castOrdina('id')">Per ID</button>
       <button class="${castOrdine==='scene'?'on':''}" onclick="castOrdina('scene')">Per scene</button>
@@ -16750,7 +16779,7 @@ function ttNomeProposto(){
   const film=v('tt-film'), sett=v('tt-settimana');
   const nome=[ttSiglaFilm(film), ttPulisciNome(v('tt-reparto').replace(/\s+/g,'')),
               sett?'Sett'+ttPulisciNome(sett):'', ttDateNome(v('tt-dal'),v('tt-al'))].filter(Boolean).join('_');
-  return nome||'Ore';
+  return nome||'Orari';
 }
 /* "Denny De Angelis" -> "DeAngelis": il cognome e' tutto quello che viene
    dopo il nome. Uno scritto con una parola sola resta quella. */

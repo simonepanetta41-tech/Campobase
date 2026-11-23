@@ -143,7 +143,7 @@ for(const [larghezza, etichetta] of [[390,'iPhone'],[768,'schermo largo']]){
     ok('si può riscrivere: spazi e segni strani spariscono', r.mio, 'ore_sett_4__suono');
     ok('lasciato vuoto, torna quello proposto', r.vuoto, 'MSG_Suono_Sett4_09-14nov');
     ok('una settimana a cavallo di due mesi', r.cavallo, 'MSG_Suono_Sett4_30nov-05dic');
-    ok('con poco: quello che c\'è', [r.poco, r.niente], ['SEP','Ore']);
+    ok('con poco: quello che c\'è', [r.poco, r.niente], ['SEP','Orari']);
     ok('⚠ i cognomi, per un file a tabella', r.cognomi, ['DeAngelis-Panetta-Rizzo','Lorenzo','']);
     // E i file escono davvero con quei nomi.
     const salvati=await p.evaluate(async()=>{
