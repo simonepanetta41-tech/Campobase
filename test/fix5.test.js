@@ -105,7 +105,8 @@ ok('⚠ su un telefono nuovo si riprendono dall\'ultima settimana salvata, una v
 
 console.log('\n── lo storico e la settimana a schermo ──');
 await p.evaluate(async()=>{ ttLoad(ttStoricoCache.findIndex(w=>w.meta.settimana==='5')); await ttRenderStorico(); });
-ok('⚠ sopra la tabella c\'è scritto quale settimana si guarda', await p.evaluate(()=>[...document.querySelectorAll('#tt-quale span')].map(x=>x.textContent)), ['A schermo','Settimana 5','2–7 nov']);
+ok('la scritta "a schermo" non c\'è da nessuna parte', await p.evaluate(async()=>{ await ttRenderStorico(); return /a schermo/i.test(document.getElementById('timetableSection').innerText+document.getElementById('tt-storico').textContent); }), false);
+ok('⚠ sopra la tabella c\'è scritto quale settimana si guarda', await p.evaluate(()=>[...document.querySelectorAll('#tt-quale span')].map(x=>x.textContent)), ['Settimana 5','2–7 nov']);
 ok('a cavallo di due mesi, o senza date', await p.evaluate(()=>[ttPeriodo('2026-11-30','2026-12-05'), ttPeriodo('2026-11-16',''), ttPeriodo('','')]), ['30 nov – 5 dic','16 nov','']);
 await p.evaluate(()=>{ document.getElementById('tt-settimana').value=''; ttSommari(); });
 ok('senza numero lo dice, non resta vuoto', await p.evaluate(()=>document.querySelector('#tt-quale .n').textContent), 'Settimana senza numero');
@@ -114,7 +115,7 @@ await p.click('#tt-quale'); await p.waitForTimeout(250);
 ok('toccandolo si apre lo storico', await aperte(), ['storico']);
 ok('una scheda per settimana, dalla più recente', await p.evaluate(()=>[...document.querySelectorAll('#tt-storico .tt-st .n')].map(x=>x.textContent)), ['Settimana 6','Settimana 5','Settimana 4']);
 ok('con le date, il reparto e chi c\'è', await p.evaluate(()=>{ const c=document.querySelector('#tt-storico .tt-st'); return [c.querySelector('.tt-st-s').textContent, c.querySelector('.tt-st-c').textContent]; }), ['9–14 nov · Suono · Missione San Gennaro','Simone Panetta, Anna Riva']);
-ok('⚠ quella a schermo è segnata, e non si riapre su se stessa', await p.evaluate(()=>[...document.querySelectorAll('#tt-storico .tt-st')].map(c=>[c.classList.contains('questa'), c.querySelector('.apri').disabled, c.querySelector('.apri').textContent])), [[false,false,'Apri'],[true,true,'È quella a schermo'],[false,false,'Apri']]);
+ok('⚠ quella che si guarda è segnata, e non si riapre su se stessa', await p.evaluate(()=>[...document.querySelectorAll('#tt-storico .tt-st')].map(c=>[c.classList.contains('questa'), c.querySelector('.apri').disabled, c.querySelector('.apri').textContent])), [[false,false,'Apri'],[true,true,'Aperta'],[false,false,'Apri']]);
 await p.click('#tt-storico .tt-st:first-child .apri'); await p.waitForTimeout(200);
 ok('"Apri" carica la settimana e chiude la finestra', [await p.evaluate(()=>document.getElementById('tt-settimana').value), await aperte(), await p.evaluate(()=>document.querySelector('#tt-quale .n').textContent)], ['6',[],'Settimana 6']);
 await p.evaluate(()=>{ askConfirm=async()=>false; return ttDelS(ttStoricoCache.findIndex(w=>w.meta.settimana==='4')); });

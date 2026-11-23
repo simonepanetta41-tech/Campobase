@@ -2155,7 +2155,7 @@ body.senza-rete #cbSenzaRete { display: block; }
           </div><button class="tt-fin-fatto" onclick="ttPiega('regole')">Fatto</button></div></div>
 
         <!-- Quale settimana e' a schermo -->
-        <button class="tt-quale" id="tt-quale" onclick="ttPiega('storico')"><span class="k">A schermo</span><span class="n">Settimana</span><span class="p"></span></button>
+        <button class="tt-quale" id="tt-quale" onclick="ttPiega('storico')"><span class="n">Settimana</span><span class="p"></span></button>
 
         <!-- Tabelle dinamiche -->
         <div id="tt-tabelle"></div>
@@ -16806,8 +16806,8 @@ async function ttRenderStorico(){
   // Su un telefono nuovo le regole si riprendono dall'ultima settimana salvata.
   try{ if(rows&&rows[0]&&rows[0].data&&ttRegoleDa(rows[0].data.meta)){ ttSoloVista=true; ttRenderAll(); ttSoloVista=false; } }catch(_){}
   /* Una scheda per settimana: quale, di quando, di chi, e due tasti
-     grandi. Quella a schermo e' segnata, e non si puo' eliminare da qui
-     senza volerlo: l'eliminazione chiede conferma. */
+     grandi. Quella che si sta guardando ha il bordo giallo e il tasto
+     "Aperta"; l'eliminazione chiede conferma. */
   const film=x=>(x.meta.film||x.meta.produzione||'').trim();
   const piuFilm=new Set(saved.map(film)).size>1;
   let ultimo=null;
@@ -16817,12 +16817,12 @@ async function ttRenderStorico(){
     const testa=piuFilm&&film(s)!==ultimo?`<div class="odg-sez">${esc(film(s)||'Senza film')}</div>`:'';
     ultimo=film(s);
     return `${testa}<div class="tt-st${questa?' questa':''}">
-      <div class="tt-st-t"><span class="n">Settimana ${esc(m.settimana||'?')}</span>${questa?'<span class="q">a schermo</span>':''}</div>
+      <div class="tt-st-t"><span class="n">Settimana ${esc(m.settimana||'?')}</span></div>
       <div class="tt-st-s">${esc([ttPeriodo(m.dal,m.al), m.reparto, piuFilm?'':film(s)].filter(Boolean).join(' · '))}</div>
       <div class="tt-st-c">${chi.length?esc(chi.join(', ')):'Nessun lavoratore'}</div>
       <div class="tt-st-a">
         <button class="via" onclick="ttDelS(${si})">Elimina</button>
-        <button class="apri" onclick="ttLoad(${si})"${questa?' disabled':''}>${questa?'È quella a schermo':'Apri'}</button>
+        <button class="apri" onclick="ttLoad(${si})"${questa?' disabled':''}>${questa?'Aperta':'Apri'}</button>
       </div>
     </div>`;
   }).join('');
