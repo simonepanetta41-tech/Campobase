@@ -326,11 +326,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-et{font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
 #tt-rdExtra .odg-sez{margin-top:22px}
 /* Quale settimana e' a schermo: sta sopra la tabella, si legge da lontano. */
-.tt-quale{display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:4px 10px;width:100%;min-height:52px;padding:10px 16px;
+.tt-quale{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:58px;padding:11px 16px;
   background:none;border:1px solid var(--yellow-dim,var(--border-l));border-radius:12px;color:var(--white);font-family:inherit;cursor:pointer;text-align:center}
 .tt-quale .k{flex-basis:100%;font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--yellow)}
 .tt-quale .n{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600}
-.tt-quale .p{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--white-dim)}
+.tt-quale .p{font-size:13px;color:var(--white-dim)}
+.tt-quale .p:empty{display:none}
 /* Lo storico: una scheda per settimana. */
 .tt-st{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
 .tt-st.questa{border-color:var(--yellow)}
@@ -5567,7 +5568,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.188';
+const CB_VERSIONE = '1.189';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -16829,8 +16830,10 @@ async function ttRenderStorico(){
 }
 
 /* "16–21 nov", o "30 nov – 5 dic" a cavallo di due mesi. */
-function ttPeriodo(dal,al){
-  const M=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+function ttPeriodo(dal,al,lungo){
+  // lungo: il mese per esteso, per il tasto sopra la tabella ("16–21 Novembre").
+  const M=lungo?['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre']
+               :['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
   const d=x=>{ const m=String(x||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?{g:+m[3],m:+m[2]-1}:null; };
   const a=d(dal), b=d(al);
   if(a&&b) return a.m===b.m?`${a.g}–${b.g} ${M[a.m]}`:`${a.g} ${M[a.m]} – ${b.g} ${M[b.m]}`;
@@ -16848,7 +16851,7 @@ function ttEQuesta(m){
 function ttQuale(){
   const el=document.getElementById('tt-quale'); if(!el)return;
   const v=id=>(document.getElementById(id)?.value||'').trim();
-  const n=v('tt-settimana'), per=ttPeriodo(v('tt-dal'),v('tt-al'));
+  const n=v('tt-settimana'), per=ttPeriodo(v('tt-dal'),v('tt-al'),true);
   el.querySelector('.n').textContent=n?'Settimana '+n:'Settimana senza numero';
   el.querySelector('.p').textContent=per;
 }

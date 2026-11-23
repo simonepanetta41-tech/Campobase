@@ -106,8 +106,9 @@ ok('⚠ su un telefono nuovo si riprendono dall\'ultima settimana salvata, una v
 console.log('\n── lo storico e la settimana a schermo ──');
 await p.evaluate(async()=>{ ttLoad(ttStoricoCache.findIndex(w=>w.meta.settimana==='5')); await ttRenderStorico(); });
 ok('la scritta "a schermo" non c\'è da nessuna parte', await p.evaluate(async()=>{ await ttRenderStorico(); return /a schermo/i.test(document.getElementById('timetableSection').innerText+document.getElementById('tt-storico').textContent); }), false);
-ok('⚠ sopra la tabella c\'è scritto quale settimana si guarda', await p.evaluate(()=>[...document.querySelectorAll('#tt-quale span')].map(x=>x.textContent)), ['Settimana 5','2–7 nov']);
+ok('⚠ sopra la tabella c\'è scritto quale settimana si guarda', await p.evaluate(()=>[...document.querySelectorAll('#tt-quale span')].map(x=>x.textContent)), ['Settimana 5','2–7 Novembre']);
 ok('a cavallo di due mesi, o senza date', await p.evaluate(()=>[ttPeriodo('2026-11-30','2026-12-05'), ttPeriodo('2026-11-16',''), ttPeriodo('','')]), ['30 nov – 5 dic','16 nov','']);
+ok('sopra la tabella il mese è per esteso, e la data sta a capo sotto il numero', await p.evaluate(()=>[ttPeriodo('2026-11-16','2026-11-21',true), ttPeriodo('2026-11-30','2026-12-05',true), getComputedStyle(document.getElementById('tt-quale')).flexDirection]), ['16–21 Novembre','30 Novembre – 5 Dicembre','column']);
 await p.evaluate(()=>{ document.getElementById('tt-settimana').value=''; ttSommari(); });
 ok('senza numero lo dice, non resta vuoto', await p.evaluate(()=>document.querySelector('#tt-quale .n').textContent), 'Settimana senza numero');
 await p.evaluate(()=>{ document.getElementById('tt-settimana').value='5'; ttSommari(); });
