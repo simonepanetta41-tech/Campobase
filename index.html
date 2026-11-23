@@ -333,16 +333,16 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-quale .p{font-size:13px;color:var(--white-dim)}
 .tt-quale .p:empty{display:none}
 /* Lo storico: una scheda per settimana. */
-.tt-st{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+.tt-st{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px}
 .tt-st.questa{border-color:var(--yellow)}
 .tt-st-t{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.tt-st-t .n{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--white)}
+.tt-st-t .n{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--white)}
 .tt-st-t .q{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
-.tt-st-s{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--white-dim);margin-top:5px}
-.tt-st-c{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.45}
-.tt-st-a{display:flex;gap:10px;margin-top:14px}
-.tt-st-a button{min-height:46px;border-radius:11px;font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:600;cursor:pointer}
-.tt-st-a .via{flex:0 0 auto;padding:0 18px;background:none;border:1px solid var(--border-l);color:var(--white-dim)}
+.tt-st-s{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--white-dim);margin-top:3px}
+.tt-st-c{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.4}
+.tt-st-a{display:flex;gap:8px;margin-top:10px}
+.tt-st-a button{min-height:38px;border-radius:9px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.tt-st-a .via{flex:0 0 auto;padding:0 14px;background:none;border:1px solid var(--border-l);color:var(--white-dim)}
 .tt-st-a .apri{flex:1;border:none;background:var(--yellow);color:#111}
 .tt-st-a .apri:disabled{background:var(--surface2);color:var(--muted);cursor:default}
 #tt-storico .odg-sez:first-child{margin-top:8px}
@@ -5568,7 +5568,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.189';
+const CB_VERSIONE = '1.190';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
