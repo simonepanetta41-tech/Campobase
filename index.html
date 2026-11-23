@@ -3270,9 +3270,13 @@ function cbTestata() {
 }
 
 /*
- * Scorrere verso destra per tornare alla scelta del progetto.
+ * Scorrere verso destra per tornare indietro: fa quello che fa la freccia
+ * in alto (cbIndietro).
  *
- * Solo su ordine del giorno, spoglio e piano. Nella sezione Ore la
+ * Su ordine del giorno, spoglio e piano, e su Altro con le sue pagine di
+ * sola lettura (cast, troupe, analisi): da li' riporta alla pagina del
+ * film da cui si era partiti. Non sulla sceneggiatura e sul wrap, dove
+ * col dito si lavora. Nella sezione Orari la
  * tabella della settimana scorre gia' in orizzontale, e un gesto che
  * vuol dire "indietro" su una pagina dove si scorre per arrivare al
  * sabato diventa un modo per uscirne per sbaglio.
@@ -3282,7 +3286,7 @@ function cbTestata() {
  * c'e' aperta una scena o un PDF, quello e' un fratello di odgSection e
  * non un figlio, quindi il contains lo esclude da solo.
  */
-const CB_INDIETRO = ['odgSection', 'spoglioSection', 'pdlSection'];
+const CB_INDIETRO = ['odgSection', 'spoglioSection', 'pdlSection', 'altroSection', 'castSection', 'troupeSection', 'analisiSection'];
 let cbTx = 0, cbTy = 0, cbSegue = false;
 
 document.addEventListener('touchstart', e => {
@@ -5568,7 +5572,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.190';
+const CB_VERSIONE = '1.191';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

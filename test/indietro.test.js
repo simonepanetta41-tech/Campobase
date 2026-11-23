@@ -121,6 +121,22 @@ for(const [sez, nome] of [['odgSection','ordine del giorno'],
   ok(`${nome}: scorrendo torno alla scelta`, await dove(), 'home');
 }
 
+console.log('\n── ⚠ e da Altro e dalle sue pagine riporta dove si era, come la freccia ──');
+/* Su cast, troupe e analisi il gesto non c'era: la freccia in alto
+   riportava alla pagina di prima, il dito no. */
+for (const [t, nome] of [['altro','Altro'],['cast','cast'],['troupe','troupe'],['analisi','analisi']]) {
+  await apri('spoglioSection');
+  await p.evaluate((t)=>{ rtAdesso=rtPrimaDiAltro=null; switchResultTab('spoglio'); switchResultTab('altro'); if(t!=='altro') switchResultTab(t); }, t);
+  await p.waitForTimeout(120);
+  await scorri('#'+({altro:'altroSection',cast:'castSection',troupe:'troupeSection',analisi:'analisiSection'})[t], 140, 10);
+  await p.waitForTimeout(150);
+  ok(`${nome}: scorrendo torno allo spoglio, non fuori dal film`, [await p.evaluate(()=>rtAdesso), await dove()], ['spoglio','progetto']);
+}
+await apri('odgSection');
+await p.evaluate(()=>{ rtAdesso=rtPrimaDiAltro=null; switchResultTab('odg'); switchResultTab('altro'); switchResultTab('script'); });
+await scorri('#scriptSection', 140, 10); await p.waitForTimeout(150);
+ok('sulla sceneggiatura no: lì col dito si lavora', await p.evaluate(()=>rtAdesso), 'script');
+
 console.log('\n── ma non dalla sezione delle ore ──');
 /* Li' la tabella della settimana si scorre col dito per arrivare al
    sabato: se quel gesto cambiasse schermata, compilare il sabato
