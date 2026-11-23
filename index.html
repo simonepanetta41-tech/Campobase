@@ -423,6 +423,18 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .odg-errata .pt b{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--yellow);font-weight:600;margin-bottom:5px}
 .odg-errata .pt .r{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:13.5px;padding:2px 0;color:var(--white)}
 .odg-errata .pt .r s{color:var(--muted);margin-right:8px}
+.odg-arrivi{margin:-5px 16px 11px 50px}
+.odg-arrivi summary{display:flex;align-items:baseline;gap:7px;cursor:pointer;list-style:none;font-size:12.5px;color:var(--white-dim);padding:3px 0}
+.odg-arrivi summary::-webkit-details-marker{display:none}
+.odg-arrivi summary .fr{color:var(--yellow);font-size:12px;transition:transform .15s;display:inline-block}
+.odg-arrivi[open] summary .fr{transform:rotate(90deg)}
+.odg-arrivi summary .mio{margin-left:auto;color:var(--yellow)}
+.odg-arrivi .righe{padding:5px 0 2px}
+.odg-arrivi .righe div{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;line-height:1.75;color:var(--white-dim)}
+.odg-arrivi .righe div span{min-width:0}
+.odg-arrivi b{font-weight:400;color:var(--white)}
+.odg-arrivi .righe .mio span,.odg-arrivi .mio b{color:var(--yellow)}
+.odg-arrivi + .odg-posto{border-top:1px solid var(--border)}
 .odg-arrivo{border-top:1px solid var(--border)}
 .odg-arrivo:first-child{border-top:none}
 .odg-arrivo + .odg-posto{border-top:1px solid var(--border)}
@@ -5468,7 +5480,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.181';
+const CB_VERSIONE = '1.182';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12493,7 +12505,7 @@ async function pushAppuntamenti(d){
    e gli ordini del giorno gia' salvati si rileggono da soli. Senza, la
    correzione valeva solo sul prossimo OdG — e quello di domani sera uno
    ce l'ha gia' in tasca con il nome sbagliato. */
-const ODG_LUOGHI_V = 3;
+const ODG_LUOGHI_V = 4;
 
 function odgNonEUnPosto(t){
   return /pronti\s+a\s+girare|convocazion|fine\s+(riprese|lavorazione)|\bpausa\b|\bcatering\b|\bcestini\b/i.test(String(t || ''))
@@ -12539,7 +12551,6 @@ function odgRicalcola() {
        diventano quelli dell'app ("Mezzi tecnici"): da li' dipendono
        l'ordine nel Dove e quale posto si usa per il meteo. Una volta. */
     if (d.luoghiV !== ODG_LUOGHI_V) {
-      d.luoghi = odgLuoghiDivisi(d.luoghi);
       (d.luoghi || []).forEach(l => { l.nome = odgNomePosto(l.nome) || odgCap(l.nome); });
       d.luoghiV = ODG_LUOGHI_V;
     }
@@ -13155,25 +13166,6 @@ function odgCercabile(a) {
 function odgMapsVicino(cosa, dove) { return odgMaps(cosa + ' vicino a ' + dove); }
 function odgCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
 
-/* Due posti scritti insieme perche' stanno allo stesso indirizzo
-   ("PREPARAZIONE ATTORI / MEZZI TECNICI 120q") diventano due righe del
-   Dove, ognuna con la sua mappa: chi cerca i mezzi da 120 quintali li
-   trova col loro nome, non in coda a quello di un altro posto.
-   Non si tocca un'etichetta che l'app conosce gia' per intero
-   ("CB/ MEZZI TECNICI" e' un posto solo, i mezzi tecnici), ne' una barra
-   che non separa due nomi ("c/o", "193/219"). */
-function odgLuoghiDivisi(luoghi) {
-  const out = [];
-  for (const l of luoghi || []) {
-    const nome = String(l && l.nome || '');
-    const parti = nome.split(/\s*\/\s*/).map(p => p.trim()).filter(Boolean);
-    const dueNomi = parti.length > 1 && !/\bc\/o\b/i.test(nome)
-      && parti.every(p => (p.match(/[a-zà-ú]/gi) || []).length >= 2);
-    if (!dueNomi || odgNomePosto(nome)) { out.push(l); continue; }
-    parti.forEach(p => out.push({ ...l, nome: p }));
-  }
-  return out;
-}
 
 /* Il giorno dopo, in forma di data. Serve al meteo delle notturne. */
 function odgDomani(iso) {
@@ -13676,6 +13668,49 @@ function odgPostoDelSet(luoghi){
   if (i < 0) i = l.findIndex(x => /set|location/i.test(String(x.nome || '')));
   return i < 0 ? l.length - 1 : i;
 }
+/* ── CHI ARRIVA DOVE, E QUANDO ───────────────────────────────────────────────
+ *
+ * Nella mail, sotto ogni posto, la produzione scrive chi ci arriva e a che
+ * ora: "Gruppo ore 14.00", "MDP alle ore 15.30", "120q Macchinisti ore
+ * 14.15". Il server le copia parola per parola (worker/scrive.js) e qui
+ * stanno sotto il posto, chiuse: "5 arrivi", e toccando si aprono con
+ * l'ora in colonna.
+ *
+ * La riga del proprio reparto si accende, e la sua ora sta gia' scritta
+ * accanto a "5 arrivi": e' l'unica che serve, e non deve costare un tocco.
+ * Per il suono e la fotografia il mezzo di riferimento e' la macchina da
+ * presa ("MDP"): arrivano con quella.
+ *
+ * Una riga che non finisce con un'ora riconoscibile si mostra intera,
+ * com'e': meglio una riga non incolonnata che un'ora inventata.
+ */
+const ODG_ARRIVI_MEZZO = { 'Suono': ['mdp'] };
+function odgArrivo(riga) {
+  const t = String(riga || '').replace(/\s+/g, ' ').trim();
+  const m = t.match(/^(.*?)[\s,;:–-]*(?:alle\s+)?(?:ore|h\.?)\s*(\d{1,2})[.:,](\d{2})\s*$/i);
+  if (!m || !m[1].trim() || +m[2] > 23 || +m[3] > 59) return { chi: t, ora: '' };
+  return { chi: m[1].trim(), ora: m[2].padStart(2, '0') + '.' + m[3] };
+}
+function odgArrivoMio(chi, mioReparto) {
+  const mio = String(mioReparto || '').trim();
+  const chiavi = (ODG_ARRIVI_MEZZO[mio] || []).concat(FAB_NOMI[mio] || []);
+  const r = senzaAccenti(String(chi || '')).toLowerCase();
+  // Le sigle corte valgono solo da sole: "mdp" si', dentro un'altra parola no.
+  return chiavi.some(k => k.length <= 3 ? new RegExp('(^|[^a-z])' + k + '($|[^a-z])').test(r) : r.includes(k));
+}
+function odgArriviHtml(l){
+  const righe = (l && Array.isArray(l.arrivi) ? l.arrivi : []).map(odgArrivo).filter(a => a.chi);
+  if (!righe.length) return '';
+  const rep = profilo().reparto;
+  righe.forEach(a => { a.mio = odgArrivoMio(a.chi, rep); });
+  const mia = righe.find(a => a.mio);
+  return `<details class="odg-arrivi">
+    <summary><span class="fr">›</span>${righe.length === 1 ? '1 arrivo' : righe.length + ' arrivi'}${mia
+      ? `<span class="mio">${esc(mia.chi)}${mia.ora ? ` <b class="num">${esc(mia.ora)}</b>` : ''}</span>` : ''}</summary>
+    <div class="righe">${righe.map(a => `<div class="${a.mio ? 'mio' : ''}"><span>${esc(a.chi)}</span>${a.ora ? `<b class="num">${esc(a.ora)}</b>` : ''}</div>`).join('')}</div>
+  </details>`;
+}
+
 function odgArrivoHtml(d){
   const passi = (d && Array.isArray(d.indicazioni) ? d.indicazioni : []).filter(p => p && p.testo);
   if (!passi.length) return '';
@@ -14153,7 +14188,7 @@ function odgPienoHtml(d) {
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(l.nome)}</span>
           ${l.indirizzo ? `<span class="s">${esc(odgAlSet(l.indirizzo) ? 'Al set' : l.indirizzo)}</span>` : ''}</span>
-          <span class="go">Mappa ›</span></a>${i === odgPostoDelSet(d.luoghi) ? odgArrivoHtml(d) : ''}`).join('')
+          <span class="go">Mappa ›</span></a>${odgArriviHtml(l)}${i === odgPostoDelSet(d.luoghi) ? odgArrivoHtml(d) : ''}`).join('')
       : `<a class="odg-posto" href="${d.mappa || odgMaps(d.location)}" target="_blank" rel="noopener">
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>

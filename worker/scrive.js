@@ -121,7 +121,7 @@ export function datiPerApp(letto, riga, adesso) {
          ne' la mappa ne' il meteo. Un link che non e' un link si butta,
          il posto resta. */
       .map(l => ({ nome: testo(l && l.nome), url: linkVero(l && l.url),
-                   indirizzo: testo(l && l.indirizzo) }))
+                   indirizzo: testo(l && l.indirizzo), arrivi: arriviDallaMail(l && l.arrivi, riga && riga.testo) }))
       .filter(l => l.nome && (l.url || l.indirizzo)),
     avvisi: avvisiDallaMail(L.avvisi, riga && riga.testo)
       .filter(a => !indicazioniDallaMail(L.indicazioni, riga && riga.testo).some(p => p.testo.includes(a) || a.includes(p.testo))),
@@ -256,6 +256,25 @@ export function avvisiDallaMail(avvisi, corpo) {
     if (!mail.includes(piatto(t))) continue;
     if (!out.includes(t)) out.push(t);
     if (out.length >= 6) break;
+  }
+  return out;
+}
+
+/* Chi arriva in un posto e a che ora, dal testo della mail ("Gruppo ore
+   14.00", "MDP alle ore 15.30"). Come per gli avvisi: si tiene una riga
+   solo se sta, parola per parola, nella mail. Un orario d'arrivo sbagliato
+   fa presentare un reparto all'ora sbagliata: nel dubbio non si mostra. */
+export function arriviDallaMail(righe, corpo) {
+  const piatto = s => String(s || '').replace(/^[ \t]*>+ ?/gm, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const mail = piatto(corpo);
+  if (!mail || !Array.isArray(righe)) return [];
+  const out = [];
+  for (const r of righe) {
+    const t = String(r || '').replace(/\s+/g, ' ').replace(/^[\s\-–—•*·]+/, '').trim();
+    if (t.length < 3 || t.length > 120) continue;
+    if (!mail.includes(piatto(t))) continue;
+    out.push(t);
+    if (out.length >= 15) break;
   }
   return out;
 }
