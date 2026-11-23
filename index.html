@@ -5480,7 +5480,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.182';
+const CB_VERSIONE = '1.183';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -7717,7 +7717,8 @@ function castApri(id){
   // scheda dev'essere la stessa da qualunque porta ci si entri.
   const o = ((odgCorrente || {}).cast || []).find(x => String(x.id) === String(id)) || {};
   if (!r && !o.id) return;
-  apriScheda({ ...o, id, ruolo: (r && r.nome) || o.ruolo || '', interprete: o.interprete || '' });
+  // Chi oggi non e' convocato il nome ce l'ha lo stesso, da un ordine del giorno passato.
+  apriScheda({ ...o, id, ruolo: (r && r.nome) || o.ruolo || '', interprete: o.interprete || interpretePerId(id) });
 }
 
 let castOrdine = 'id';
@@ -7768,7 +7769,8 @@ function renderCastTab(rows, showAlert) {
   const conScene = righe.filter(x => x.n).length;
   wrap.innerHTML = `
     <div class="sp-testa"><span class="t">Cast</span>
-      <span class="s">${righe.length} personagg${righe.length===1?'io':'i'}${ufficiale?' · lista ufficiale':''}</span></div>
+      <span class="s">${righe.length} personagg${righe.length===1?'io':'i'}${ufficiale?' · lista ufficiale':''}${
+        righe.some(x => x.interprete) ? ' · ' + righe.filter(x => x.interprete).length + ' con l’interprete' : ''}</span></div>
     ${conScene ? `<div class="cal-vista" style="margin-bottom:11px">
       <button class="${castOrdine==='id'?'on':''}" onclick="castOrdina('id')">Per ID</button>
       <button class="${castOrdine==='scene'?'on':''}" onclick="castOrdina('scene')">Per scene</button>
@@ -11699,7 +11701,7 @@ async function odgSalva(d, opzioni) {
  *
  * I numeri si confrontano con catNumero, che di "36PT" fa "36".
  */
-let odgPassati = [];            // [{data, scene:[numeri]}], dal cloud
+let odgPassati = [];            // [{data, scene:[numeri], cast:[{id,interprete,ruolo}]}], dal cloud
 const ODG_PASSATI = 'cb_odg_passati';
 
 function oggiLocale(adesso){
@@ -11906,18 +11908,21 @@ async function odgPassatiCarica(){
   try { odgPassati = JSON.parse(localStorage.getItem(chiave) || '[]') || []; } catch (_) { odgPassati = []; }
   if (currentUser) {
     try {
-      const q = sb.from('odg').select('data,scene:dati->scene');
+      const q = sb.from('odg').select('data,scene:dati->scene,cast:dati->cast');
       const { data, error } = await (f ? q.eq('project_id', f.id) : q.eq('user_id', currentUser.id))
         .order('data', { ascending: false }).limit(200);
       if (error) throw new Error(error.message);
       odgPassati = (data || []).filter(r => r && r.data).map(r => ({
         data: r.data,
-        scene: (Array.isArray(r.scene) ? r.scene : []).map(s => s && s.n).filter(Boolean)
+        scene: (Array.isArray(r.scene) ? r.scene : []).map(s => s && s.n).filter(Boolean),
+        cast: odgCastVisto(r.cast)
       }));
       try { localStorage.setItem(chiave, JSON.stringify(odgPassati)); } catch (_) {}
     } catch (e) { console.log('[scene fatte] ordini del giorno passati non letti:', e.message); }
   }
   sceneFatteAggiorna();
+  // La lista cast potrebbe essere gia' a schermo senza gli interpreti dei giorni passati.
+  try { if ((window.castData || []).length && document.getElementById('castTableWrap')) renderCastTab(window.castData, castAlertVisibile); } catch (_) {}
   // E la barra delle scene nel piano, che conta dalla stessa regola.
   try { if (pdlData && document.getElementById('pdlProgBars')) renderPdlStats(); } catch (_) {}
 }
@@ -12871,8 +12876,35 @@ function personaggiConta(nomi){
    La lista cast ufficiale i nomi degli attori non li porta quasi mai:
    arrivano un giorno alla volta, dalle convocazioni. */
 function interpretePerId(id){
-  const c = ((odgCorrente || {}).cast || []).find(x => String(x.id) === String(id));
-  return (c && c.interprete) || '';
+  const c = ((odgCorrente || {}).cast || []).find(x => String(x.id) === String(id) && x.interprete);
+  if (c) return c.interprete;
+  /* Non e' convocato oggi: lo si cerca negli ordini del giorno passati,
+     dal piu' recente. Cosi' la lista si riempie da sola, una convocazione
+     alla volta, e resta piena: prima un attore spariva dalla lista il
+     giorno dopo aver girato. Vince il foglio piu' nuovo, perche' un ruolo
+     puo' cambiare interprete. */
+  const k = String(id);
+  const fogli = (odgPassati || []).slice().sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
+  for (const f of fogli) {
+    const v = (f.cast || []).find(x => String(x.id) === k);
+    if (v) return v.interprete;
+  }
+  return '';
+}
+
+/* Di un ordine del giorno passato si tiene, del cast, solo chi ha un
+   interprete scritto: ID, nome, ruolo. Uno per ID — il primo, che e'
+   l'attore: le figurazioni che il foglio numera di nuovo da 1 ("1
+   FORNAIO") un interprete non ce l'hanno e non entrano. */
+function odgCastVisto(cast){
+  const out = [], visti = new Set();
+  for (const c of Array.isArray(cast) ? cast : []) {
+    const id = String((c && c.id) || '').trim(), nome = String((c && c.interprete) || '').trim();
+    if (!id || !nome || visti.has(id)) continue;
+    visti.add(id);
+    out.push({ id, interprete: nome, ruolo: String((c && c.ruolo) || '').trim() });
+  }
+  return out;
 }
 
 function castNomePerId(id){

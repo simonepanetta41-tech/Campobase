@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v182';
+const CACHE = 'campobase-v183';
 // Quanto si aspetta la rete prima di aprire la pagina salvata (millisecondi).
 const ATTESA_RETE = 3000;
 // Le cache che restano da una versione all'altra: il biglietto della
