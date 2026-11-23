@@ -136,7 +136,7 @@ ok('l\'interprete dall\'OdG', await p.evaluate(()=>document.querySelector('#cast
 ok('solo per chi l\'OdG ha detto', await p.evaluate(()=>document.querySelectorAll('#castTableWrap .odg-att .s').length), 1);
 ok('il minore è segnato',  await p.evaluate(()=>!!document.querySelector('.cast-m')), true);
 ok('in testa il conto',    await p.evaluate(()=>document.querySelector('#castTableWrap .sp-testa .s').textContent),
-   '4 personaggi · lista ufficiale');
+   '4 personaggi · lista ufficiale · 1 con l’interprete');
 
 console.log('\n── si riordina per peso ──');
 ok('prima per ID',   await p.evaluate(()=>[...document.querySelectorAll('#castTableWrap .odg-att .id')].map(e=>e.textContent)), ['1','2','3','4']);
