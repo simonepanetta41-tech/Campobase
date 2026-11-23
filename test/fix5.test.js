@@ -55,8 +55,28 @@ ok('inizio', await p.evaluate(()=>ttTabelle[0].orari.inizio[0]), '07.30');
 ok('fine',   await p.evaluate(()=>ttTabelle[0].orari.fine[0]), '21.30');
 ok('a schermo', await p.inputValue('[id$="-fine"]'), '21.30');
 
-console.log('\n── 2. storico senza "vuoto" ──');
-ok('riepilogo muto quando è vuoto', await p.evaluate(()=>{ttSommari();return document.getElementById('sum-storico').textContent}), '');
+console.log('\n── 2. storico, intestazione e regole: tre tasti, tre finestre ──');
+/* I tasti dicono solo il loro nome, al centro, senza riepilogo; toccati,
+   aprono una finestra a tutto schermo. I campi restano quelli di prima. */
+ok('i tasti portano solo il nome, niente riepilogo', await p.evaluate(()=>{ttSommari();return [...document.querySelectorAll('.tt-sez-t')].map(b=>b.textContent.trim())}), ['Storico settimane','Intestazione','Regole di calcolo']);
+ok('col nome al centro', await p.evaluate(()=>getComputedStyle(document.querySelector('.tt-sez-t')).justifyContent), 'center');
+const aperte=()=>p.evaluate(()=>['storico','testa','regole'].filter(k=>document.getElementById('sez-'+k).classList.contains('aperta')));
+ok('⚠ entrando nella pagina nessuna finestra è aperta', await aperte(), []);
+await p.evaluate(()=>{ localStorage.setItem('cb_tt_sez_regole','1'); ttPieghePrime(); });
+ok('nemmeno se una volta la sezione era rimasta aperta', await aperte(), []);
+await p.evaluate(()=>ttPiega('regole'));
+ok('toccando il tasto si apre a tutto schermo, sopra la barra', await p.evaluate(()=>{ const c=document.querySelector('#sez-regole .tt-sez-c'), r=c.getBoundingClientRect(), st=getComputedStyle(c);
+  return [st.position, Math.round(r.width)===innerWidth, Math.round(r.height)===innerHeight, +st.zIndex>=300]; }), ['fixed',true,true,true]);
+ok('con il suo titolo e i gruppi in ordine', await p.evaluate(()=>[document.querySelector('#sez-regole .cb-titolo').textContent, [...document.querySelectorAll('#sez-regole .odg-sez')].filter(e=>e.offsetParent).map(e=>e.textContent)]),
+  ['Regole di calcolo',['Tipo giornata','Raddoppio ore golden','Maggiorazioni notturne','Ore viaggio concesse al giorno']]);
+ok('⚠ le scelte sono quelle di prima, con i loro nomi', await p.evaluate(()=>[['tt-tg10','tt-tg8','tt-rd0','tt-rd1','tt-rd2','tt-rd3','tt-nOff','tt-nOn','tt-applG','tt-applS'].every(id=>document.querySelector('#sez-regole #'+id)), document.querySelectorAll('#sez-regole .tt-vtog').length, document.querySelectorAll('#sez-regole .tt-tog.active').length>=3]), [true,5,true]);
+await p.evaluate(()=>ttPiega('testa'));
+ok('⚠ una finestra alla volta', await aperte(), ['testa']);
+ok('i campi dell\'intestazione ci sono tutti, con i loro nomi', await p.evaluate(()=>['tt-produzione','tt-film','tt-reparto','tt-settimana','tt-dal','tt-al'].every(id=>document.querySelector('#sez-testa #'+id))), true);
+await p.click('#sez-testa .tt-fin-fatto');
+ok('"Fatto" la chiude', await aperte(), []);
+await p.evaluate(()=>ttPiega('storico')); await p.click('#sez-storico .tt-fin-via');
+ok('e anche la freccia in alto', await aperte(), []);
 
 console.log('\n── 3. il profilo si chiede all\'ingresso, non all\'OdG ──');
 await p.evaluate(()=>{localStorage.removeItem('cb_profilo');localStorage.removeItem('cb_odg_io');});
