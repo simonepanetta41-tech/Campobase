@@ -628,9 +628,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
  * il gesto e' toccare una scena per vedere cosa ha dentro, non leggere
  * una tabella di numeri grandi. */
 #spoglioSection{padding:14px 16px 96px}
-.sp-testa{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:13px}
+.sp-testa{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:3px 10px;margin-bottom:13px}
 .sp-testa .t{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
-.sp-testa .s{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--muted);white-space:nowrap}
+/* Il conto accanto al titolo va a capo se non ci sta: con "nowrap" una
+   riga lunga ("40 personaggi · lista ufficiale · 12 con l'interprete")
+   allargava tutta la pagina oltre lo schermo. */
+.sp-testa .s{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--muted);min-width:0}
 .sp-conti{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);
   border:1px solid var(--border);border-radius:13px;overflow:hidden}
 .sp-conti>div{padding:12px 14px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -5480,7 +5483,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.183';
+const CB_VERSIONE = '1.184';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

@@ -135,6 +135,7 @@ ok('e la scheda dice lo stesso', await p.evaluate(()=>{
 ok('l\'interprete dall\'OdG', await p.evaluate(()=>document.querySelector('#castTableWrap .odg-att .s')?.textContent), 'Rocco Maffei');
 ok('solo per chi l\'OdG ha detto', await p.evaluate(()=>document.querySelectorAll('#castTableWrap .odg-att .s').length), 1);
 ok('il minore è segnato',  await p.evaluate(()=>!!document.querySelector('.cast-m')), true);
+ok('⚠ il conto lungo non allarga la pagina oltre lo schermo', await p.evaluate(()=>{ const s=document.querySelector('#castTableWrap .sp-testa .s'); const prima=s.textContent; s.textContent='40 personaggi · lista ufficiale · 12 con l’interprete'; const larga=document.getElementById('castTableWrap').scrollWidth<=document.getElementById('castTableWrap').clientWidth+1; s.textContent=prima; return larga; }), true);
 ok('in testa il conto',    await p.evaluate(()=>document.querySelector('#castTableWrap .sp-testa .s').textContent),
    '4 personaggi · lista ufficiale · 1 con l’interprete');
 
