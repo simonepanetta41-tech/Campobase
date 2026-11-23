@@ -2072,8 +2072,8 @@ body.senza-rete #cbSenzaRete { display: block; }
           <div class="tt-fin-corpo">
 
           <div class="tt-campi">
-            <div><div class="tt-et">Produzione</div><input id="tt-produzione" type="text" placeholder="Es. Indigo Film" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
-            <div><div class="tt-et">Film</div><input id="tt-film" type="text" placeholder="Da analisi..." style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'" oninput="this.dataset.manuallyEdited='1'"></div>
+            <div><div class="tt-et">Produzione</div><input id="tt-produzione" type="text" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'"></div>
+            <div><div class="tt-et">Film</div><input id="tt-film" type="text" style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none;font-style:italic" onfocus="this.style.borderColor='var(--yellow)'" onblur="this.style.borderColor='var(--border)'" oninput="this.dataset.manuallyEdited='1'"></div>
           </div>
           <div class="tt-campi">
             <div><div class="tt-et">Reparto</div><select id="tt-reparto" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--white);font-family:'DM Mono',monospace;font-size:12px;padding:7px 10px;border-radius:6px;outline:none"><option value="Suono">Suono</option><option value="Fotografia">Fotografia</option></select></div>
@@ -5544,7 +5544,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.186';
+const CB_VERSIONE = '1.187';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
