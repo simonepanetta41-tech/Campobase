@@ -137,7 +137,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.8';
+const ADMIN_VERSIONE = '1.9';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
