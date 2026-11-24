@@ -15683,6 +15683,9 @@ function initTimetable(){
   const presi=(()=>{ try{ return ttDaOdg(); }catch(_){ return 0; } })();
   ttSoloVista=!presi; ttRenderAll(); ttSoloVista=false;
   ttMigrateLocalStorico().then(()=>ttRenderStorico());
+  // Gli orari nascono visibili agli altri reparti del film: lo si prepara
+  // qui, senza aspettare che qualcuno apra il confronto.
+  try{ if(navigator.onLine) ttCfCarica(); }catch(_){}
 }
 
 /*
@@ -16938,7 +16941,7 @@ function ttQuale(){
  * Chi compila gli orari del suo reparto li puo' far vedere agli altri
  * reparti dello stesso film, e guardare i loro accanto ai propri.
  *
- * L'interruttore e' uno per film e vale per tutte le settimane: sta sulle
+ * L'interruttore e' uno per film, nasce acceso e vale per tutte le settimane: sta sulle
  * righe di timetable_weeks (project_id, condivisa), cosi' i permessi li
  * decide il database e non l'app. Si vede solo, non si scrive.
  *
@@ -17036,10 +17039,30 @@ async function ttCfCarica(){
   try{ localStorage.setItem(TT_CF_OK,'1'); }catch(_){}
   rows=rows||[];
   const mie=rows.filter(r=>r.user_id===currentUser.id);
+  /* L'interruttore nasce acceso. Se ho gia' settimane legate al film vale
+     quello che c'e' scritto sopra (magari l'ho spento da un altro
+     telefono); altrimenti e' la prima volta: acceso, e le settimane di
+     questo film gia' salvate lo prendono subito. */
   if(mie.length) ttCfPref(film.id,mie.some(r=>r.condivisa));
-  else if(!(film.id in ttCfPrefLeggi())) ttCfPref(film.id,false);
+  else if(!(film.id in ttCfPrefLeggi())){
+    ttCfPref(film.id,true);
+    try{ await ttCfMarca(film,true); }catch(e){ console.log('[tt confronto] prima marcatura:',e.message); }
+  }
   ttCf.righe=rows.filter(r=>r.user_id!==currentUser.id&&r.condivisa&&r.data&&Array.isArray(r.data.tabelle)&&r.data.tabelle.length);
   ttCf.stato='ok'; ttCfDisegna();
+}
+/* Scrive l'interruttore su tutte le mie settimane del film: quelle salvate
+   prima che esistesse il legame si riconoscono dal titolo. */
+async function ttCfMarca(film,on){
+  const titolo=(document.getElementById('tt-film')?.value||'').trim();
+  if(titolo){
+    const{error}=await sb.from('timetable_weeks').update({project_id:film.id,condivisa:on})
+      .eq('user_id',currentUser.id).eq('film',titolo);
+    if(error)throw new Error(error.message);
+  }
+  const{error}=await sb.from('timetable_weeks').update({condivisa:on})
+    .eq('user_id',currentUser.id).eq('project_id',film.id);
+  if(error)throw new Error(error.message);
 }
 async function ttCfCondividi(){
   const film=filmCorrente(); if(!film||!film.id||!currentUser)return;
@@ -17049,15 +17072,7 @@ async function ttCfCondividi(){
   try{
     // La settimana a schermo sale subito, gia' col film e l'interruttore.
     clearTimeout(ttSyncT); await ttSync();
-    const titolo=(document.getElementById('tt-film')?.value||'').trim();
-    if(titolo){
-      const{error}=await sb.from('timetable_weeks').update({project_id:film.id,condivisa:on})
-        .eq('user_id',currentUser.id).eq('film',titolo);
-      if(error)throw new Error(error.message);
-    }
-    const{error}=await sb.from('timetable_weeks').update({condivisa:on})
-      .eq('user_id',currentUser.id).eq('project_id',film.id);
-    if(error)throw new Error(error.message);
+    await ttCfMarca(film,on);
   }catch(e){
     console.log('[tt confronto] interruttore:',e.message);
     ttCfPref(film.id,!on); ttCfDisegna(); showToast('Non riuscito. Riprova quando c\'è rete.'); return;

@@ -7,7 +7,7 @@ let ko=0;
 const ok=(n,got,exp)=>{const b=JSON.stringify(got)===JSON.stringify(exp);if(!b)ko++;
   console.log(`  ${b?'ok ':'KO '} ${String(n).padEnd(52)} ${JSON.stringify(got)}`.padEnd(96)+` atteso ${JSON.stringify(exp)}`);};
 const STUB=()=>{
-  window.__fatte=[]; window.__righe=[]; window.__errore=null;
+  window.__fatte=[]; window.__righe=[]; window.__errore=localStorage.getItem('__err')||null;
   const q=(tab)=>{ const x={_op:'select',_f:{},
     select(){return x}, order(){return x}, limit(){return x},
     eq(k,v){x._f[k]=v;return x},
@@ -68,15 +68,15 @@ ok('e dice perché non c\'è niente', (await testo('#tt-cf .cf-nota'))[0].starts
 ok('senza interruttore', await p.locator('#tt-cf-sw').count(), 0);
 
 console.log('\n── 2. finché la query non è stata lanciata, il salvataggio resta quello di prima ──');
+await p.evaluate(()=>localStorage.setItem('__err','column timetable_weeks.condivisa does not exist'));
 await apri(true);
 ok('⚠ nessuna colonna nuova nel salvataggio', await p.evaluate(()=>ttCfColonne()), {});
-await p.evaluate(()=>{window.__errore='column timetable_weeks.condivisa does not exist';});
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
 ok('la finestra lo dice', await testo('#tt-cf .cf-nota'), ['Il confronto fra reparti non è ancora attivo.']);
 ok('⚠ e le colonne restano fuori', await p.evaluate(()=>ttCfColonne()), {});
 
 console.log('\n── 3. chi ha condiviso questa settimana ──');
-await p.evaluate((r)=>{window.__errore=null; window.__righe=r; ttPiega('confronto');},
+await p.evaluate((r)=>{localStorage.removeItem('__err'); window.__errore=null; window.__righe=r; ttPiega('confronto');},
   [sett('a','altro1','Fotografia','2026-11-17'), sett('b','altro2','Macchinisti','2026-11-16',{condivisa:false}),
    sett('c','altro3','Elettricisti','2026-11-09'), sett('d','io','Suono','2026-11-16',{condivisa:false})]);
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
@@ -132,6 +132,20 @@ await p.evaluate(()=>{ window.__righe[0].data.meta.tipoGiornata=10; window.__rig
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
 await p.click('#tt-cf .cf-r'); await p.waitForTimeout(150);
 ok('non compare', await p.locator('#tt-cf-regole').count(), 0);
+
+console.log('\n── 9. la prima volta l\'interruttore è già acceso ──');
+await p.evaluate(()=>{ localStorage.removeItem('cb_tt_condivisi'); localStorage.removeItem('cb_tt_cf_ok'); });
+await apri(true);
+await p.waitForTimeout(300);
+await p.evaluate((r)=>{ window.__righe=r; }, [sett('a','altro1','Fotografia','2026-11-17')]);
+ok('⚠ acceso senza aprire il confronto', await p.evaluate(()=>ttCfColonne()), {project_id:'F1',condivisa:true});
+ok('e le settimane del film già salvate lo prendono', await p.evaluate(()=>window.__fatte.filter(f=>f.op==='update').map(f=>f.v)), [{project_id:'F1',condivisa:true},{condivisa:true}]);
+await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
+ok('nella finestra risulta acceso', await p.getAttribute('#tt-cf-sw','aria-pressed'), 'true');
+await p.evaluate(()=>{window.__righe.push({id:'d',user_id:'io',reparto:'Suono',project_id:'F1',condivisa:false,data:{meta:{},tabelle:[]}});});
+await p.click('#tt-cf-sw'); await p.waitForTimeout(300);
+await p.evaluate(()=>{ localStorage.removeItem('cb_tt_condivisi'); ttCfApri(); }); await p.waitForTimeout(300);
+ok('⚠ chi l\'ha spento lo ritrova spento, anche su un altro telefono', await p.getAttribute('#tt-cf-sw','aria-pressed'), 'false');
 
 ok('nessun errore in pagina', err, []);
 await b.close();
