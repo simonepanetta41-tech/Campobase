@@ -325,6 +325,19 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tt-campi{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .tt-et{font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.08em}
 #tt-rdExtra .odg-sez{margin-top:22px}
+/* Le regole di calcolo, con il disegno del resto dell'app: sotto ogni
+   titolo una scheda larga quanto la pagina con le scelte affiancate, e
+   quella attiva piena in giallo come gli altri tasti che contano. I tasti
+   sono gli stessi di prima (stessi id, stesse funzioni): cambia l'abito. */
+#sez-regole .tt-fin-corpo .odg-sez{margin:26px 0 8px}
+#sez-regole .tt-fin-corpo > div:first-child > .odg-sez{margin-top:6px}
+#sez-regole .tt-scelte{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;margin:0;padding:4px;
+  background:var(--surface);border:1px solid var(--border);border-radius:14px}
+#sez-regole .tt-tog,#sez-regole .tt-tog-o{min-height:46px;padding:4px;background:none;border:none;border-radius:10px;
+  font-family:inherit;font-size:14px;font-weight:500;color:var(--white-dim);white-space:normal;line-height:1.2}
+#sez-regole .tt-tog span{display:block;font-size:10.5px !important;font-weight:400;opacity:.75 !important;margin-top:2px}
+#sez-regole .tt-tog.active,#sez-regole .tt-tog-o.active-o{background:var(--yellow);color:#111;font-weight:600}
+#sez-regole #tt-rdExtra .odg-sez{margin-top:14px;color:var(--white-dim)}
 /* Quale settimana e' a schermo: sta sopra la tabella, si legge da lontano. */
 .tt-quale{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:58px;padding:11px 16px;
   background:none;border:1px solid var(--yellow-dim,var(--border-l));border-radius:12px;color:var(--white);font-family:inherit;cursor:pointer;text-align:center}
@@ -5585,7 +5598,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.192';
+const CB_VERSIONE = '1.193';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
