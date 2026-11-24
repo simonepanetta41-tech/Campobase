@@ -5644,7 +5644,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.194';
+const CB_VERSIONE = '1.195';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -17093,19 +17093,18 @@ function ttCfDisegna(){
   if(tit)tit.textContent=riga?'Confronto':'Confronta reparti';
   if(riga){ el.innerHTML=ttCfConfrontoHtml(riga,sett); return; }
 
-  if(ttCf.stato==='nofilm'){ el.innerHTML='<div class="cf-nota">Il confronto funziona dentro un film con la sua troupe: gli orari si condividono fra chi ne fa parte.</div>'; return; }
-  if(ttCf.stato==='spenta'){ el.innerHTML='<div class="cf-nota">Il confronto fra reparti non è ancora attivo.</div>'; return; }
+  if(ttCf.stato==='nofilm'){ el.innerHTML='<div class="cf-nota">Disponibile dentro un film.</div>'; return; }
+  if(ttCf.stato==='spenta'){ el.innerHTML='<div class="cf-nota">Non ancora attivo.</div>'; return; }
   const on=ttCfVisibili();
   let h=`<div class="odg-sez">I tuoi orari</div>
-    <div class="cf-io"><div class="t"><div class="a">Visibili agli altri reparti</div>
-      <div class="b">Vale per tutte le settimane di questo film. Li vede solo chi è nel film, senza poterli cambiare.</div></div>
+    <div class="cf-io"><div class="t"><div class="a">Visibili agli altri reparti</div></div>
       <button class="cf-sw" id="tt-cf-sw" aria-pressed="${on}" aria-label="Visibili agli altri reparti" onclick="ttCfCondividi()"></button></div>
     <div class="odg-sez">${esc(sett)}</div>`;
   const qui=ttCf.righe.filter(r=>ttCfStessaSettimana(r.data.meta))
     .sort((a,b)=>String(a.reparto||'').localeCompare(String(b.reparto||'')));
   if(ttCf.stato==='carica') h+='<div class="cf-nota">Carico…</div>';
-  else if(ttCf.stato==='errore') h+='<div class="cf-nota">Non riesco a leggere gli orari degli altri reparti. Riprova quando c\'è rete.</div>';
-  else if(!qui.length) h+='<div class="cf-nota">Nessun altro reparto ha condiviso questa settimana.</div>';
+  else if(ttCf.stato==='errore') h+='<div class="cf-nota">Serve la rete.</div>';
+  else if(!qui.length) h+='<div class="cf-nota">Nessun reparto per questa settimana.</div>';
   else h+=qui.map(r=>{
     const m=r.data.meta||{};
     return `<button class="cf-r" data-cf="${esc(r.id)}" onclick="ttCfScegli(this.dataset.cf)"><div class="t">

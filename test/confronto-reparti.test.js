@@ -64,7 +64,7 @@ console.log('\n── 1. senza film il confronto non c\'è ──');
 await apri(false);
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(200);
 ok('si apre a finestra', await p.evaluate(()=>document.getElementById('sez-confronto').classList.contains('aperta')), true);
-ok('e dice perché non c\'è niente', (await testo('#tt-cf .cf-nota'))[0].startsWith('Il confronto funziona dentro un film'), true);
+ok('e lo dice in due parole', await testo('#tt-cf .cf-nota'), ['Disponibile dentro un film.']);
 ok('senza interruttore', await p.locator('#tt-cf-sw').count(), 0);
 
 console.log('\n── 2. finché la query non è stata lanciata, il salvataggio resta quello di prima ──');
@@ -72,7 +72,7 @@ await p.evaluate(()=>localStorage.setItem('__err','column timetable_weeks.condiv
 await apri(true);
 ok('⚠ nessuna colonna nuova nel salvataggio', await p.evaluate(()=>ttCfColonne()), {});
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
-ok('la finestra lo dice', await testo('#tt-cf .cf-nota'), ['Il confronto fra reparti non è ancora attivo.']);
+ok('la finestra lo dice', await testo('#tt-cf .cf-nota'), ['Non ancora attivo.']);
 ok('⚠ e le colonne restano fuori', await p.evaluate(()=>ttCfColonne()), {});
 
 console.log('\n── 3. chi ha condiviso questa settimana ──');
@@ -85,6 +85,7 @@ ok('solo chi ha condiviso, e solo questa settimana', await testo('#tt-cf .cf-r .
 ok('⚠ stessa settimana anche se "Dal" è un altro giorno', (await testo('#tt-cf .cf-r .b'))[0].startsWith('M. Greco · aggiornata oggi'), true);
 ok('nessuna etichetta uguale/diverso', await p.evaluate(()=>/uguale|divers/i.test(document.getElementById('tt-cf').textContent)), false);
 ok('nessun elenco di chi non ha condiviso', await p.evaluate(()=>/non ancora/i.test(document.getElementById('tt-cf').textContent)), false);
+ok('sotto l\'interruttore nessuna spiegazione', await p.locator('#tt-cf .cf-io .b').count(), 0);
 ok('interruttore spento, com\'è sul server', await p.getAttribute('#tt-cf-sw','aria-pressed'), 'false');
 
 console.log('\n── 4. l\'interruttore vale per tutto il film ──');
