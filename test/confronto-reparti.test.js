@@ -7,7 +7,7 @@ let ko=0;
 const ok=(n,got,exp)=>{const b=JSON.stringify(got)===JSON.stringify(exp);if(!b)ko++;
   console.log(`  ${b?'ok ':'KO '} ${String(n).padEnd(52)} ${JSON.stringify(got)}`.padEnd(96)+` atteso ${JSON.stringify(exp)}`);};
 const STUB=()=>{
-  window.__fatte=[]; window.__righe=[]; window.__errore=localStorage.getItem('__err')||null;
+  window.__fatte=[]; window.__righe=[]; window.__errore=null;
   const q=(tab)=>{ const x={_op:'select',_f:{},
     select(){return x}, order(){return x}, limit(){return x},
     eq(k,v){x._f[k]=v;return x},
@@ -34,10 +34,11 @@ await p.addInitScript(STUB);
 await p.route('**',r=>r.request().url().startsWith('file://')?r.continue():r.abort());
 await p.goto('file://'+RADICE+'/index.html',{waitUntil:'domcontentloaded'});
 await p.evaluate(()=>localStorage.clear());
-const apri=async(film)=>{
+const apri=async(film,errore=null)=>{
   await p.goto('file://'+RADICE+'/index.html',{waitUntil:'domcontentloaded',timeout:20000});
   await p.waitForTimeout(700);
-  await p.evaluate((film)=>{
+  await p.evaluate(({film,errore})=>{
+    window.__errore=errore;
     currentUser={id:'io'};
     localStorage.setItem('cb_profilo',JSON.stringify({nome:'Simone',cognome:'Panetta',reparto:'Suono'}));
     if(film) localStorage.setItem('cb_film',JSON.stringify({id:'F1',titolo:'Missione San Gennaro'})); else localStorage.removeItem('cb_film');
@@ -52,7 +53,7 @@ const apri=async(film)=>{
     m('tt-film','Missione San Gennaro'); m('tt-settimana','7'); m('tt-dal','2026-11-16'); m('tt-al','2026-11-21');
     const o=ttTabelle[0].orari; o.inizio[0]='07.00'; o.fine[0]='18.30'; o.inizio[1]='07.30'; o.pausa[1]='13.00'; o.fine[1]='19.00';
     ttMeta.tipoGiornata=10; ttMeta.raddoppio=2;
-  },film);
+  },{film,errore});
   await p.waitForTimeout(200);
 };
 const sett=(id,chi,reparto,dal,extra={})=>({id,user_id:chi,reparto,project_id:'F1',condivisa:true,updated_at:new Date().toISOString(),
@@ -68,15 +69,14 @@ ok('e lo dice in due parole', await testo('#tt-cf .cf-nota'), ['Disponibile dent
 ok('senza interruttore', await p.locator('#tt-cf-sw').count(), 0);
 
 console.log('\n── 2. finché la query non è stata lanciata, il salvataggio resta quello di prima ──');
-await p.evaluate(()=>localStorage.setItem('__err','column timetable_weeks.condivisa does not exist'));
-await apri(true);
+await apri(true,'column timetable_weeks.condivisa does not exist');
 ok('⚠ nessuna colonna nuova nel salvataggio', await p.evaluate(()=>ttCfColonne()), {});
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
 ok('la finestra lo dice', await testo('#tt-cf .cf-nota'), ['Non ancora attivo.']);
 ok('⚠ e le colonne restano fuori', await p.evaluate(()=>ttCfColonne()), {});
 
 console.log('\n── 3. chi ha condiviso questa settimana ──');
-await p.evaluate((r)=>{localStorage.removeItem('__err'); window.__errore=null; window.__righe=r; ttPiega('confronto');},
+await p.evaluate((r)=>{window.__errore=null; window.__righe=r; ttPiega('confronto');},
   [sett('a','altro1','Fotografia','2026-11-17'), sett('b','altro2','Macchinisti','2026-11-16',{condivisa:false}),
    sett('c','altro3','Elettricisti','2026-11-09'), sett('d','io','Suono','2026-11-16',{condivisa:false})]);
 await p.click('#sez-confronto .tt-sez-t'); await p.waitForTimeout(250);
