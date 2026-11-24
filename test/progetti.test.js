@@ -40,7 +40,7 @@ ok('caricamento chiuso', await p.evaluate(()=>getComputedStyle(document.getEleme
 console.log('\n── senza progetti ──');
 await p.evaluate(()=>renderHistoryGrid([]));
 ok('lo dice',            await p.evaluate(()=>/Nessun progetto/.test(document.querySelector('.prog-vuoto').innerText)), true);
-ok('e dice come farne uno', await p.evaluate(()=>/sceneggiatura/.test(document.querySelector('.prog-vuoto').innerText)), true);
+ok('in due parole, senza spiegazioni', await p.evaluate(()=>document.querySelector('.prog-vuoto').innerText.trim()), 'Nessun progetto.');
 
 console.log('\n── con tre progetti ──');
 const oggi=new Date(), anno=oggi.getFullYear();
