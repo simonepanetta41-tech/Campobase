@@ -58,7 +58,7 @@ ok('a schermo', await p.inputValue('[id$="-fine"]'), '21.30');
 console.log('\n── 2. storico, intestazione e regole: tre tasti, tre finestre ──');
 /* I tasti dicono solo il loro nome, al centro, senza riepilogo; toccati,
    aprono una finestra a tutto schermo. I campi restano quelli di prima. */
-ok('i tasti portano solo il nome, niente riepilogo', await p.evaluate(()=>{ttSommari();return [...document.querySelectorAll('.tt-sez-t')].map(b=>b.textContent.trim())}), ['Storico settimane','Intestazione','Regole di calcolo']);
+ok('i tasti portano solo il nome, niente riepilogo', await p.evaluate(()=>{ttSommari();return [...document.querySelectorAll('.tt-sez-t')].map(b=>b.textContent.trim())}), ['Storico settimane','Intestazione','Regole di calcolo','Confronta con altri reparti']);
 ok('col nome al centro', await p.evaluate(()=>getComputedStyle(document.querySelector('.tt-sez-t')).justifyContent), 'center');
 const aperte=()=>p.evaluate(()=>['storico','testa','regole'].filter(k=>document.getElementById('sez-'+k).classList.contains('aperta')));
 ok('⚠ entrando nella pagina nessuna finestra è aperta', await aperte(), []);

@@ -338,6 +338,41 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 #sez-regole .tt-tog span{display:block;font-size:10.5px !important;font-weight:400;opacity:.75 !important;margin-top:2px}
 #sez-regole .tt-tog.active,#sez-regole .tt-tog-o.active-o{background:var(--yellow);color:#111;font-weight:600}
 #sez-regole #tt-rdExtra .odg-sez{margin-top:14px;color:var(--white-dim)}
+/* Il confronto con gli altri reparti: chi ha condiviso, poi le due
+   settimane affiancate. Nessun giudizio su uguale o diverso: gli orari
+   dei reparti differiscono sempre di qualche minuto, serve solo vedere
+   che si va nella stessa direzione. */
+.cf-io{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px}
+.cf-io .t{flex:1;min-width:0}
+.cf-io .a{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:var(--white)}
+.cf-io .b{font-size:12px;color:var(--white-dim);margin-top:3px;line-height:1.35}
+.cf-sw{flex:0 0 auto;width:50px;height:30px;padding:0;border:none;border-radius:15px;background:var(--surface2);position:relative;cursor:pointer;transition:background .15s}
+.cf-sw::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.cf-sw[aria-pressed="true"]{background:var(--yellow)}
+.cf-sw[aria-pressed="true"]::after{transform:translateX(20px);background:#111}
+.cf-r{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-family:inherit;cursor:pointer}
+.cf-r .t{flex:1;min-width:0}
+.cf-r .a{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:var(--white)}
+.cf-r .b{font-size:12px;color:var(--muted);margin-top:3px}
+.cf-r .f{color:var(--muted);font-size:20px}
+.cf-nota{font-size:13px;color:var(--white-dim);text-align:center;line-height:1.45;padding:10px 8px}
+.cf-g{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.cf-t{display:grid;grid-template-columns:1.1fr 1fr 1fr;font-family:'DM Mono',monospace;font-size:13px}
+.cf-t.gg{grid-template-columns:.8fr 1.2fr 1.2fr;width:100%;padding:0;background:none;border:none;color:inherit;text-align:left;cursor:pointer}
+.cf-t > div{padding:9px 12px;color:var(--white-dim);border-bottom:1px solid var(--border);min-width:0}
+.cf-t .l{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:var(--muted)}
+.cf-t .g{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--white)}
+.cf-t .c{text-align:center;white-space:nowrap}
+.cf-t .i{font-family:'Inter',system-ui,sans-serif;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center;padding:7px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cf-ap{background:var(--surface2)}
+.cf-usa{display:block;width:calc(100% - 28px);margin:10px 14px 12px;min-height:40px;border-radius:9px;background:none;border:1px solid var(--border-l);color:var(--white);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.cf-reg{padding:11px 14px 12px}
+.cf-reg .k{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.cf-reg .v{font-size:12.5px;color:var(--white-dim);margin-top:6px;line-height:1.5}
+.cf-tab{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:0 0 10px}
+.cf-tab button{min-height:34px;padding:0 12px;border-radius:999px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:inherit;font-size:12px;cursor:pointer}
+.cf-tab button.si{background:var(--yellow);border-color:var(--yellow);color:#111;font-weight:600}
+#tt-cf > .odg-sez:first-child{margin-top:8px}
 /* Quale settimana e' a schermo: sta sopra la tabella, si legge da lontano. */
 .tt-quale{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;width:100%;min-height:58px;padding:11px 16px;
   background:none;border:1px solid var(--yellow-dim,var(--border-l));border-radius:12px;color:var(--white);font-family:inherit;cursor:pointer;text-align:center}
@@ -2168,6 +2203,14 @@ body.senza-rete #cbSenzaRete { display: block; }
           </div>
           </div><button class="tt-fin-fatto" onclick="ttPiega('regole')">Fatto</button></div></div>
 
+        <!-- Confronto con gli altri reparti del film -->
+        <div class="tt-sez" id="sez-confronto">
+          <button class="tt-sez-t" onclick="ttPiega('confronto')"><span class="n">Confronta con altri reparti</span></button>
+          <div class="tt-sez-c">
+          <div class="tt-fin-testa"><button class="tt-fin-via" onclick="ttCfIndietro()" aria-label="Indietro">‹</button><div class="cb-titolo" id="tt-cf-titolo">Confronta reparti</div></div>
+          <div class="tt-fin-corpo" id="tt-cf"></div>
+          <button class="tt-fin-fatto" onclick="ttPiega('confronto')">Fatto</button></div></div>
+
         <!-- Quale settimana e' a schermo -->
         <button class="tt-quale" id="tt-quale" onclick="ttPiega('storico')"><span class="n">Settimana</span><span class="p"></span></button>
 
@@ -3333,7 +3376,10 @@ document.addEventListener('touchend', e => {
   // che sbanda non deve far cambiare schermata.
   if (!(dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5)) return;
   const finestra = document.querySelector('#timetableSection .tt-sez.aperta');
-  if (finestra && finestra.offsetParent !== null) { finestra.classList.remove('aperta'); return; }
+  if (finestra && finestra.offsetParent !== null) {
+    if (finestra.id === 'sez-confronto') { try { ttCfIndietro(); return; } catch (_) {} }
+    finestra.classList.remove('aperta'); return;
+  }
   cbIndietro();
 }, { passive: true });
 
@@ -5598,7 +5644,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.193';
+const CB_VERSIONE = '1.194';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -16182,9 +16228,11 @@ let ttSoloVista=false;
 function ttPiega(chiave){
   const el=document.getElementById('sez-'+chiave); if(!el)return;
   // Una finestra alla volta.
-  for(const k of ['storico','testa','regole']) if(k!==chiave) document.getElementById('sez-'+k)?.classList.remove('aperta');
+  for(const k of ['storico','testa','regole','confronto']) if(k!==chiave) document.getElementById('sez-'+k)?.classList.remove('aperta');
   // Aprendo lo storico lo si ridisegna: "a schermo" dev'essere quella di adesso.
-  if(el.classList.toggle('aperta') && chiave==='storico'){ try{ ttRenderStorico(); }catch(_){} }
+  const aperta=el.classList.toggle('aperta');
+  if(aperta && chiave==='storico'){ try{ ttRenderStorico(); }catch(_){} }
+  if(aperta && chiave==='confronto'){ try{ ttCfApri(); }catch(_){} }
   ttSommari();
 }
 
@@ -16214,7 +16262,7 @@ function ttSommari(){
 function ttPieghePrime(){
   // Sono finestre: all'apertura della pagina nessuna e' aperta, qualunque
   // cosa si fosse lasciato l'ultima volta.
-  for(const k of ['storico','testa','regole']) document.getElementById('sez-'+k)?.classList.remove('aperta');
+  for(const k of ['storico','testa','regole','confronto']) document.getElementById('sez-'+k)?.classList.remove('aperta');
   ttSommari();
 }
 
@@ -16677,7 +16725,7 @@ function ttRecord(){
   return {meta:{
     produzione:v('tt-produzione'), film:v('tt-film'), reparto:v('tt-reparto'),
     settimana:v('tt-settimana'), dal:v('tt-dal'), al:v('tt-al'),
-    note:ttMeta.note||'',
+    note:ttMeta.note||'', autore:ttCfIo(),
     tipoGiornata:ttMeta.tipoGiornata, raddoppio:ttMeta.raddoppio,
     applicazione:ttMeta.applicazione, maggiorazioniNott:ttMeta.maggiorazioniNott,
     viaggioConcesso:ttMeta.viaggioConcesso
@@ -16732,7 +16780,7 @@ async function ttSync(){
     const{error}=await sb.from('timetable_weeks').upsert({
       user_id:currentUser.id,
       settimana:rec.meta.settimana||'', film:rec.meta.film||'', reparto:rec.meta.reparto||'',
-      data:rec, updated_at:new Date().toISOString()
+      data:rec, updated_at:new Date().toISOString(), ...ttCfColonne()
     },{onConflict:'user_id,settimana,film,reparto'});
     if(error)throw new Error(error.message);
   }catch(e){
@@ -16884,6 +16932,226 @@ function ttQuale(){
   const n=v('tt-settimana'), per=ttPeriodo(v('tt-dal'),v('tt-al'),true);
   el.querySelector('.n').textContent=n?'Settimana '+n:'Settimana senza numero';
   el.querySelector('.p').textContent=per;
+}
+
+/* ── Confronto fra reparti ────────────────────────────────────────────
+ * Chi compila gli orari del suo reparto li puo' far vedere agli altri
+ * reparti dello stesso film, e guardare i loro accanto ai propri.
+ *
+ * L'interruttore e' uno per film e vale per tutte le settimane: sta sulle
+ * righe di timetable_weeks (project_id, condivisa), cosi' i permessi li
+ * decide il database e non l'app. Si vede solo, non si scrive.
+ *
+ * Le colonne nuove arrivano con sql/orari-condivisi.sql. Finche' la query
+ * non e' stata lanciata il salvataggio non le manda: un upsert con una
+ * colonna che non esiste fallirebbe, e con lui il salvataggio degli orari.
+ */
+const TT_CF_OK='cb_tt_cf_ok', TT_CF_PREF='cb_tt_condivisi';
+let ttCf={stato:'',righe:[],scelta:null,aperto:null,tabMia:0,tabLoro:0};
+
+function ttCfIo(){
+  try{ const p=profilo(); const n=(p.nome||'').trim(), c=(p.cognome||'').trim();
+    return n&&c?n[0].toUpperCase()+'. '+c:(c||n); }catch(_){ return ''; }
+}
+function ttCfPrefLeggi(){ try{ return JSON.parse(localStorage.getItem(TT_CF_PREF)||'{}')||{}; }catch(_){ return {}; } }
+function ttCfPref(id,v){ const m=ttCfPrefLeggi(); m[id]=!!v; try{ localStorage.setItem(TT_CF_PREF,JSON.stringify(m)); }catch(_){} }
+function ttCfVisibili(){ const f=filmCorrente(); return !!(f&&f.id&&ttCfPrefLeggi()[f.id]); }
+/* Cosa aggiungere al salvataggio: niente finche' il database non e' pronto
+   o non si sa come sta l'interruttore (un telefono nuovo lo spegnerebbe). */
+function ttCfColonne(){
+  try{
+    const f=filmCorrente(); if(!f||!f.id||localStorage.getItem(TT_CF_OK)!=='1')return {};
+    const m=ttCfPrefLeggi(); if(!(f.id in m))return {};
+    return {project_id:f.id,condivisa:!!m[f.id]};
+  }catch(_){ return {}; }
+}
+/* Il lunedi' della settimana di una data: due reparti scrivono "Dal" in
+   giorni diversi, ma la settimana e' la stessa. */
+function ttCfLun(iso){
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m)return '';
+  const d=new Date(+m[1],+m[2]-1,+m[3]); d.setDate(d.getDate()-((d.getDay()+6)%7));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function ttCfStessaSettimana(meta){
+  const v=id=>(document.getElementById(id)?.value||'').trim();
+  const mia=ttCfLun(v('tt-dal')), sua=ttCfLun(meta&&meta.dal);
+  if(mia&&sua)return mia===sua;
+  const n=x=>String(x||'').replace(/\D+/g,'');
+  return !!n(v('tt-settimana')) && n(v('tt-settimana'))===n(meta&&meta.settimana);
+}
+function ttCfQuando(iso){
+  const d=new Date(iso); if(isNaN(d))return '';
+  const ora=String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0');
+  const g=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((g(new Date())-g(d))/86400000);
+  if(diff===0)return 'aggiornata oggi '+ora;
+  if(diff===1)return 'aggiornata ieri '+ora;
+  return 'aggiornata il '+d.getDate()+' '+['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'][d.getMonth()];
+}
+/* Gli orari di una tabella altrui, messi in forma: sei giorni per riga. */
+function ttCfOrari(tab){
+  const o={}; TTG_ORARI.forEach(r=>{ const a=(tab&&tab.orari&&tab.orari[r.k])||[]; o[r.k]=TT_DAYS.map((_,i)=>String(a[i]||'')); });
+  return o;
+}
+/* Il calcolo con le regole di chi ha compilato: ttCalcTab legge ttMeta,
+   quindi gli si prestano le regole altrui per il tempo del conto. */
+function ttCfCalc(orari,meta){
+  const mie={}; TT_REGOLE_CAMPI.forEach(c=>{ mie[c]=ttMeta[c]; });
+  try{
+    if(meta) TT_REGOLE_CAMPI.forEach(c=>{ if(meta[c]!=null) ttMeta[c]=meta[c]; });
+    return ttCalcTab(orari);
+  }finally{ TT_REGOLE_CAMPI.forEach(c=>{ ttMeta[c]=mie[c]; }); }
+}
+function ttCfRegoleDiverse(meta){
+  if(!meta)return [];
+  const h=m=>m?(m>=60?(m/60)+'h':m+' min'):'nessuno', sn=b=>b?'sì':'no';
+  const rd=n=>n?'dopo '+n+'h':'no';
+  const out=[], v=c=>meta[c]!=null&&meta[c]!==ttMeta[c];
+  if(v('tipoGiornata')) out.push(`Giornata: tu ${ttMeta.tipoGiornata}h · loro ${meta.tipoGiornata}h`);
+  if(v('viaggioConcesso')) out.push(`Viaggio concesso: tu ${h(ttMeta.viaggioConcesso)} · loro ${h(meta.viaggioConcesso)}`);
+  if(v('maggiorazioniNott')) out.push(`Maggiorazioni notturne: tu ${sn(ttMeta.maggiorazioniNott)} · loro ${sn(meta.maggiorazioniNott)}`);
+  if(v('raddoppio')) out.push(`Raddoppio golden: tu ${rd(ttMeta.raddoppio)} · loro ${rd(meta.raddoppio)}`);
+  else if(ttMeta.raddoppio&&v('applicazione')) out.push(`Raddoppio: tu ${ttMeta.applicazione} · loro ${meta.applicazione}`);
+  return out;
+}
+
+function ttCfApri(){ ttCf.scelta=null; ttCf.aperto=null; ttCfDisegna(); ttCfCarica(); }
+function ttCfIndietro(){
+  if(ttCf.scelta!=null){ ttCf.scelta=null; ttCf.aperto=null; ttCfDisegna(); return; }
+  document.getElementById('sez-confronto')?.classList.remove('aperta');
+}
+async function ttCfCarica(){
+  const film=filmCorrente();
+  if(!currentUser||!film||!film.id){ ttCf.stato='nofilm'; ttCfDisegna(); return; }
+  if(!ttCf.righe.length){ ttCf.stato='carica'; ttCfDisegna(); }
+  let rows=null, error=null;
+  try{ ({data:rows,error}=await sb.from('timetable_weeks')
+        .select('id,user_id,reparto,condivisa,project_id,data,updated_at').eq('project_id',film.id)); }
+  catch(e){ error=e; }
+  if(error){
+    console.log('[tt confronto]',error.message);
+    ttCf.stato=/condivisa|project_id|column|schema/i.test(error.message||'')?'spenta':'errore';
+    ttCf.righe=[]; ttCfDisegna(); return;
+  }
+  try{ localStorage.setItem(TT_CF_OK,'1'); }catch(_){}
+  rows=rows||[];
+  const mie=rows.filter(r=>r.user_id===currentUser.id);
+  if(mie.length) ttCfPref(film.id,mie.some(r=>r.condivisa));
+  else if(!(film.id in ttCfPrefLeggi())) ttCfPref(film.id,false);
+  ttCf.righe=rows.filter(r=>r.user_id!==currentUser.id&&r.condivisa&&r.data&&Array.isArray(r.data.tabelle)&&r.data.tabelle.length);
+  ttCf.stato='ok'; ttCfDisegna();
+}
+async function ttCfCondividi(){
+  const film=filmCorrente(); if(!film||!film.id||!currentUser)return;
+  if(!navigator.onLine){ showToast('Serve la rete per cambiarlo.'); return; }
+  const on=!ttCfVisibili();
+  ttCfPref(film.id,on); ttCfDisegna();
+  try{
+    // La settimana a schermo sale subito, gia' col film e l'interruttore.
+    clearTimeout(ttSyncT); await ttSync();
+    const titolo=(document.getElementById('tt-film')?.value||'').trim();
+    if(titolo){
+      const{error}=await sb.from('timetable_weeks').update({project_id:film.id,condivisa:on})
+        .eq('user_id',currentUser.id).eq('film',titolo);
+      if(error)throw new Error(error.message);
+    }
+    const{error}=await sb.from('timetable_weeks').update({condivisa:on})
+      .eq('user_id',currentUser.id).eq('project_id',film.id);
+    if(error)throw new Error(error.message);
+  }catch(e){
+    console.log('[tt confronto] interruttore:',e.message);
+    ttCfPref(film.id,!on); ttCfDisegna(); showToast('Non riuscito. Riprova quando c\'è rete.'); return;
+  }
+  showToast(on?'Orari visibili agli altri reparti.':'Orari non più visibili.');
+}
+function ttCfScegli(id){ ttCf.scelta=id; ttCf.aperto=null; ttCf.tabLoro=0; ttCf.tabMia=0; ttCfDisegna();
+  const c=document.getElementById('tt-cf'); if(c)c.scrollTop=0; }
+function ttCfGiorno(i){ ttCf.aperto=ttCf.aperto===i?null:i; ttCfDisegna(); }
+function ttCfTab(chi,n){ ttCf[chi]=n; ttCf.aperto=null; ttCfDisegna(); }
+
+function ttCfDisegna(){
+  const el=document.getElementById('tt-cf'); if(!el)return;
+  const tit=document.getElementById('tt-cf-titolo');
+  const v=id=>(document.getElementById(id)?.value||'').trim();
+  const sett=['Settimana '+(v('tt-settimana')||'?'),ttPeriodo(v('tt-dal'),v('tt-al'),true)].filter(Boolean).join(' · ');
+  const riga=ttCf.scelta!=null?ttCf.righe.find(r=>r.id===ttCf.scelta):null;
+  if(tit)tit.textContent=riga?'Confronto':'Confronta reparti';
+  if(riga){ el.innerHTML=ttCfConfrontoHtml(riga,sett); return; }
+
+  if(ttCf.stato==='nofilm'){ el.innerHTML='<div class="cf-nota">Il confronto funziona dentro un film con la sua troupe: gli orari si condividono fra chi ne fa parte.</div>'; return; }
+  if(ttCf.stato==='spenta'){ el.innerHTML='<div class="cf-nota">Il confronto fra reparti non è ancora attivo.</div>'; return; }
+  const on=ttCfVisibili();
+  let h=`<div class="odg-sez">I tuoi orari</div>
+    <div class="cf-io"><div class="t"><div class="a">Visibili agli altri reparti</div>
+      <div class="b">Vale per tutte le settimane di questo film. Li vede solo chi è nel film, senza poterli cambiare.</div></div>
+      <button class="cf-sw" id="tt-cf-sw" aria-pressed="${on}" aria-label="Visibili agli altri reparti" onclick="ttCfCondividi()"></button></div>
+    <div class="odg-sez">${esc(sett)}</div>`;
+  const qui=ttCf.righe.filter(r=>ttCfStessaSettimana(r.data.meta))
+    .sort((a,b)=>String(a.reparto||'').localeCompare(String(b.reparto||'')));
+  if(ttCf.stato==='carica') h+='<div class="cf-nota">Carico…</div>';
+  else if(ttCf.stato==='errore') h+='<div class="cf-nota">Non riesco a leggere gli orari degli altri reparti. Riprova quando c\'è rete.</div>';
+  else if(!qui.length) h+='<div class="cf-nota">Nessun altro reparto ha condiviso questa settimana.</div>';
+  else h+=qui.map(r=>{
+    const m=r.data.meta||{};
+    return `<button class="cf-r" data-cf="${esc(r.id)}" onclick="ttCfScegli(this.dataset.cf)"><div class="t">
+      <div class="a">${esc(r.reparto||m.reparto||'Reparto')}</div>
+      <div class="b">${esc([m.autore,ttCfQuando(r.updated_at)].filter(Boolean).join(' · '))}</div></div><span class="f">›</span></button>`;
+  }).join('');
+  el.innerHTML=h;
+}
+
+function ttCfConfrontoHtml(riga,sett){
+  const meta=riga.data.meta||{}, loro=riga.reparto||meta.reparto||'Loro';
+  const io=(document.getElementById('tt-reparto')?.value||'').trim()||'Tu';
+  const tabM=ttTabelle[ttCf.tabMia]||ttTabelle[0], tabL=riga.data.tabelle[ttCf.tabLoro]||riga.data.tabelle[0];
+  if(!tabM) return '<div class="cf-nota">Non hai ancora una tabella in questa settimana.</div>';
+  const oM=ttCfOrari(tabM), oL=ttCfOrari(tabL);
+  const cM=ttCalcTab(oM), cL=ttCfCalc(oL,meta);
+  const gold=d=>(d.goldenOrd||0)+(d.goldenNott||0)+(d.golden6||0);
+  const fascia=(o,i)=>{ const a=o.inizio[i], b=o.fine[i]; return a||b?`${a||'?'}–${b||'…'}`:'—'; };
+  const nomi=['Lun','Mar','Mer','Gio','Ven','Sab'], estesi=['lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  const testa=`<div class="i"></div><div class="i">${esc(io)}</div><div class="i">${esc(loro)}</div>`;
+  const cella=(l,a,b)=>`<div class="l">${l}</div><div class="c">${esc(a||'—')}</div><div class="c">${esc(b||'—')}</div>`;
+  const scelta=(chi,tabelle,sel)=>tabelle.length<2?'':`<div class="cf-tab" data-chi="${chi}">${tabelle.map((t,n)=>
+    `<button class="${n===sel?'si':''}" onclick="ttCfTab('${chi}',${n})">${esc((t.workers&&t.workers[0])||('Tabella '+(n+1)))}${t.workers&&t.workers.length>1?' +'+(t.workers.length-1):''}</button>`).join('')}</div>`;
+
+  let h=`<div class="odg-sez">${esc(sett)}</div>`;
+  if(ttTabelle.length>1||riga.data.tabelle.length>1){
+    h+=(ttTabelle.length>1?`<div class="cf-nota" style="padding:0 0 6px">${esc(io)}</div>`+scelta('tabMia',ttTabelle,ttCf.tabMia):'')
+      +(riga.data.tabelle.length>1?`<div class="cf-nota" style="padding:0 0 6px">${esc(loro)}</div>`+scelta('tabLoro',riga.data.tabelle,ttCf.tabLoro):'');
+  }
+  h+=`<div class="cf-g"><div class="cf-t gg" style="cursor:default">${testa}</div>`;
+  TT_DAYS.forEach((_,i)=>{
+    const d=ttDataGiorno(i), nome=nomi[i]+(d?' '+d.getDate():''), ap=ttCf.aperto===i;
+    h+=`<button class="cf-t gg${ap?' cf-ap':''}" data-g="${i}" aria-expanded="${ap}" onclick="ttCfGiorno(${i})">
+      <div class="g">${nome}</div><div class="c">${esc(fascia(oM,i))}</div><div class="c">${esc(fascia(oL,i))}</div></button>`;
+    if(!ap)return;
+    const righe=TTG_ORARI.filter(r=>oM[r.k][i]||oL[r.k][i]).map(r=>cella(r.l,oM[r.k][i],oL[r.k][i])).join('');
+    const haLoro=TTG_ORARI.some(r=>oL[r.k][i]);
+    h+=`<div class="cf-ap"><div class="cf-t gg" style="cursor:default">${righe}${cella('Golden',gold(cM.days[i])?ttToHM(gold(cM.days[i])):'',gold(cL.days[i])?ttToHM(gold(cL.days[i])):'')}</div>
+      ${haLoro?`<button class="cf-usa" onclick="ttCfCopia(${i})">Copia i loro orari nel mio ${estesi[i]}</button>`:''}</div>`;
+  });
+  h+=`</div><div class="odg-sez">Totale settimana</div><div class="cf-g"><div class="cf-t">${testa}
+    ${cella('Golden',gold(cM.tot)?ttToHM(gold(cM.tot)):'',gold(cL.tot)?ttToHM(gold(cL.tot)):'')}
+    ${cella('Notturno',ttToHM((cM.tot.nottOrd||0)+(cM.tot.nottStr||0)),ttToHM((cL.tot.nottOrd||0)+(cL.tot.nottStr||0)))}
+    ${cella('Viaggio',ttToHM(cM.tot.oreViaggio),ttToHM(cL.tot.oreViaggio))}</div>`;
+  const reg=ttCfRegoleDiverse(meta);
+  if(reg.length) h+=`<div class="cf-reg" id="tt-cf-regole"><div class="k">Regole diverse dalle tue</div><div class="v">${reg.map(esc).join('<br>')}</div></div>`;
+  return h+'</div>';
+}
+
+/* Porta nel proprio giorno gli orari dell'altro reparto. Se il giorno e'
+   gia' compilato si chiede prima: sono ore di lavoro scritte a mano. */
+async function ttCfCopia(i){
+  const riga=ttCf.righe.find(r=>r.id===ttCf.scelta); if(!riga)return;
+  const tabM=ttTabelle[ttCf.tabMia]||ttTabelle[0]; if(!tabM)return;
+  const oL=ttCfOrari(riga.data.tabelle[ttCf.tabLoro]||riga.data.tabelle[0]);
+  const estesi=['lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  if(ttGiornoHaDati(tabM.orari,i) &&
+     !await askConfirm('Sostituire i tuoi orari di '+estesi[i]+' con quelli di '+(riga.reparto||'questo reparto')+'?',{conferma:'Copia',pericolo:false}))return;
+  TTG_ORARI.forEach(r=>{ if(!tabM.orari[r.k])tabM.orari[r.k]=[]; tabM.orari[r.k][i]=oL[r.k][i]; });
+  ttTocca(); ttSoloVista=true; ttRenderAll(); ttSoloVista=false;
+  ttCfDisegna(); showToast('Orari di '+estesi[i]+' copiati.');
 }
 
 function ttLoad(si){
