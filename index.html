@@ -1504,6 +1504,7 @@ input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:
 .cb-int:disabled{opacity:.4;cursor:default}
 .settings-row-label { font-size: 13px; font-weight: 500; color: var(--white); margin-bottom: 3px; }
 .settings-row-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.settings-row-desc:empty{display:none}
 .settings-input-wrap { display: flex; gap: 8px; min-width: 240px; flex: 1; }
 .settings-input-wrap input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--white); font-family: 'DM Mono', monospace; font-size: 12px; outline: none; transition: border-color 0.15s; }
 .settings-input-wrap input:focus { border-color: var(--yellow); }
@@ -1812,14 +1813,14 @@ body.senza-rete #cbSenzaRete { display: block; }
         <div class="settings-row">
           <div class="settings-row-info">
             <div class="settings-row-label">Avvisi sul telefono</div>
-            <div class="settings-row-desc" id="pushDesc">Quando la produzione manda un ordine del giorno o un piano, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering.</div>
+            <div class="settings-row-desc" id="pushDesc">Ordine del giorno, piano, pick-up e catering.</div>
           </div>
 <button id="pushTasto" class="cb-int" role="switch" aria-checked="false" aria-label="Avvisi sul telefono" onclick="pushCambia()"></button>
         </div>
         <div class="settings-row" id="pushProvaRiga" style="display:none">
           <div class="settings-row-info">
             <div class="settings-row-label">Prova</div>
-            <div class="settings-row-desc" id="pushProvaDesc">Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.</div>
+            <div class="settings-row-desc" id="pushProvaDesc"></div>
           </div>
           <button id="pushProvaTasto" class="cb-int" role="switch" aria-checked="false" aria-label="Prova" onclick="pushProva()"></button>
         </div>
@@ -1974,7 +1975,6 @@ body.senza-rete #cbSenzaRete { display: block; }
           <div class="chat-intro-icon"><svg viewBox="0 0 100 110" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38 95 Q36 108 50 110 Q64 108 62 95 Q57 99 50 100 Q43 99 38 95z" fill="#F5C542"/><ellipse cx="50" cy="68" rx="22" ry="24" fill="#F5C542"/><path d="M28 60 Q28 44 50 42 Q72 44 72 60 Q68 52 50 52 Q32 52 28 60z" fill="#F5C542"/><path d="M28 58 Q27 48 30 44 Q28 52 29 61z" fill="#000"/><path d="M72 58 Q73 48 70 44 Q72 52 71 61z" fill="#000"/><path d="M30 55 Q30 38 44 32 Q52 28 60 31 Q68 34 70 44 Q62 36 50 37 Q38 38 33 48z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M31 50 Q32 34 46 28 Q54 25 62 28 Q58 26 50 28 Q39 30 34 42z" fill="#000" stroke="#F5C542" stroke-width="0.5"/><path d="M33 46 Q40 36 54 32" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M32 50 Q40 41 55 37" stroke="#F5C542" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M32 60 Q38 57 44 58" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M56 58 Q62 57 68 60" stroke="#F5C542" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="27" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><rect x="53" y="62" width="20" height="11" rx="1.5" stroke="#F5C542" stroke-width="1.3" fill="#000"/><path d="M47 67 Q50 65.5 53 67" stroke="#F5C542" stroke-width="1" fill="none"/><line x1="27" y1="67" x2="23" y2="66" stroke="#F5C542" stroke-width="1.2"/><line x1="73" y1="67" x2="77" y2="66" stroke="#F5C542" stroke-width="1.2"/><path d="M42 84 Q46 82.5 50 83 Q54 82.5 58 84" stroke="#F5C542" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M36 87 Q38 92 43 94 Q50 96 57 94 Q62 92 64 87" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M43 94 Q47 98 50 98.5 Q53 98 57 94" stroke="#F5C542" stroke-width="1" fill="none" stroke-linecap="round"/><path d="M38 102 Q44 107 50 108 Q56 107 62 102" stroke="#F5C542" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2.5,1.5"/><circle cx="50" cy="110" r="4" stroke="#F5C542" stroke-width="1" fill="none"/><text x="50" y="113" font-size="4.5" text-anchor="middle" fill="#F5C542" font-weight="700" font-family="serif">N</text></svg></div>
           <div class="chat-intro-text">
             <div class="t">Chiedi a Gennaro</div>
-            <div class="s">Gennaro conosce l'intero spoglio — chiedigli del tuo reparto o di una scena</div>
           </div>
         </div>
         <div class="chat-messages" id="chatMessages"></div>
@@ -2081,7 +2081,7 @@ body.senza-rete #cbSenzaRete { display: block; }
             <span style="font-size:16px">⚠️</span>
             <div>
               <div style="font-size:12px;font-weight:700;color:var(--yellow);margin-bottom:3px">Lista provvisoria</div>
-              <div style="font-size:12px;color:var(--muted);line-height:1.5">Questa lista è ricavata automaticamente dalla sceneggiatura. Gli ID potrebbero non corrispondere a quelli ufficiali del reparto regia. Carica la lista ufficiale qui sotto per sostituirla.</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.5">Lista provvisoria, ricavata dalla sceneggiatura.</div>
             </div>
           </div>
 
@@ -2097,7 +2097,6 @@ body.senza-rete #cbSenzaRete { display: block; }
           <!-- Upload ufficiale -->
           <div style="border:1px dashed var(--border);border-radius:10px;padding:18px 20px;margin-bottom:24px">
             <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">Carica lista ID ufficiale</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:12px">PDF o JPEG della lista cast dal reparto regia. Sostituirà la lista provvisoria.</div>
             <div style="display:flex;gap:10px;align-items:center">
               <input type="file" id="castUploadInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleCastUpload(this)">
               <button onclick="document.getElementById('castUploadInput').click()" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--white);cursor:pointer;font-size:12px">📎 Scegli file</button>
@@ -2229,7 +2228,6 @@ body.senza-rete #cbSenzaRete { display: block; }
           <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:12px;padding:22px;width:380px;max-width:92vw">
             <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;margin-bottom:12px">⚠ Mancata pausa</div>
             <div id="tt-mancataItems"></div>
-            <div style="font-size:10px;color:var(--muted);margin-top:10px">+1h golden ordinaria aggiunta automaticamente.</div>
             <button onclick="document.getElementById('tt-mancataOv').style.display='none'" style="margin-top:12px;width:100%;padding:8px;background:none;border:1px solid var(--border-l);color:var(--white-dim);font-family:'DM Mono',monospace;font-size:11px;border-radius:6px;cursor:pointer">Chiudi</button>
           </div>
         </div>
@@ -2238,7 +2236,7 @@ body.senza-rete #cbSenzaRete { display: block; }
         <div id="tt-scorporoOv" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:300;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top) + 40px) 16px 40px;overflow-y:auto">
           <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:12px;padding:22px;width:460px;max-width:100%">
             <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px">Scorporo lavoratori</div>
-            <div style="font-size:10px;color:var(--muted);margin-bottom:16px">Seleziona chi ha orari diversi — verrà creata una nuova tabella con gli orari già copiati. I selezionati vengono rimossi dalla tabella di origine.</div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:16px">Chi ha orari diversi passa in una nuova tabella.</div>
             <div id="tt-scorporoList"></div>
             <div style="display:flex;gap:8px;margin-top:14px">
               <button onclick="ttConfirmScorporo()" style="flex:1;padding:9px;background:var(--yellow);color:#000;border:none;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer">Crea nuova tabella</button>
@@ -2562,7 +2560,7 @@ body.senza-rete #cbSenzaRete { display: block; }
 <div class="share-modal-overlay" id="shareModal">
   <div class="share-modal-box">
     <div class="share-modal-title">🔗 Condividi Analisi</div>
-    <div class="share-modal-sub">Chiunque abbia il link potrà importare l'analisi nel proprio account Campobase.</div>
+    <div class="share-modal-sub">Chi ha il link può importare l'analisi.</div>
     <div class="share-link-row">
       <input class="share-link-input" id="shareLinkInput" readonly>
       <button class="btn-copy" onclick="copyShareLink()">Copia</button>
@@ -2574,7 +2572,6 @@ body.senza-rete #cbSenzaRete { display: block; }
         <input type="checkbox" id="sharePdlCheck" style="width:16px;height:16px;accent-color:var(--yellow);cursor:pointer">
         <span>Includi PDL nella condivisione</span>
       </label>
-      <div style="font-size:10px;color:var(--muted);margin-top:4px;margin-left:26px">Chi importa riceverà anche il piano di lavorazione</div>
     </div>
     <div class="share-modal-footer">
       <button class="btn-unshare" onclick="disableShare()">🚫 Disattiva link</button>
@@ -2617,7 +2614,6 @@ body.senza-rete #cbSenzaRete { display: block; }
         </svg>
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--yellow)">PDL incluso</div>
-          <div style="font-size:10px;color:var(--muted)">Il piano di lavorazione verrà importato insieme all'analisi</div>
         </div>
       </div>
 
@@ -2635,7 +2631,6 @@ body.senza-rete #cbSenzaRete { display: block; }
       </div>
       <div id="svSuccess" style="display:none;text-align:center;padding:12px">
         <div style="font-size:14px;font-weight:600;color:var(--green);margin-bottom:8px">✓ Importata con successo!</div>
-        <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Verrai reindirizzato alla home tra un momento...</div>
       </div>
       <div id="svError" style="display:none;padding:10px 12px;background:rgba(224,80,80,0.1);border:1px solid rgba(224,80,80,0.3);border-radius:8px;font-size:11px;color:var(--danger)"></div>
 
@@ -4177,7 +4172,7 @@ function renderHistoryGrid(items, film) {
   const grid = document.getElementById('historyGrid');
   film = film || [];
   if (!items.length && !film.length) {
-    grid.innerHTML = '<div class="prog-vuoto">Nessun progetto. Il primo nasce caricando una sceneggiatura.</div>';
+    grid.innerHTML = '<div class="prog-vuoto">Nessun progetto.</div>';
     return;
   }
   const schede = film.map(f => `<div class="prog" data-film="${esc(f.id)}" onclick="apriFilm('${esc(f.id)}')">
@@ -4326,7 +4321,7 @@ function showCastPopup() {
     overlay.innerHTML = `
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px 32px;max-width:420px;width:90%">
         <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--white);margin-bottom:10px">Lista ID provvisoria</div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:22px">Vuoi generare una lista ID personaggi provvisoria basata sulle presenze in sceneggiatura?<br><br>Potrai sostituirla in qualsiasi momento con la lista ufficiale del reparto regia.</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:22px">Generare una lista provvisoria dalla sceneggiatura?</div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
           <button id="castPopupNo"  style="padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:13px">Non ora</button>
           <button id="castPopupSi"  style="padding:9px 18px;border-radius:8px;border:none;background:var(--yellow);color:#000;font-weight:700;cursor:pointer;font-size:13px">Sì, genera</button>
@@ -5644,7 +5639,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.196';
+const CB_VERSIONE = '1.197';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -7962,7 +7957,7 @@ function renderCastTab(rows, showAlert) {
     ${(conta.restanti || []).length ? `<div class="odg-sez">NELLA SCENEGGIATURA, NON IN LISTA</div>
     <div class="card" style="margin-top:9px;padding:13px 15px">
       <div class="at-elenco" style="margin:0">${conta.restanti.map(esc).join(' · ')}</div>
-      <p class="cast-nota" style="margin:9px 0 0">Nomi che parlano nella sceneggiatura e che la lista ID non ha, o che ha scritti in un altro modo.</p>
+      <p class="cast-nota" style="margin:9px 0 0">Non presenti nella lista ID.</p>
     </div>` : ''}`;
 }
 
@@ -10260,7 +10255,6 @@ function profiloChiediHtml() {
   const p = profilo();
   return `<div class="prof-chiedi">
     <div class="t">Come ti chiami?</div>
-    <div class="s">Serve a trovarti nei documenti della produzione.</div>
     <div class="campi">
       <input id="profNome"    type="text" placeholder="Nome"    value="${esc(p.nome || '')}" autocomplete="given-name">
       <input id="profCognome" type="text" placeholder="Cognome" value="${esc(p.cognome || '')}" autocomplete="family-name">
@@ -10299,9 +10293,9 @@ function profiloRenderImpostazioni() {
   const p = profilo();
   el.innerHTML = profiloCompleto()
     ? `<div class="settings-row-label">${esc(p.nome)} ${esc(p.cognome)}</div>
-       <div class="settings-row-desc">${esc(p.reparto || 'reparto non indicato')} · tocca per cambiare</div>`
+       <div class="settings-row-desc">${esc(p.reparto || 'reparto non indicato')}</div>`
     : `<div class="settings-row-label">Nome e reparto</div>
-       <div class="settings-row-desc">Non ancora indicati. Servono a trovarti nei documenti della produzione.</div>`;
+       <div class="settings-row-desc">Non ancora indicati.</div>`;
 }
 
 
@@ -12508,7 +12502,7 @@ function pushInvitoHtml(){
   if (!pushDaChiedere()) return '';
   return `<div class="card push-invito">
     <div class="t">Ti avviso io?</div>
-    <div class="s">Quando arriva un ordine del giorno nuovo, dieci minuti prima del tuo pick-up e un quarto d'ora prima del catering. Niente altro.</div>
+    <div class="s">Ordine del giorno, piano, pick-up e catering.</div>
     <div class="sino">
       <button class="si" onclick="pushInvitoSi()">Sì, avvisami</button>
       <button class="no" onclick="pushInvitoNo()">No grazie</button>
@@ -12600,7 +12594,7 @@ async function pushRender(){
    dover aspettare il catering. */
 /* La prova e' un interruttore che si spegne da solo: acceso finche' la
    notifica finta e' in viaggio, poi torna com'era. */
-const PUSH_PROVA_TESTO = 'Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.';
+const PUSH_PROVA_TESTO = '';
 let pushProvaTimer = null;
 function pushProvaStato(accesa){
   const t = document.getElementById('pushProvaTasto'), d = document.getElementById('pushProvaDesc');

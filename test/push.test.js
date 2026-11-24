@@ -186,7 +186,7 @@ console.log('\n── ⚠ gli interruttori delle notifiche ──');
   ok('spento, toccarlo accende; acceso, spegne', r.chiamate, ['accendi','spegni']);
   ok('sono interruttori, non tasti con la scritta', [r.prima, r.testo], [['cb-int','BUTTON','cb-int'], '']);
   ok('⚠ la prova resta accesa mentre la notifica viaggia', r.accesa, [true, "Arriva fra un minuto. Puoi anche chiudere l'app."]);
-  ok('⚠ e si spegne da sola, poco dopo il minuto', [r.attesa, r.dopo], [75000, [false, 'Manda a questo telefono una notifica finta fra un minuto, per vedere se arriva.']]);
+  ok('⚠ e si spegne da sola, poco dopo il minuto', [r.attesa, r.dopo], [75000, [false, '']]);
   ok('se la prova non parte, torna subito spenta', r.fallita, false);
 }
 
