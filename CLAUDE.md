@@ -1,7 +1,10 @@
 # Campobase — regole per chi ci mette le mani
 
-- **Prima di ogni push gira tutta la serie**, non solo i test delle parti
-  toccate: `cd test && NODE_PATH=$(npm root -g) node prova.js`. In una copia
+- **Prima di ogni push su main gira tutta la serie**, non solo i test delle
+  parti toccate: `cd test && NODE_PATH=$(npm root -g) node prova.js` (quattro
+  prove alla volta, circa un minuto; chi fallisce sotto carico viene rilanciato
+  da solo e segnato `ok*`). Sui rami di anteprima, che non pubblicano niente,
+  il blocco fa girare il controllo rapido e le sole prove toccate. In una copia
   nuova del repo attivare il blocco: `git config core.hooksPath .githooks`.
 - `git push` pubblica subito (Cloudflare). Prima del deploy gira
   `test/controllo-rapido.mjs` (wrangler.jsonc, `build.command`): se fallisce

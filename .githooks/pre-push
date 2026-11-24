@@ -1,13 +1,34 @@
 #!/bin/sh
-# Prima di ogni push: il controllo rapido e poi tutta la serie dei test.
+# Prima di ogni push: il controllo rapido, poi i test.
 # Se qualcosa e' rosso il push non parte.
 #
 # Si attiva una volta per copia del repo:  git config core.hooksPath .githooks
 # Il 14 novembre 2026 un sw.js vuoto e' andato online perche' prima del
 # push erano stati lanciati solo i test delle parti toccate.
+#
+# Verso main gira SEMPRE tutta la serie: main e' quello che va online.
+# Verso un ramo di anteprima, che non pubblica niente, girano il controllo
+# rapido e le sole prove toccate rispetto a main; la serie completa la
+# rifa' comunque il push su main, prima che qualcosa arrivi a qualcuno.
 cd "$(git rev-parse --show-toplevel)" || exit 1
+verso_main=0; letto=0
+while read locale sha remoto resto; do
+  letto=1
+  [ "$remoto" = "refs/heads/main" ] && verso_main=1
+done
+# Senza elenco dei rami (push lanciato a mano in modi strani) si sta larghi.
+[ "$letto" = 0 ] && verso_main=1
+
 node test/controllo-rapido.mjs || exit 1
-echo "serie completa dei test (un paio di minuti)…"
-esito=$(cd test && NODE_PATH=$(npm root -g) node prova.js 2>&1)
+
+if [ "$verso_main" = 1 ]; then
+  echo "serie completa dei test (circa un minuto)…"
+  esito=$(cd test && NODE_PATH=$(npm root -g) node prova.js 2>&1)
+else
+  toccate=$(git diff --name-only origin/main...HEAD -- test 2>/dev/null | sed -n 's#^test/\(.*\.test\.m\{0,1\}js\)$#\1#p' | tr '\n' ' ')
+  if [ -z "$toccate" ]; then echo "ramo di anteprima, nessuna prova toccata: basta il controllo rapido."; exit 0; fi
+  echo "ramo di anteprima: solo le prove toccate ($toccate)…"
+  esito=$(cd test && NODE_PATH=$(npm root -g) node prova.js $toccate 2>&1)
+fi
 echo "$esito" | tail -3
 echo "$esito" | grep -q "tutti passati" || { echo "$esito" | grep -vE "^\s*ok " | tail -30; echo "PUSH FERMATO: la serie non è tutta verde."; exit 1; }
