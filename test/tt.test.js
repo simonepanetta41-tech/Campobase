@@ -142,6 +142,20 @@ for(const [etichetta,t,v] of viaggi){
   const r=tt.ttCalcDay(0,orariDa([t]),false);
   atteso(etichetta, hm(r.oreViaggio), v);
 }
+/* Senza franchigia. Partenza 13.30, rientro 21.30: otto ore filate, il
+   viaggio sta tutto dentro la giornata e non si paga a parte. Prima
+   l'andata si contava sempre, e uscivano 30 minuti. */
+console.log('\n── ore viaggio dentro la giornata (8h, nessuna franchigia) ──');
+ttMeta.viaggioConcesso=0;
+for(const [etichetta,t,v] of [
+  ['⚠ 13.30 14.00 21.00 21.30 — otto ore dalla partenza al rientro', {par:'13.30',ini:'14.00',fin:'21.00',rie:'21.30'}, '—'],
+  ['13.00 14.00 21.00 21.30 — mezz\'ora fuori dalle otto',          {par:'13.00',ini:'14.00',fin:'21.00',rie:'21.30'}, '30min'],
+  ['giornata finita presto, senza rientro: 13.30 14.00 20.00',      {par:'13.30',ini:'14.00',fin:'20.00'}, '—'],
+  ['riprese lunghe: il viaggio non supera quello fatto',            {par:'13.30',ini:'14.00',fin:'23.30',rie:'00.00'}, '1h'],
+]){
+  atteso(etichetta, hm(tt.ttCalcDay(0,orariDa([t]),false).oreViaggio), v);
+}
+ttMeta.viaggioConcesso=60;
 ttMeta.tipoGiornata=10;
 
 console.log(ko===0?'\nTutti i controlli passati.':`\n${ko} controlli falliti.`);

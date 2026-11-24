@@ -5639,7 +5639,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.197';
+const CB_VERSIONE = '1.198';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -15914,22 +15914,26 @@ function ttCalcDay(d,orari,isSestoGiorno){
   /*
    * Ore viaggio: calcolo grezzo, poi sottrazione della franchigia.
    *
-   * Il tragitto di andata sta per definizione fuori dalla giornata, perche'
-   * precede l'inizio delle riprese, e si conta tutto.
+   * Il viaggio si paga a parte solo per quanto la giornata intera, dalla
+   * partenza al rientro, esce dalla giornata contrattuale. Se si parte
+   * alle 13:30 e si rientra alle 21:30 sono otto ore filate: il viaggio
+   * sta tutto dentro l'orario di lavoro, e non c'e' niente da retribuire
+   * in piu'.
    *
-   * Il rientro no: conta solo per la parte che esce dalla giornata
-   * contrattuale. Se si comincia alle 09:00 con la giornata da 8h, le 17:00
-   * sono ancora dentro, e un rientro alle 17:00 non e' tempo di viaggio da
-   * retribuire a parte — e' tempo gia' compreso. Prima si contava tutto cio'
-   * che cadeva dopo la fine delle riprese, e quell'ora risultava pagata due
-   * volte.
+   * Prima l'andata si contava sempre per intero, perche' precede l'inizio
+   * delle riprese: in una giornata finita presto risultava mezz'ora di
+   * viaggio pagata dentro una giornata piu' corta del contratto. Il
+   * rientro seguiva gia' questa regola; ora vale per tutti e due.
+   *
+   * Non si paga mai piu' del viaggio fatto: lo sforamento dovuto alle
+   * riprese che vanno lunghe e' golden, non viaggio.
    */
   if(isTrasf){
     const parM=T.parM, rieM=T.rieM;
-    const fineGiornata=iniM+soglia;
-    let v=0;
-    if(parM!==null)v+=Math.max(0,iniM-parM);
-    if(rieM!==null)v+=Math.max(0,rieM-Math.max(finM,fineGiornata));
+    const daM=parM!==null?Math.min(parM,iniM):iniM;
+    const aM=rieM!==null?Math.max(rieM,finM):finM;
+    const fatto=(iniM-daM)+(aM-finM);
+    const v=Math.min(fatto,Math.max(0,(aM-daM)-soglia));
     const viaggioLordo=Math.min(v,120); // cap fisico a 2h
     const netto=Math.max(0,viaggioLordo-ttMeta.viaggioConcesso);
     r.oreViaggio=netto>0?netto:null;
