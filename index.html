@@ -3276,7 +3276,15 @@ function cbTestata() {
  * Su ordine del giorno, spoglio e piano, e su Altro con le sue pagine di
  * sola lettura (cast, troupe, analisi): da li' riporta alla pagina del
  * film da cui si era partiti. Non sulla sceneggiatura e sul wrap, dove
- * col dito si lavora. Nella sezione Orari la
+ * col dito si lavora.
+ *
+ * Negli Orari vale su tutta la pagina tranne che sulle tabelle (TT_TABELLE):
+ * li' si scorre col dito per arrivare al sabato, e un gesto che vuol dire
+ * "indietro" farebbe uscire per sbaglio mentre si compila. Se e' aperta una
+ * delle sue finestre (storico, intestazione, regole) il gesto chiude
+ * quella, non la pagina. E non parte mai da un campo in cui si scrive.
+ *
+ * Una volta la sezione era esclusa tutta: la
  * tabella della settimana scorre gia' in orizzontale, e un gesto che
  * vuol dire "indietro" su una pagina dove si scorre per arrivare al
  * sabato diventa un modo per uscirne per sbaglio.
@@ -3286,7 +3294,8 @@ function cbTestata() {
  * c'e' aperta una scena o un PDF, quello e' un fratello di odgSection e
  * non un figlio, quindi il contains lo esclude da solo.
  */
-const CB_INDIETRO = ['odgSection', 'spoglioSection', 'pdlSection', 'altroSection', 'castSection', 'troupeSection', 'analisiSection'];
+const CB_INDIETRO = ['odgSection', 'spoglioSection', 'pdlSection', 'timetableSection', 'altroSection', 'castSection', 'troupeSection', 'analisiSection'];
+const CB_NON_QUI = '#tt-tabelle, input, textarea, select';     // da qui il gesto non parte
 let cbTx = 0, cbTy = 0, cbSegue = false;
 
 document.addEventListener('touchstart', e => {
@@ -3295,6 +3304,7 @@ document.addEventListener('touchstart', e => {
   const sez = CB_INDIETRO.map(id => document.getElementById(id))
                          .find(el => el && el.offsetParent !== null);
   if (!sez || !sez.contains(e.target)) return;
+  if (e.target.closest && e.target.closest(CB_NON_QUI)) return;
   for (let n = e.target; n && n !== sez; n = n.parentElement)
     if (n.scrollWidth > n.clientWidth + 4) return;
   cbTx = e.touches[0].clientX; cbTy = e.touches[0].clientY; cbSegue = true;
@@ -3308,7 +3318,10 @@ document.addEventListener('touchend', e => {
   const dx = t.clientX - cbTx, dy = t.clientY - cbTy;
   // Abbondante e chiaramente orizzontale: uno scorrimento in verticale
   // che sbanda non deve far cambiare schermata.
-  if (dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5) cbIndietro();
+  if (!(dx > 70 && Math.abs(dy) < 50 && dx > Math.abs(dy) * 1.5)) return;
+  const finestra = document.querySelector('#timetableSection .tt-sez.aperta');
+  if (finestra && finestra.offsetParent !== null) { finestra.classList.remove('aperta'); return; }
+  cbIndietro();
 }, { passive: true });
 
 /*
@@ -5572,7 +5585,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.191';
+const CB_VERSIONE = '1.192';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

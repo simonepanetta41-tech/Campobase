@@ -137,15 +137,23 @@ await p.evaluate(()=>{ rtAdesso=rtPrimaDiAltro=null; switchResultTab('odg'); swi
 await scorri('#scriptSection', 140, 10); await p.waitForTimeout(150);
 ok('sulla sceneggiatura no: lì col dito si lavora', await p.evaluate(()=>rtAdesso), 'script');
 
-console.log('\n── ma non dalla sezione delle ore ──');
-/* Li' la tabella della settimana si scorre col dito per arrivare al
+console.log('\n── ⚠ negli Orari: ovunque, tranne che sulle tabelle ──');
+/* Sulla tabella della settimana si scorre col dito per arrivare al
    sabato: se quel gesto cambiasse schermata, compilare il sabato
-   diventerebbe un terno al lotto. */
+   diventerebbe un terno al lotto. Sul resto della pagina vale come altrove. */
 await apri('timetableSection');
-ok('prima sono dentro',        await dove(), 'progetto');
-await scorri('#timetableSection', 140, 10);
-await p.waitForTimeout(150);
-ok('scorrendo resto dove sono', await dove(), 'progetto');
+await p.evaluate(()=>{ rtAdesso='ore'; rtPrimaDiAltro=null; try{ initTimetable(); }catch(_){} });
+ok('prima sono dentro', await dove(), 'progetto');
+await scorri('#tt-tabelle', 140, 10); await p.waitForTimeout(150);
+ok('sulla tabella: scorrendo resto dove sono', await dove(), 'progetto');
+ok('la tabella c\'è davvero, non è un contenitore vuoto', await p.evaluate(()=>document.getElementById('tt-tabelle').getBoundingClientRect().height>100), true);
+await scorri('#tt-note', 140, 10); await p.waitForTimeout(150);
+ok('da un campo in cui si scrive, nemmeno', await dove(), 'progetto');
+await p.evaluate(()=>ttPiega('regole'));
+await scorri('#sez-regole .tt-fin-corpo', 140, 10); await p.waitForTimeout(150);
+ok('⚠ con una finestra aperta il gesto chiude quella, non la pagina', [await p.evaluate(()=>document.querySelectorAll('.tt-sez.aperta').length), await dove()], [0,'progetto']);
+await scorri('#tt-quale', 140, 10); await p.waitForTimeout(150);
+ok('⚠ dal resto della pagina torno indietro', await dove(), 'home');
 
 console.log('\n── e nemmeno con un gesto che non è chiaro ──');
 await apri('odgSection');
