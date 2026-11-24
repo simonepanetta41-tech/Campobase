@@ -135,6 +135,6 @@ ok('non compare', await p.locator('#tt-cf-regole').count(), 0);
 
 ok('nessun errore in pagina', err, []);
 await b.close();
-console.log(ko?`\n${ko} KO`:'\ntutto ok');
+console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati');
 process.exit(ko?1:0);
 })();
