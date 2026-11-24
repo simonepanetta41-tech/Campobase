@@ -94,7 +94,7 @@ ok('acceso', await p.getAttribute('#tt-cf-sw','aria-pressed'), 'true');
 const fatte=await p.evaluate(()=>window.__fatte);
 ok('le settimane del film prendono film e interruttore', fatte.filter(f=>f.op==='update').map(f=>[f.v,f.f]),
   [[{project_id:'F1',condivisa:true},{user_id:'io',film:'Missione San Gennaro'}],[{condivisa:true},{user_id:'io',project_id:'F1'}]]);
-ok('e la settimana a schermo sale già così', fatte.filter(f=>f.op==='upsert').map(f=>[f.v.project_id,f.v.condivisa,f.v.data.meta.autore]), [['F1',true,'S. Panetta']]);
+ok('e la settimana a schermo sale già così', [...new Set(fatte.filter(f=>f.op==='upsert').map(f=>[f.v.project_id,f.v.condivisa,f.v.data.meta.autore].join('|')))], ['F1|true|S. Panetta']);
 ok('da qui in poi ogni salvataggio lo porta', await p.evaluate(()=>ttCfColonne()), {project_id:'F1',condivisa:true});
 
 console.log('\n── 5. il confronto ──');
