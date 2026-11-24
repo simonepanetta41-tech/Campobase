@@ -343,6 +343,14 @@ ok('⚠ le versioni si confrontano da numeri: 1.176 è dopo 1.98', [d.versioni.u
 [st, d] = await chiedi('tok-io', { azione: 'persona', id: ANNA });
 ok('nella scheda: versione e spesa', [d.versione, d.dollari], ['1.98', 0.8]);
 ok('nell\'elenco: la versione di ognuno', (await chiedi('tok-io', { azione: 'persone' }))[1].persone.map(p => p.versione).sort(), ['1.176', '1.98', null].sort());
+/* L'ultima apertura: Luca non ha tempo d'uso registrato (apre per pochi
+   secondi), ma l'app ha segnato l'apertura con la versione. Nell'elenco
+   non deve risultare "mai aperta", e deve dire lo stesso della scheda Server. */
+const lucaVista = fam(90); T.profiles.find(p => p.id === LUCA).app_vista = lucaVista;
+d = (await chiedi('tok-io', { azione: 'persone' }))[1];
+ok('⚠ ultima apertura anche senza tempo d\'uso', d.persone.find(p => p.id === LUCA).ultima, lucaVista);
+ok('chi ha tempo d\'uso più recente tiene quello', d.persone.find(p => p.id === ANNA).ultima > fam(500), true);
+ok('nella scheda della persona, la stessa data', (await chiedi('tok-io', { azione: 'persona', id: LUCA }))[1].ultima, lucaVista);
 
 console.log('\n── ⚠ l\'avviso a chi amministra ──');
 const { avvisaAdmin, guasto, adminIds } = await import(RADICE + '/worker/guardia.js');

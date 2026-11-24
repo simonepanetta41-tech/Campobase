@@ -5644,7 +5644,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.195';
+const CB_VERSIONE = '1.196';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -7137,26 +7137,36 @@ function usoSegna(){
   try { localStorage.setItem(USO_CODA, JSON.stringify(c)); } catch (_) {}
 }
 
+let usoInVolo = false;
 async function usoManda(){
-  if (!USO_ACCESO || usoFermo || !currentUser) return;
+  if (!USO_ACCESO || usoFermo || usoInVolo || !currentUser) return;
   const c = usoCoda();
   const righe = Object.entries(c).filter(([, s]) => s > 0).map(([sezione, secondi]) => ({ sezione, secondi }));
   if (!righe.length) return;
   usoUltimoInvio = Date.now();
-  // La coda si svuota prima: se l'invio fallisce si rimette, cosi' il tempo
-  // che passa nel frattempo non viene contato due volte.
-  try { localStorage.removeItem(USO_CODA); } catch (_) {}
+  /* La coda si svuota solo a invio confermato, togliendo quello che e'
+     partito. Prima si svuotava subito: chi apriva l'app per pochi secondi
+     e la chiudeva perdeva quel tempo, perche' il telefono ferma la pagina
+     prima che l'invio arrivi, e in amministrazione sembrava non aprirla
+     da giorni. Cosi' quel tempo resta sul telefono e parte alla prossima
+     apertura. */
+  usoInVolo = true;
   let errore = null;
   try { const r = await sb.rpc('segna_uso', { p_righe: righe }); errore = r && r.error; }
   catch (e) { errore = e; }
-  if (!errore) return;
-  /* La funzione non c'e' (sql/uso.sql non lanciato): inutile riprovare a
-     ogni minuto, e quel tempo non serve tenerlo. Per ogni altro guasto —
-     niente campo, di solito — si rimette in coda e si riprova. */
-  if (/PGRST202|42883|does not exist|Could not find/i.test(String(errore.code || '') + ' ' + String(errore.message || ''))) { usoFermo = true; return; }
+  usoInVolo = false;
+  if (errore) {
+    /* La funzione non c'e' (sql/uso.sql non lanciato): inutile riprovare a
+       ogni minuto, e quel tempo non serve tenerlo. Per ogni altro guasto —
+       niente campo, di solito — resta in coda e si riprova. */
+    if (/PGRST202|42883|does not exist|Could not find/i.test(String(errore.code || '') + ' ' + String(errore.message || ''))) {
+      usoFermo = true; try { localStorage.removeItem(USO_CODA); } catch (_) {}
+    }
+    return;
+  }
   const d = usoCoda();
-  righe.forEach(x => { d[x.sezione] = Math.min((d[x.sezione] || 0) + x.secondi, 6 * 3600); });
-  try { localStorage.setItem(USO_CODA, JSON.stringify(d)); } catch (_) {}
+  righe.forEach(x => { const resto = (d[x.sezione] || 0) - x.secondi; if (resto > 0) d[x.sezione] = resto; else delete d[x.sezione]; });
+  try { if (Object.keys(d).length) localStorage.setItem(USO_CODA, JSON.stringify(d)); else localStorage.removeItem(USO_CODA); } catch (_) {}
 }
 
 if (USO_ACCESO) {

@@ -76,6 +76,15 @@ await p.evaluate(()=>{ GUASTO=null; });
 await p.clock.runFor(10000);
 ok('torna il campo: parte tutto, una volta sola', [await manda(), await coda()], [[{piano:30}], {}]);
 
+console.log('\n── ⚠ app chiusa mentre l\'invio è in viaggio: il tempo resta sul telefono ──');
+/* Chi apre l'app per pochi secondi e la chiude: il telefono ferma la pagina
+   prima che l'invio arrivi. Prima la coda era gia' stata svuotata, e quel
+   tempo spariva: in amministrazione sembrava non aprisse l'app da giorni. */
+await p.evaluate(()=>{ localStorage.setItem('cb_uso_coda', JSON.stringify({odg:8})); window.__vero=sb.rpc; sb.rpc=()=>new Promise(()=>{}); usoManda(); });
+ok('l\'invio non torna: la coda c\'è ancora', await coda(), {odg:8});
+await p.evaluate(()=>{ sb.rpc=window.__vero; usoInVolo=false; });
+ok('alla prossima apertura parte', [await manda(), await coda()], [[{odg:8}], {}]);
+
 console.log('\n── fuori dal film, e senza la funzione sul database ──');
 await p.evaluate(()=>{ document.getElementById('resultsPage').style.display='none'; });
 await p.clock.runFor(10000);

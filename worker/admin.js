@@ -112,6 +112,15 @@ async function profili(env, uno) {
   catch (_) { return await db(env, `profiles?select=id,nome,cognome,reparto${dove}`) || []; }
 }
 /* "1.176" contro "1.98": si confrontano i numeri, non le lettere. */
+/* La piu' recente di due date ISO; null se mancano tutte e due. */
+export function piuTardi(a, b) {
+  const ta = Date.parse(a || ''), tb = Date.parse(b || '');
+  if (isNaN(ta) && isNaN(tb)) return null;
+  if (isNaN(tb)) return a;
+  if (isNaN(ta)) return b;
+  return tb > ta ? b : a;
+}
+
 export function versioneMaggiore(a, b) {
   const x = String(a || '').split('.').map(n => +n || 0), y = String(b || '').split('.').map(n => +n || 0);
   for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
@@ -174,6 +183,10 @@ const AZIONI = {
   // Chi sono: la pagina lo chiede per prima cosa.
   async io(env, b, io) { return { admin: true, id: io.id, email: io.email || null }; },
 
+  /* "Ultima apertura": la piu' recente fra il tempo d'uso e l'apertura
+     registrata con la versione. Il tempo d'uso da solo non basta: chi
+     apre l'app per pochi secondi puo' non lasciarne traccia, e nell'elenco
+     risultava ferma da giorni una persona che l'aveva aperta la notte. */
   async persone(env) {
     const [acc, prof, membri, ff, iscr, uso] = await Promise.all([
       account(env), profili(env),
@@ -195,7 +208,7 @@ const AZIONI = {
       const p = P.get(a.id) || {};
       return { id: a.id, nome: p.nome || '', cognome: p.cognome || '', reparto: p.reparto || '', email: a.email || '',
                film: filmDi.get(a.id) || [], telefoni: telefoni.get(a.id) || 0,
-               ultima: visto.get(a.id) || null, iscritto: a.created_at || null, bloccato: bloccato(a),
+               ultima: piuTardi(visto.get(a.id), p.app_vista), iscritto: a.created_at || null, bloccato: bloccato(a),
                versione: p.app_versione || null };
     }).sort((x, y) => String(y.ultima || '').localeCompare(String(x.ultima || '')));
     /* Di ogni film, quante persone ha dentro: nella tabella dei film ci
@@ -229,7 +242,7 @@ const AZIONI = {
     return {
       id: u, nome: p.nome || '', cognome: p.cognome || '', reparto: p.reparto || '', email: a.email || '',
       iscritto: a.created_at || null, ultimoAccesso: a.last_sign_in_at || null, bloccato: bloccato(a),
-      ultima: ((uso || [])[0] || {}).ultimo || null,
+      ultima: piuTardi(((uso || [])[0] || {}).ultimo, p.app_vista),
       versione: p.app_versione || null, versioneVista: p.app_vista || null, dollari: somma(consumi).dollari,
       film: (membri || []).filter(m => F.has(m.project_id)).map(m => ({ id: m.project_id, titolo: F.get(m.project_id).titolo,
               sigla: F.get(m.project_id).sigla || null, ruolo: m.ruolo, segna: !!m.segna, entrato: m.created_at })),
