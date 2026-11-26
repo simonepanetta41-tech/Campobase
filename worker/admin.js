@@ -582,8 +582,12 @@ const AZIONI = {
       interruttori: [
         interruttore('Legge gli ordini del giorno', env.OMBRA, true), interruttore('Scrive gli ordini del giorno', env.OMBRA_SCRIVE),
         interruttore('Legge i piani', env.PIANO, true), interruttore('Scrive i piani', env.PIANO_SCRIVE),
-        interruttore('Smistamento allegati', env.SMISTA), interruttore('Indice degli stralci', env.STRALCI),
-        interruttore('Avvisi dalla lettura in ombra', env.OMBRA_AVVISI) ]
+        interruttore('Smistamento allegati', env.SMISTA), interruttore('Indice degli stralci', env.STRALCI) ]
+      /* OMBRA_AVVISI non si mostra: da quando il server scrive gli ordini del
+         giorno, pick-up e catering li crea scrive.js per tutta la troupe, e
+         quell'interruttore vale solo nel percorso "legge senza scrivere",
+         dove le mail non passano piu'. In elenco risultava "spento" e
+         sembrava una funzione mancante. */
     };
   },
 

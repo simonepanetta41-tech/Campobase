@@ -39,5 +39,5 @@ module.exports = function dati() {
       versioni:{ultima:'1.176',aggiornati:12,indietro:[{id:A,nome:'Luca Berti',versione:'1.171',vista:fa(60*50)}],ignoti:3},
       prezzi:[{modello:'claude-sonnet-5-5',entrata:2,uscita:10},{modello:'claude-haiku-5-5',entrata:0.1,uscita:0.5}],
       interruttori:[{nome:'Legge gli ordini del giorno',acceso:true},{nome:'Scrive gli ordini del giorno',acceso:true},{nome:'Legge i piani',acceso:true},{nome:'Scrive i piani',acceso:true},
-        {nome:'Smistamento allegati',acceso:true},{nome:'Indice degli stralci',acceso:true},{nome:'Avvisi dalla lettura in ombra',acceso:false}]} };
+        {nome:'Smistamento allegati',acceso:true},{nome:'Indice degli stralci',acceso:true}]} };
 };
