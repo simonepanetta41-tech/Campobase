@@ -890,6 +890,18 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .cod-box button{flex:none;padding:0 18px;min-height:44px;background:var(--yellow);
   border:none;border-radius:11px;color:#0A0B0D;font-family:'Space Grotesk',sans-serif;
   font-size:14px;font-weight:600;cursor:pointer}
+.cod-box.on{flex-wrap:wrap}
+.cod-box button.cod-qr{flex:1 0 100%;background:none;border:1px solid var(--border-l);color:var(--white)}
+.qr-vista{display:none;position:fixed;inset:0;z-index:2000;background:#000}
+.qr-vista.on{display:block}
+.qr-vista video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.qr-mira{position:absolute;left:50%;top:44%;width:min(66vw,280px);aspect-ratio:1;transform:translate(-50%,-50%);
+  border:2px solid var(--yellow);border-radius:18px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
+.qr-testo{position:absolute;left:0;right:0;top:calc(44% + min(33vw,140px) + 22px);text-align:center;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#fff}
+.qr-vista button{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom));
+  min-width:150px;min-height:48px;padding:0 22px;border-radius:12px;border:1px solid rgba(255,255,255,.5);
+  background:rgba(0,0,0,.55);color:#fff;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600}
 /* ── Accesso ───────────────────────────────────────────────────────── */
 /* Marchio, frase e tasti sono un blocco solo, centrato. Prima i tasti
    erano spinti in fondo allo schermo e fra la frase e il primo tocco
@@ -1734,6 +1746,15 @@ body.senza-rete #cbSenzaRete { display: block; }
                spellcheck="false" placeholder="C59C90CE"
                onkeydown="if(event.key==='Enter')codiceEntra()">
         <button onclick="codiceEntra()">Entra</button>
+        <button class="cod-qr" onclick="qrScansiona()">Inquadra il QR</button>
+      </div>
+      <!-- La fotocamera, dentro l'app: inquadrando il QR con quella del
+           telefono si finisce nel browser, non nell'app installata. -->
+      <div class="qr-vista" id="qrVista">
+        <video id="qrVideo" playsinline muted></video>
+        <div class="qr-mira"></div>
+        <div class="qr-testo">Inquadra il QR del film</div>
+        <button onclick="qrChiudi()">Annulla</button>
       </div>
       <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
         ＋ Nuovo da sceneggiatura</button>
@@ -3948,6 +3969,81 @@ function codiceChiudi() {
   if (home) home.classList.remove('cod-aperto');
 }
 
+/* ── Il QR, letto da dentro l'app ──────────────────────────────────────
+ *
+ * Inquadrando il QR con la fotocamera del telefono si apre il link nel
+ * browser: su iPhone un'app messa sulla Home non puo' prendersi i link.
+ * Per chi l'app ce l'ha gia' e' un giro inutile — accesso da rifare, o
+ * codice da ricopiare a mano. Qui la fotocamera si apre dentro l'app e
+ * dal QR si entra nel film.
+ *
+ * Il QR resta quello di sempre, con il link: chi l'app non ce l'ha ancora
+ * lo inquadra dal telefono e arriva sul sito, com'e' giusto.
+ *
+ * La libreria che lo legge (qr-leggi.js, jsQR) si carica solo qui.
+ */
+let qrLeggiPronto = null, qrFlusso = null, qrGiro = 0;
+function qrLeggiCarica(){
+  if (window.jsQR) return Promise.resolve();
+  if (!qrLeggiPronto) qrLeggiPronto = new Promise((ok, no) => {
+    const t = document.createElement('script');
+    t.src = 'qr-leggi.js'; t.onload = ok; t.onerror = () => { qrLeggiPronto = null; no(new Error('libreria non caricata')); };
+    document.head.appendChild(t);
+  });
+  return qrLeggiPronto;
+}
+/* Il codice dentro un QR: il link d'invito, o il codice nudo. Qualunque
+   altro QR non e' nostro e si ignora. */
+function qrCodiceDa(testo){
+  const t = String(testo || '').trim();
+  try { const c = new URL(t).searchParams.get('film'); if (c && /^[0-9a-z]{6,9}$/i.test(c.trim())) return c.trim().toUpperCase(); } catch (_) {}
+  return /^[0-9a-z]{6,9}$/i.test(t) ? t.toUpperCase() : null;
+}
+function qrChiudi(){
+  qrGiro++;
+  try { if (qrFlusso) qrFlusso.getTracks().forEach(t => t.stop()); } catch (_) {}
+  qrFlusso = null;
+  const v = document.getElementById('qrVideo'); if (v) { try { v.pause(); } catch (_) {} v.srcObject = null; }
+  document.getElementById('qrVista')?.classList.remove('on');
+}
+async function qrScansiona(){
+  const no = (permesso) => { qrChiudi(); showToast(permesso ? 'Fotocamera non permessa: scrivi il codice.' : 'Fotocamera non disponibile: scrivi il codice.', 'red', 5000); };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return no(false);
+  const mio = ++qrGiro;
+  try {
+    await qrLeggiCarica();
+    const flusso = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    if (mio !== qrGiro) { flusso.getTracks().forEach(t => t.stop()); return; }
+    qrFlusso = flusso;
+  } catch (e) {
+    console.log('[qr] fotocamera:', e && (e.name || e.message));
+    return no(/NotAllowed|Permission|Security/i.test(String(e && e.name) + String(e && e.message)));
+  }
+  const video = document.getElementById('qrVideo');
+  document.activeElement && document.activeElement.blur && document.activeElement.blur();   // via la tastiera
+  document.getElementById('qrVista').classList.add('on');
+  video.srcObject = qrFlusso;
+  try { await video.play(); } catch (_) {}
+  const tela = document.createElement('canvas'), ctx = tela.getContext('2d', { willReadFrequently: true });
+  const passo = () => {
+    if (mio !== qrGiro || !qrFlusso) return;
+    if (video.readyState >= 2 && video.videoWidth) {
+      // Rimpicciolita: a piena risoluzione ogni lettura costa mezzo secondo.
+      const k = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+      const w = tela.width = Math.round(video.videoWidth * k), h = tela.height = Math.round(video.videoHeight * k);
+      ctx.drawImage(video, 0, 0, w, h);
+      let letto = null;
+      try { letto = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: 'dontInvert' }); } catch (_) {}
+      const c = letto && qrCodiceDa(letto.data);
+      if (c) { qrChiudi(); document.getElementById('codInput').value = c; codiceEntra(); return; }
+    }
+    setTimeout(passo, 150);
+  };
+  passo();
+}
+// Uscendo dall'app la fotocamera si spegne: non resta accesa dietro.
+document.addEventListener('visibilitychange', () => { if (document.hidden && qrFlusso) qrChiudi(); });
+
 async function codiceEntra() {
   const el = document.getElementById('codInput');
   const c = (el.value || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -5639,7 +5735,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.199';
+const CB_VERSIONE = '1.200';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

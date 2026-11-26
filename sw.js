@@ -1,4 +1,4 @@
-const CACHE = 'campobase-v199';
+const CACHE = 'campobase-v200';
 // Quanto si aspetta la rete prima di aprire la pagina salvata (millisecondi).
 const ATTESA_RETE = 3000;
 // Le cache che restano da una versione all'altra: il biglietto della
@@ -14,6 +14,7 @@ const STATIC = [
   '/manifest.json',
   '/installa.html',
   '/qr.js',
+  '/qr-leggi.js',
   'https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700;800&display=swap',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
