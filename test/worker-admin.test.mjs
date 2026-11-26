@@ -323,6 +323,15 @@ ok('scartata: resta, ma nessuno la prende', [mailDi(D2).stato, (await chiedi('to
 
 console.log('\n── correggere un film ──');
 mondo();
+/* Il codice d'invito: cambiarlo chiude la porta a chi lo conosce e non
+   dovrebbe piu' entrare. */
+{ const pr = T.projects.find(p => p.id === FA); pr.codice = 'K7QM2XAA'; const membri = T.film_membri.length;
+  ok('il codice non lo cambia un membro qualsiasi', [(await chiedi('tok-anna', { azione: 'codiceNuovo', id: FA }))[0], pr.codice], [403, 'K7QM2XAA']);
+  [st, d] = await chiedi('tok-io', { azione: 'codiceNuovo', id: FA });
+  ok('⚠ un codice nuovo, diverso da prima, della forma giusta', [st, d.codice !== 'K7QM2XAA', /^[0-9A-F]{8}$/.test(d.codice), pr.codice === d.codice], [200, true, true, true]);
+  ok('⚠ chi è nel film resta nel film', T.film_membri.length, membri);
+  ok('un film che non c\'è', (await chiedi('tok-io', { azione: 'codiceNuovo', id: U('d') }))[0], 400);
+}
 ok('un membro qualsiasi non può', (await chiedi('tok-anna', { azione: 'filmCambia', id: FA, sigla: 'XX' }))[0], 403);
 [st, d] = await chiedi('tok-io', { azione: 'filmCambia', id: FA, sigla: ' msg2 ', mittente: 'Prod@Esempio.it; altra@esempio.it' });
 ok('sigla in maiuscolo, mittenti in ordine', [st, T.projects[0].sigla, T.projects[0].mittente, T.projects[0].titolo], [200, 'MSG2', 'prod@esempio.it, altra@esempio.it', 'Missione San Gennaro']);

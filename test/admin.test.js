@@ -146,6 +146,13 @@ await p.click('#fSi'); await p.waitForTimeout(100);
 ok('senza cambiare niente non si chiede niente', await fatte('filmCambia'), []);
 await p.evaluate(()=>modificaFilm()); await p.fill('#fSigla','msg2'); await p.click('#fSi'); await p.waitForTimeout(200);
 ok('⚠ si manda solo quello che è cambiato', await fatte('filmCambia'), [{azione:'filmCambia',id:'f1f1f1f1-1111-4111-8111-111111111111',sigla:'msg2'}]);
+/* Il codice d'invito si cambia dopo una conferma che dice cosa succede. */
+await p.evaluate(()=>{ D.codiceNuovo={fatto:true,codice:'9F3A77C1'}; cambiaCodice(); }); await p.waitForTimeout(100);
+ok('cambiare codice: dice quale smette di funzionare', await p.evaluate(()=>document.querySelector('#foglio .sotto').textContent), 'K7QM2X smette di funzionare. Chi è già nel film resta dentro.');
+await p.evaluate(()=>chiudiFoglio()); ok('annullando non cambia', await fatte('codiceNuovo'), []);
+await p.evaluate(()=>cambiaCodice()); await p.click('#cSi'); await p.waitForTimeout(200);
+ok('⚠ confermando chiede il codice nuovo, per quel film', await fatte('codiceNuovo'), [{azione:'codiceNuovo',id:'f1f1f1f1-1111-4111-8111-111111111111'}]);
+ok('e lo dice', await p.evaluate(()=>document.getElementById('avviso').textContent), 'Codice nuovo: 9F3A77C1');
 /* I mittenti: uno alla volta col +, via con la X dopo la conferma. */
 await p.evaluate(()=>{ CHIESTE=CHIESTE.filter(c=>c.azione!=='filmCambia'); modificaFilm(); }); await p.waitForTimeout(100);
 await p.fill('#fMittente','non-una-mail'); await p.click('#fMittPiu');
@@ -167,7 +174,7 @@ await p.evaluate(()=>modificaFilm()); await p.waitForTimeout(100);
 await p.click('#fMittenti .mitt-x'); await p.click('#fMittenti [data-si]');
 ok('senza mittenti lo dice', await p.evaluate(()=>document.querySelector('#fMittenti .m').textContent), 'Nessuno: la casella accetta qualunque mittente');
 await p.evaluate(()=>chiudiFoglio());
-await p.evaluate(()=>{ CHIESTE=CHIESTE.filter(c=>!/^(messaggio|filmCambia)$/.test(c.azione)); });
+await p.evaluate(()=>{ CHIESTE=CHIESTE.filter(c=>!/^(messaggio|filmCambia|codiceNuovo)$/.test(c.azione)); });
 const eliminati=()=>p.evaluate(()=>CHIESTE.filter(c=>c.azione==='eliminaFilm'));
 await p.click('#scheda .btn.r'); await p.waitForTimeout(100);
 ok('⚠ eliminare dice cosa si perde e che non si torna indietro', await p.evaluate(()=>document.querySelector('#foglio .sotto').textContent), 'Si cancellano per sempre: lo spoglio e il piano di Simone Panetta, 30 ordini del giorno, 23 mail con gli allegati. Le 3 persone della troupe non lo vedranno più. Non si può annullare.');

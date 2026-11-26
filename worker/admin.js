@@ -473,6 +473,28 @@ const AZIONI = {
      mittente atteso della posta. Chi l'ha aperto non si cambia da qui:
      gli ordini del giorno sono scritti a suo nome, e spostarli e' un
      lavoro a parte. */
+  /* Cambiare il codice d'invito. Escludere una persona le toglie
+     l'accesso, ma il codice lo conosce ancora: con un'altra mail si fa un
+     account nuovo e rientra. Con un codice nuovo quello vecchio non apre
+     piu' niente; chi e' gia' nel film resta dov'e', perche' nel film ci
+     sta per la sua riga fra i membri, non per il codice. */
+  async codiceNuovo(env, b) {
+    const f = id(b.id); if (!f) throw new Error('manca il film');
+    const c = ((await db(env, `projects?select=id,codice&id=eq.${f}&limit=1`)) || [])[0];
+    if (!c) throw new Error('film non trovato');
+    // Otto cifre come quelle di sql/troupe.sql. L'indice vuole che sia unico:
+    // se per caso esiste gia', se ne tira un altro.
+    for (let giro = 0; giro < 4; giro++) {
+      const codice = [...crypto.getRandomValues(new Uint8Array(4))].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+      if (codice === c.codice) continue;
+      try {
+        await db(env, `projects?id=eq.${f}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ codice }) });
+        return { fatto: true, codice };
+      } catch (e) { if (!/23505|duplicate|unique/i.test(e.message || '')) throw e; }
+    }
+    throw new Error('non sono riuscito a trovare un codice libero: riprova');
+  },
+
   async filmCambia(env, b) {
     const f = id(b.id); if (!f) throw new Error('manca il film');
     const c = {};

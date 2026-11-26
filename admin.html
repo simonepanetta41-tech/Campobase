@@ -149,7 +149,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.13';
+const ADMIN_VERSIONE = '1.14';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -588,6 +588,7 @@ async function apriFilm(id) {
         '</span><span>' + soldi(x.dollari) + ' · ' + mila(x.entrata + x.uscita) + ' token</span></div>').join('') : '<div class="vuoto">Nessuna chiamata al modello.</div>') + '</div>' +
       '<div class="sez">Film</div><button class="btn y" style="margin-top:0" onclick="scriviAllaTroupe()">Scrivi alla troupe</button>' +
       '<button class="btn" onclick="modificaFilm()">Modifica titolo, sigla, mittente</button>' +
+      (f.codice ? '<button class="btn" onclick="cambiaCodice()">Cambia codice d\'invito</button>' : '') +
       '<button class="btn r" onclick="eliminaFilm()">Elimina il film</button>';
     window.FILM_APERTO = f;
   } catch (e) { if (mia === corsa) s.innerHTML = '<div class="vuoto no">' + esc(e.message) + '</div>'; }
@@ -607,6 +608,15 @@ function scriviAllaTroupe() {
       avvisa('Mandato a ' + r.persone + (r.persone === 1 ? ' persona' : ' persone') + ' · ' + r.raggiunte + ' con le notifiche attive'); }
     catch (e) { si.disabled = false; avvisa(e.message, true); }
   };
+}
+/* Un codice d'invito nuovo: quello vecchio smette di aprire il film. */
+function cambiaCodice() {
+  const f = window.FILM_APERTO;
+  apriFoglio('<h3>Cambiare il codice d\'invito?</h3><div class="sotto">' + esc(f.codice) + ' smette di funzionare. Chi è già nel film resta dentro.</div>' +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="cSi">Cambia</button></div>');
+  document.getElementById('cSi').onclick = async () => { chiudiFoglio();
+    try { const r = await chiedi('codiceNuovo', { id: f.id }); avvisa('Codice nuovo: ' + r.codice); FILM = []; apriFilm(f.id); }
+    catch (e) { avvisa(e.message, true); } };
 }
 /* Correggere titolo, sigla e mittente atteso. Si manda solo quello che e' cambiato. */
 function modificaFilm() {
