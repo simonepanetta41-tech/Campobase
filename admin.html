@@ -137,7 +137,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.10';
+const ADMIN_VERSIONE = '1.11';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -602,7 +602,7 @@ function modificaFilm() {
   apriFoglio('<h3>Modifica il film</h3>' +
     '<label>TITOLO</label><input class="cerca" id="fTitolo" autocomplete="off" value="' + esc(f.titolo || '') + '">' +
     '<label>SIGLA · il prefisso delle notifiche</label><input class="cerca" id="fSigla" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="nessuna" value="' + esc(f.sigla || '') + '">' +
-    '<label>MITTENTE ATTESO DELLA POSTA</label><input class="cerca" id="fMittente" type="email" autocomplete="off" autocapitalize="off" placeholder="qualunque" value="' + esc(f.mittente || '') + '">' +
+    '<label>MITTENTE ATTESO DELLA POSTA</label><input class="cerca" id="fMittente" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="uno o più indirizzi, separati da virgola" value="' + esc(f.mittente || '') + '">' +
     '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="fSi">Salva</button></div>');
   document.getElementById('fSi').onclick = async () => {
     const v = k => document.getElementById(k).value.trim(), c = {};
