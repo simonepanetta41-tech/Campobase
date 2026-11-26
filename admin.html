@@ -51,6 +51,18 @@ button{font-family:inherit;cursor:pointer}
 .btn.r{border-color:rgba(248,113,113,.5);color:var(--r)}
 .btn:disabled{opacity:.5}
 .due{display:flex;gap:8px}.due .btn{flex:1}
+.mitt-nuovo{display:flex;gap:8px;align-items:stretch;margin-top:5px}
+#foglio .mitt-nuovo .cerca{flex:1;min-width:0;margin:0}
+.mitt-nuovo .btn{width:48px;flex:0 0 48px;margin:0;padding:0;font-size:22px;line-height:1;color:var(--y);border-color:var(--y)}
+#fMittenti{margin:8px 0 14px;border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.mitt-r{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;min-height:44px;border-bottom:1px solid var(--bd)}
+.mitt-r:last-child{border-bottom:none}
+.mitt-r .m{flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:13px;color:var(--w);overflow-wrap:anywhere}
+.mitt-r.chiede .m{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--d)}
+.mitt-r.vuoto .m{font-family:inherit;color:var(--m);font-size:12.5px}
+.mitt-x{flex:0 0 36px;height:36px;border:none;background:none;color:var(--m);font-size:22px;line-height:1}
+.mitt-b{flex:0 0 auto;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--bd);background:none;color:var(--w);font-size:12.5px}
+.mitt-b.r{border-color:var(--r);color:var(--r)}
 .mini{background:none;border:1px solid var(--bd);border-radius:99px;color:var(--d);font-size:11px;padding:5px 10px;margin-left:6px;white-space:nowrap}
 .mini.r{border-color:rgba(248,113,113,.4);color:var(--r)}
 .nota{font-size:12.5px;color:var(--d);line-height:1.5;margin:10px 2px 0}
@@ -137,7 +149,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.11';
+const ADMIN_VERSIONE = '1.12';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -602,13 +614,46 @@ function modificaFilm() {
   apriFoglio('<h3>Modifica il film</h3>' +
     '<label>TITOLO</label><input class="cerca" id="fTitolo" autocomplete="off" value="' + esc(f.titolo || '') + '">' +
     '<label>SIGLA · il prefisso delle notifiche</label><input class="cerca" id="fSigla" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="nessuna" value="' + esc(f.sigla || '') + '">' +
-    '<label>MITTENTE ATTESO DELLA POSTA</label><input class="cerca" id="fMittente" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="uno o più indirizzi, separati da virgola" value="' + esc(f.mittente || '') + '">' +
+    '<label>MITTENTI ATTESI DELLA POSTA</label>' +
+    '<div class="mitt-nuovo"><input class="cerca" id="fMittente" type="email" autocomplete="off" autocapitalize="off" placeholder="indirizzo mail">' +
+    '<button class="btn" id="fMittPiu" aria-label="Aggiungi indirizzo">+</button></div>' +
+    '<div id="fMittenti"></div>' +
     '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="fSi">Salva</button></div>');
+  /* I mittenti attesi: un indirizzo alla volta, col +, in un elenco da cui
+     si tolgono con la X (che chiede conferma sulla riga). L'elenco si
+     scrive con "Salva", insieme al resto del foglio. */
+  const prima = String(f.mittente || '').toLowerCase().split(/[,;\s]+/).filter(Boolean);
+  let mitt = prima.slice(), togli = -1;
+  const campo = document.getElementById('fMittente');
+  const disegna = () => {
+    document.getElementById('fMittenti').innerHTML = mitt.length ? mitt.map((m, i) => i === togli
+      ? '<div class="mitt-r chiede"><span class="m">' + esc(m) + '</span><button class="mitt-b" data-no="1">No</button><button class="mitt-b r" data-si="' + i + '">Togli</button></div>'
+      : '<div class="mitt-r"><span class="m">' + esc(m) + '</span><button class="mitt-x" data-x="' + i + '" aria-label="Togli ' + esc(m) + '">×</button></div>').join('')
+      : '<div class="mitt-r vuoto"><span class="m">Nessuno: la casella accetta qualunque mittente</span></div>';
+  };
+  const aggiungi = () => {
+    const a = campo.value.trim().toLowerCase();
+    if (!a) return true;
+    if (!/^[^@\s,;]+@[^@\s,;]+\.[a-z]{2,}$/.test(a)) { avvisa('Non è un indirizzo mail', true); return false; }
+    if (!mitt.includes(a)) mitt.push(a);
+    campo.value = ''; togli = -1; disegna(); return true;
+  };
+  document.getElementById('fMittPiu').onclick = () => { aggiungi(); campo.focus(); };
+  campo.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); aggiungi(); } };
+  document.getElementById('fMittenti').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.x != null) togli = +b.dataset.x;
+    else if (b.dataset.si != null) { mitt.splice(+b.dataset.si, 1); togli = -1; }
+    else togli = -1;
+    disegna();
+  };
+  disegna();
   document.getElementById('fSi').onclick = async () => {
     const v = k => document.getElementById(k).value.trim(), c = {};
+    if (!aggiungi()) return;               // un indirizzo scritto e non ancora aggiunto non si perde
     if (v('fTitolo') !== (f.titolo || '')) c.titolo = v('fTitolo');
     if (v('fSigla').toUpperCase() !== (f.sigla || '')) c.sigla = v('fSigla');
-    if (v('fMittente').toLowerCase() !== (f.mittente || '')) c.mittente = v('fMittente');
+    if (mitt.join(', ') !== prima.join(', ')) c.mittente = mitt.join(', ');
     if (!Object.keys(c).length) return chiudiFoglio();
     try { await chiedi('filmCambia', { id: f.id, ...c }); chiudiFoglio(); avvisa('Salvato'); FILM = []; apriFilm(f.id); caricaElenco(); }
     catch (e) { avvisa(e.message, true); }
