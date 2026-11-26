@@ -5639,7 +5639,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.198';
+const CB_VERSIONE = '1.199';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -12205,7 +12205,7 @@ async function odgAllegatiInCasa(){
     const foglio = { nome: d.nomeFile, file: d.file, percorso: d.percorso, _foglio: true };
     for (const a of [foglio].concat(d.allegati || [])) {
       if (!a || !a.nome || odgCorrente !== d) continue;
-      const chiave = a.file || odgChiaveFile(a.nome);
+      const chiave = odgChiaveDi(a);
       if (await cbFileLeggi(chiave)) { if (!a.file) { a.file = chiave; presi++; } continue; }   // c'e' gia'
       if (!a.percorso && !currentUser) continue;
       if (await odgByteDi(a)) presi++;
@@ -13490,6 +13490,11 @@ async function cbFileCancella(prefisso, tieni){
 }
 
 const odgChiaveFile = nome => 'odg/' + String(nome || '').replace(/[^\w.\-]+/g, '_');
+/* Sotto quale chiave un allegato sta sul telefono. Se viene dalla posta
+   conta il percorso, che cambia a ogni mail: la produzione rimanda gli
+   stralci corretti con lo stesso nome di prima, e con la chiave fatta dal
+   nome il telefono trovava "gia' in casa" il PDF vecchio e apriva quello. */
+const odgChiaveDi = a => a.file || odgChiaveFile(a.percorso || a.nome);
 
 /* Le pagine si disegnano tutte, una sotto l'altra, nella stessa colonna
    che si scorre: un documento del set si sfoglia, non si naviga. Alla
@@ -13607,7 +13612,7 @@ async function odgByteDi(att){
     const buf = await blob.arrayBuffer();
     // Da parte, per la prossima volta. Se la memoria e' piena si rinuncia
     // a tenerlo e si va avanti: il foglio si apre comunque.
-    const chiave = att.file || odgChiaveFile(att.nome);
+    const chiave = odgChiaveDi(att);
     try { if (await cbFileSalva(chiave, buf)) att.file = chiave; } catch (_) {}
     return buf;
   } catch (e) {

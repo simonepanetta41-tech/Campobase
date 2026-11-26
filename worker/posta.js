@@ -25,7 +25,9 @@ import { leggiMessaggio } from './mime.js';
    catch e' giusto, una notifica mancata non deve far rimbalzare una mail
    arrivata; ma messo attorno a un nome che non esiste rende invisibile un
    errore di programmazione. */
-import { avvisaPosta, avvisaMailDaParte } from './push.js';
+import { avvisaPosta, avvisaMailDaParte, primeParole } from './push.js';
+import { stralciNuovi, stralciIndiceDopo } from './scrive.js';
+import { indiceStralci } from './stralci.js';
 import { genereDalNome } from './ombra.js';
 import { daSmistare, toccaAlServer } from './smista.js';
 
@@ -404,8 +406,28 @@ export async function riceviPosta(message, env, ctx) {
          con \bpdl\b non si riconosceva, e la notifica diceva "nuova
          posta" invece di "nuovo piano". */
       const generi = riga.allegati.filter(v => v.tenuto).map(v => genereDalNome(v.nome));
-      const fatti = ['odg', 'pdl'].filter(g => generi.includes(g));
-      const quanti = await avvisaPosta(env, film.id, fatti, riga.oggetto);
+      if (riga.allegati.some(v => v.tenuto && /stralc/i.test(v.nome || '') && /\.pdf$/i.test(v.nome || ''))) generi.push('stralci');
+      const fatti = ['odg', 'pdl', 'stralci', 'giri'].filter(g => generi.includes(g));
+
+      /* Soli stralci, a ordine del giorno gia' arrivato: prendono il posto
+         dei vecchi (scrive.js). Vale solo se l'ordine del giorno lo scrive
+         il server; e se qualcosa va storto la mail resta com'e', con la
+         sua notifica. L'indice delle scene arriva un momento dopo. */
+      if (fatti.includes('stralci') && !fatti.includes('odg') && !fatti.includes('pdl')
+          && String(env.OMBRA_SCRIVE || '').toLowerCase() === 'si') {
+        try {
+          const parole = primeParole(riga.testo);
+          const fatto = await stralciNuovi(env, riga, Date.now(), parole ? [parole] : []);
+          if (fatto) {
+            const dopo = (async () => {
+              try { await stralciIndiceDopo(env, riga, fatto, await indiceStralci(env, riga.allegati, riga)); }
+              catch (e) { console.error('posta: indice dei nuovi stralci non fatto', e.message); }
+            })();
+            if (ctx && ctx.waitUntil) ctx.waitUntil(dopo); else await dopo;
+          }
+        } catch (e) { console.error('posta: stralci non sostituiti', e.message); }
+      }
+      const quanti = await avvisaPosta(env, film.id, fatti, riga.oggetto, riga.testo);
       console.log('posta: avvisati', quanti, 'membri', fatti.length ? '(' + fatti.join('+') + ')' : '(generico)');
     } catch (e) {
       // Una notifica mancata non deve far rimbalzare una mail arrivata.

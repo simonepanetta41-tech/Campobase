@@ -146,6 +146,14 @@ r=await p.evaluate(async()=>{
 ok('⚠ foglio, giri e stralci si scaricano da soli, senza aprirli', [r.presi, r.scaricati], [3, ['f/m/odg.pdf','f/m/giri.pdf','f/m/stralci.pdf']]);
 ok('e l\'ordine del giorno salvato sa dove sono', r.ricordati, [true,true,true,false]);
 ok('la volta dopo non si riscaricano', [r.secondi, r.ancora], [0,3]);
+/* La produzione rimanda gli stralci corretti con lo stesso nome. Il server
+   li mette nell'ordine del giorno con un percorso nuovo; il telefono non
+   deve trovare "gia' in casa" quelli vecchi solo perche' si chiamano uguale. */
+r=await p.evaluate(async()=>{ SCARICATI.length=0;
+  odgCorrente={data:'2026-11-23',nomeFile:'MSG - ODG 31.pdf',percorso:'f/m/odg.pdf',file:odgChiaveFile('f/m/odg.pdf'),allegati:[{nome:'STRALCI 31.pdf',tipo:'stralci',percorso:'f/m2/stralci.pdf',file:null}]};
+  const n=await odgAllegatiInCasa(); const a=odgCorrente.allegati[0];
+  return [n, SCARICATI.slice(), a.file!==odgChiaveFile('f/m/stralci.pdf') && !!a.file]; });
+ok('⚠ stralci corretti con lo stesso nome: si scaricano i nuovi', r, [1, ['f/m2/stralci.pdf'], true]);
 r=await p.evaluate(async()=>{ SCARICATI.length=0; odgCorrente={data:'2026-11-24',nomeFile:'Altro.pdf',percorso:'f/m/altro.pdf',allegati:[]}; sbSegna(true); const n=await odgAllegatiInCasa(); sbSegna(false); return [n, SCARICATI.length]; });
 ok('senza rete non ci si prova nemmeno', r, [0,0]);
 ok('nessun errore di pagina', p.errori, []);

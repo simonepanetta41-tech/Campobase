@@ -19,7 +19,9 @@
  */
 import { json, readJson, requireUser } from './shared.js';
 import { db } from './ombra.js';
-import { mandaScadute, avvisaPosta } from './push.js';
+import { mandaScadute, avvisaPosta, primeParole } from './push.js';
+import { stralciNuovi, stralciIndiceDopo } from './scrive.js';
+import { indiceStralci } from './stralci.js';
 import { genereDi } from './smista.js';
 import { costo, PREZZI } from './consumi.js';
 
@@ -119,6 +121,13 @@ export function piuTardi(a, b) {
   if (isNaN(tb)) return a;
   if (isNaN(ta)) return b;
   return tb > ta ? b : a;
+}
+
+/* Stralci si', ordine del giorno e piano no. */
+function soliStralci(allegati) {
+  const t = (allegati || []).filter(a => a && a.tenuto && a.percorso);
+  return t.some(a => /\.pdf$/i.test(a.nome || '') && (a.smistato ? a.genere === 'stralci' : /stralc/i.test(a.nome || '')))
+    && !t.some(a => ['odg', 'pdl'].includes(genereDi(a)));
 }
 
 export function versioneMaggiore(a, b) {
@@ -413,7 +422,8 @@ const AZIONI = {
     const [esito, colore] = esitoMail(r);
     return { ...rigaMail(r, F, new Map([[r.id, cons || []]])), esito, colore, nota: r.nota || r.onota || null, mittente: r.mittente_vero || null,
       allegati: (r.allegati || []).map(a => ({ nome: a.nome, byte: a.byte || 0, tenuto: !!a.tenuto, genere: a.tenuto ? (genereDi(a) || null) : null })),
-      rileggibile: { odg: tenuti.some(a => genereDi(a) === 'odg'), piano: tenuti.some(a => genereDi(a) === 'pdl') },
+      rileggibile: { odg: tenuti.some(a => genereDi(a) === 'odg'), piano: tenuti.some(a => genereDi(a) === 'pdl'),
+        stralci: soliStralci(r.allegati) && !/^stralci sostituiti/.test(r.nota || '') },
       passi, haOdg: /^(fatta|tronca|errore)$/.test(r.ombra_stato || ''), haPiano: /^(fatta|tronca|errore)$/.test(r.piano_stato || '') };
   },
 
@@ -525,6 +535,24 @@ const AZIONI = {
       body: JSON.stringify(piano ? { stato: 'rilettura piano', nota, piano_stato: null, piano: null, piano_il: null }
                                  : { stato: 'rilettura', nota, ombra_stato: null, ombra: null, ombra_il: null }) });
     return { fatto: true, avvisa: b.notifiche === true };
+  },
+
+  /* Una mail con i soli stralci arrivata dopo l'ordine del giorno: li si
+     mette al posto dei vecchi (scrive.js). Da quando esiste lo fa il
+     server da solo all'arrivo; questo tasto serve per le mail arrivate
+     prima, o per quando non ha capito di quale giorno fossero. Non manda
+     notifiche: la troupe quella mail l'ha gia' vista arrivare. */
+  async stralci(env, b) {
+    const m = id(b.id); if (!m) throw new Error('manca la mail');
+    const r = ((await db(env, `posta?select=id,project_id,oggetto,testo,allegati,stato&id=eq.${m}&limit=1`)) || [])[0];
+    if (!r) throw new Error('mail non trovata');
+    if (!soliStralci(r.allegati)) throw new Error('in questa mail non ci sono solo stralci');
+    if (!si(env.OMBRA_SCRIVE)) throw new Error('il server non sta scrivendo gli ordini del giorno: l\'interruttore è spento');
+    const parole = primeParole(r.testo);
+    const fatto = await stralciNuovi(env, r, Date.now(), parole ? [parole] : []);
+    if (!fatto) throw new Error('non trovo l\'ordine del giorno a cui si riferiscono');
+    try { await stralciIndiceDopo(env, r, fatto, await indiceStralci(env, r.allegati, r)); } catch (_) {}
+    return { fatto: true, numero: fatto.numero || null, data: fatto.data };
   },
 
   /* ── Il server ── */

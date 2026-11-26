@@ -149,7 +149,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.12';
+const ADMIN_VERSIONE = '1.13';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -715,7 +715,8 @@ async function apriMail(id, zitta) {
       (m.esito === 'in rilettura' ? '<div class="nota boh">Il server la sta rileggendo: di solito ci mette un minuto o due.</div>' :
         m.esito === 'da verificare' ? '' :
         ((m.rileggibile || {}).odg ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'odg\')">Fai rileggere l\'ordine del giorno</button>' : '') +
-        ((m.rileggibile || {}).piano ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'piano\')">Fai rileggere il piano</button>' : ''));
+        ((m.rileggibile || {}).piano ? '<button class="btn" onclick="rileggi(\'' + m.id + '\',\'piano\')">Fai rileggere il piano</button>' : '') +
+        ((m.rileggibile || {}).stralci ? '<button class="btn" onclick="mettiStralci(\'' + m.id + '\')">Metti questi stralci nell\'ordine del giorno</button>' : ''));
     /* Mentre rilegge si torna a guardare da soli, finche' non ha finito. */
     if (m.esito === 'in rilettura') { const g = ++giro; setTimeout(() => { if (g === giro && aperta === id && LING === 'posta') apriMail(id, true); }, 6000); }
     else if (zitta) caricaElenco();
@@ -738,6 +739,14 @@ function rileggi(id, cosa) {
   };
   document.getElementById('rMuta').onclick = () => vai(false);
   document.getElementById('rAvvisa').onclick = () => vai(true);
+}
+/* Gli stralci arrivati da soli, al posto di quelli dell'ordine del giorno. */
+function mettiStralci(id) {
+  apriFoglio('<h3>Sostituire gli stralci?</h3><div class="sotto">Prendono il posto di quelli dell\'ordine del giorno, nell\'app di tutti. Nessuna notifica.</div>' +
+    '<div class="due"><button class="btn" onclick="chiudiFoglio()">Annulla</button><button class="btn y" id="stSi">Sostituisci</button></div>');
+  document.getElementById('stSi').onclick = async () => { chiudiFoglio();
+    try { const r = await chiedi('stralci', { id }); avvisa('Sostituiti nell\'ordine del giorno' + (r.numero ? ' ' + r.numero : '')); apriMail(id); caricaElenco(); }
+    catch (e) { avvisa(e.message, true); } };
 }
 async function vediLettura(id, cosa) {
   try {

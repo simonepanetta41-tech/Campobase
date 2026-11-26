@@ -481,11 +481,40 @@ export async function handleMessaggio(request, env) {
 /* Chiamata da posta.js quando un pacchetto e' stato messo da parte.
  * L'appuntamento e' per adesso, cosi' il cron lo manda al primo passaggio:
  * un meccanismo solo per tutte e tre le notifiche. */
-export async function avvisaPosta(env, projectId, fatti, oggetto) {
+/* Le parole della produzione, dal corpo della mail: il primo capoverso
+   che dice qualcosa. Via il blocco che mette l'inoltro in testa, i saluti
+   e la firma. Si copia, non si riscrive: se la produzione scrive "stralci
+   corretti Day #35", sotto la notifica c'e' quello. */
+export function primeParole(corpo) {
+  const righe = String(corpo || '').replace(/\r/g, '').split('\n').map(r => r.replace(/\s+/g, ' ').trim());
+  const out = [];
+  for (const r of righe) {
+    if (/^[-_=]{2,}.*(forwarded|inoltrat|messaggio originale|original message)/i.test(r)
+        || /^(da|from|date|data|inviato|sent|subject|oggetto|to|a|cc|ccn|bcc)\s*:/i.test(r)
+        || /^[-_=*]{3,}$/.test(r)) { if (!out.length) continue; break; }
+    if (!r) { if (out.length) break; continue; }
+    if (!out.length && /^(ciao|buonasera|buongiorno|buon pomeriggio|salve|gentil\w*|car[ei]|a tutt[ei])\b[^.]{0,30}[,!.]?$/i.test(r)) continue;
+    if (/^(grazie|saluti|cordial|un saluto|buon lavoro|buona (serata|giornata|notte)|a presto|a domani|inviato da|sent from|--\s*$)/i.test(r)) break;
+    if (/^>/.test(r)) break;                       // la mail citata sotto
+    out.push(r);
+    if (out.join(' ').length > 110) break;
+  }
+  const t = out.join(' ').trim();
+  if (t.length < 4) return '';
+  return t.length > 110 ? t.slice(0, 109).trimEnd() + '…' : t;
+}
+
+export async function avvisaPosta(env, projectId, fatti, oggetto, corpo) {
+  /* Il titolo dice cosa c'e' dentro. "Nuova posta dalla produzione" con
+     sotto l'oggetto dell'ordine del giorno non diceva che erano arrivati
+     gli stralci corretti. */
+  const st = fatti.includes('stralci'), gi = fatti.includes('giri');
+  const documento = fatti.includes('pdl') || fatti.includes('odg');
   const titolo = fatti.includes('pdl')
     ? 'Nuovo piano di lavorazione!'
     : fatti.includes('odg')
       ? 'Nuovo ordine del giorno!'
+      : st && gi ? 'Stralci e giri auto' : st ? 'Stralci' : gi ? 'Giri auto'
       : 'Nuova posta dalla produzione';
 
   /* Sotto il titolo, l'oggetto della mail: e' la produzione a scriverlo, e
@@ -495,7 +524,11 @@ export async function avvisaPosta(env, projectId, fatti, oggetto) {
   const sotto = String(oggetto || '')
     .replace(/^(\s*(?:fwd?|re|i|inoltro)\s*:\s*)+/i, '')
     .replace(/\s+/g, ' ').trim().slice(0, 80);
-  const testo = sotto ? titolo + '\n' + sotto : titolo;
+  /* Per ordine del giorno e piano l'oggetto dice gia' tutto. Per il resto
+     conta cosa ha scritto la produzione; l'oggetto solo se non ha scritto
+     niente. */
+  const parole = documento ? '' : primeParole(corpo);
+  const testo = (parole || sotto) ? titolo + '\n' + (parole || sotto) : titolo;
 
   const membri = await db(env,
     `film_membri?select=user_id&project_id=eq.${projectId}`);

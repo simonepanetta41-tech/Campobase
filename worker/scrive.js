@@ -537,6 +537,70 @@ export async function pianoInSospeso(env, riga) {
   } catch (_) { return false; }
 }
 
+/* Una mail con i soli stralci, dopo che l'ordine del giorno e' gia'
+ * arrivato: "in allegato stralci corretti Day #35". Prima restava nella
+ * posta e nell'app si continuava ad aprire il PDF sbagliato.
+ *
+ * I nuovi prendono il posto dei vecchi nell'ordine del giorno di quel
+ * giorno. Quale giorno lo dice la mail — "ODG #35", "Day #35" — e se dice
+ * un numero che non c'e' non si tocca niente; se non dice nessun numero
+ * vale l'ultimo ordine del giorno, purche' non sia di ieri.
+ *
+ * Quello che il telefono aveva ricavato dal PDF vecchio (le scene, il
+ * testo, l'indice) si butta: lo rifara' sul nuovo. `caricatoIl` avanza,
+ * ed e' cosi' che i telefoni capiscono di doverselo riprendere.
+ *
+ * Torna { data, numero, dati } o null se non c'era niente da fare.
+ */
+const eStralcio = a => a && a.tenuto && a.percorso && /\.pdf$/i.test(a.nome || '')
+  && (a.smistato ? a.genere === 'stralci' : /stralc/i.test(a.nome || ''));
+
+export function numeriOdg(scritto) {
+  return [...new Set([...String(scritto || '').matchAll(/(?:\bodg|\bo\.d\.g\.?|\bday|\bgiorno|\bgg)\s*(?:n[°.ºo]?\s*)?#?\s*(\d{1,3})\b/gi)].map(m => +m[1]))];
+}
+
+export async function stralciNuovi(env, riga, adesso = Date.now(), righeNota = []) {
+  const nuovi = (riga && riga.allegati || []).filter(eStralcio);
+  if (!nuovi.length || !riga.project_id) return null;
+  const numeri = numeriOdg([riga.oggetto, riga.testo].concat(nuovi.map(a => a.nome)).join('\n'));
+  const rr = await db(env, `odg?select=data,numero,dati&project_id=eq.${riga.project_id}&order=data.desc&limit=6`);
+  let r = null;
+  if (numeri.length) r = (rr || []).find(x => numeri.includes(+x.numero)) || null;
+  else {
+    const oggi = new Date(adesso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' });
+    r = (rr || [])[0]; if (r && String(r.data) < oggi) r = null;
+  }
+  if (!r || !r.dati) return null;
+
+  const d = { ...r.dati };
+  d.allegati = (d.allegati || []).filter(a => a && a.tipo !== 'stralci')
+    .concat(nuovi.map(a => ({ nome: a.nome, tipo: 'stralci', percorso: a.percorso, file: null })));
+  delete d.sceneggiatura; delete d.stralci; delete d.stralciRiletti; delete d.stralciIndice;
+  d.caricatoIl = new Date(adesso).toISOString();
+  // Nel riquadro giallo in cima al foglio, con le parole della produzione.
+  d.errata = (Array.isArray(d.errata) ? d.errata : [])
+    .concat([{ quando: d.caricatoIl, tipo: 'aggiornato', righe: righeNota.length ? righeNota : ['Stralci sostituiti.'], perChi: {} }]).slice(-4);
+
+  await db(env, `odg?project_id=eq.${riga.project_id}&data=eq.${r.data}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ dati: d, updated_at: d.caricatoIl }) });
+  await db(env, `posta?id=eq.${riga.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ stato: 'fatta', nota: `stralci sostituiti nell'ordine del giorno ${r.numero || ''} del ${r.data}`.replace(/\s+/g, ' ') }) });
+  console.log('scrive: stralci sostituiti —', r.data, nuovi.map(a => a.nome).join(', '));
+  return { data: r.data, numero: r.numero, dati: d };
+}
+
+/* L'indice dei nuovi stralci (stralci.js), aggiunto appena c'e'. Si
+   rilegge la riga: nel frattempo un telefono puo' averci scritto. */
+export async function stralciIndiceDopo(env, riga, fatto, indice) {
+  if (!indice || !indice.length) return false;
+  const rr = await db(env, `odg?select=dati&project_id=eq.${riga.project_id}&data=eq.${fatto.data}&limit=1`);
+  const d = rr && rr[0] && rr[0].dati;
+  if (!d || d.caricatoIl !== fatto.dati.caricatoIl) return false;     // qualcuno l'ha riscritto: non e' piu' il nostro
+  await db(env, `odg?project_id=eq.${riga.project_id}&data=eq.${fatto.data}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ dati: { ...d, stralciIndice: indice } }) });
+  return true;
+}
+
 /* La strada vecchia: la mail torna 'nuova', parte la notifica di sempre,
    e il primo telefono che apre analizza. Si scrive solo se la mail e'
    ancora 'al server', cosi' due passaggi del cron non la rilasciano due
@@ -549,7 +613,8 @@ export async function rilascia(env, riga, motivo) {
   if (!prese || !prese.length) return false;
   try {
     const generi = (riga.allegati || []).filter(a => a && a.tenuto).map(a => genereDi(a));
-    await avvisaPosta(env, riga.project_id, ['odg', 'pdl'].filter(g => generi.includes(g)), riga.oggetto);
+    if ((riga.allegati || []).some(eStralcio)) generi.push('stralci');
+    await avvisaPosta(env, riga.project_id, ['odg', 'pdl', 'stralci', 'giri'].filter(g => generi.includes(g)), riga.oggetto, riga.testo);
   } catch (e) { console.error('scrive: avviso di riserva non partito', e.message); }
   console.log('scrive: rilasciata al telefono —', motivo);
   return true;

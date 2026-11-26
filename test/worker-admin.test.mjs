@@ -236,6 +236,28 @@ ok('con la scrittura spenta si rifiuta e lo spiega', [st, /interruttore/.test(d.
 ENV.OMBRA_SCRIVE = 'si';
 ok('una mail senza ordine del giorno non si rilegge come tale', (await chiedi('tok-io', { azione: 'rileggi', id: M3 }))[0], 400);
 ok('né come piano, se il piano non c\'è', (await chiedi('tok-io', { azione: 'rileggi', id: M1, cosa: 'piano' }))[0], 400);
+/* Gli stralci arrivati da soli: il tasto li mette nell'ordine del giorno
+   a cui si riferiscono. Serve per le mail arrivate prima che il server lo
+   facesse da solo. */
+{
+  const MS = U('e');
+  T.odg = [{ project_id: FA, data: '2099-11-27', numero: 35, dati: { daServer: true, numero: '35', data: '2099-11-27', caricatoIl: '2099-11-26T17:00:00.000Z',
+    allegati: [{ nome: 'ODG 35.pdf', tipo: 'odg', percorso: 'a/b/odg.pdf' }, { nome: 'Stralci 35.pdf', tipo: 'stralci', percorso: 'a/b/vecchi.pdf' }], sceneggiatura: [{ n: '1' }] } }];
+  T.posta.push({ id: MS, project_id: FA, stato: 'nuova', oggetto: 'MSG - ODG #35', testo: 'In allegato \nstralci corretti  Day #35\n\nGrazie\nA.', ricevuta: new Date().toISOString(),
+    allegati: [{ nome: 'Stralci 35.pdf', tenuto: true, percorso: 'a/c/nuovi.pdf', byte: 5 }] });
+  ok('nella scheda della mail c\'è il tasto', (await chiedi('tok-io', { azione: 'mail', id: MS }))[1].rileggibile.stralci, true);
+  ok('una mail con l\'ordine del giorno non ce l\'ha', (await chiedi('tok-io', { azione: 'mail', id: M1 }))[1].rileggibile.stralci, false);
+  ok('un membro qualsiasi non può', (await chiedi('tok-anna', { azione: 'stralci', id: MS }))[0], 403);
+  const prima = T.push_appuntamenti.length;
+  [st, d] = await chiedi('tok-io', { azione: 'stralci', id: MS });
+  const dd = T.odg[0].dati;
+  ok('⚠ gli stralci nuovi al posto dei vecchi', [st, d.numero, dd.allegati.filter(a => a.tipo === 'stralci').map(a => a.percorso), dd.sceneggiatura], [200, 35, ['a/c/nuovi.pdf'], undefined]);
+  ok('con le parole della produzione nel riquadro', dd.errata[0].righe, ['In allegato stralci corretti Day #35']);
+  ok('⚠ senza mandare notifiche', T.push_appuntamenti.length, prima);
+  ok('fatto una volta, il tasto sparisce', (await chiedi('tok-io', { azione: 'mail', id: MS }))[1].rileggibile.stralci, false);
+  ok('su una mail che non è di soli stralci non va', (await chiedi('tok-io', { azione: 'stralci', id: M1 }))[0], 400);
+  T.posta = T.posta.filter(r => r.id !== MS);
+}
 [st, d] = await chiedi('tok-io', { azione: 'rileggi', id: M1 });
 ok('⚠ senza dire niente: NON avvisa', [st, d.avvisa, mailUna().stato, mailUna().nota, mailUna().ombra_stato, mailUna().ombra], [200, false, 'rilettura', 'rilettura: senza notifiche', null, null]);
 ok('⚠ mai rimessa "al server": verrebbe passata ai telefoni', T.posta.some(x => x.stato === 'al server'), false);
