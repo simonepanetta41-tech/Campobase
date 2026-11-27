@@ -5735,7 +5735,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.200';
+const CB_VERSIONE = '1.201';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -13462,6 +13462,13 @@ function odgCercabile(a) {
    la facciamo noi, perche' un indirizzo solo pescato da un database
    libero vale meno dei dieci che vede Maps. */
 function odgMapsVicino(cosa, dove) { return odgMaps(cosa + ' vicino a ' + dove); }
+/* I parcheggi si cercano vicino al set, non al campo base: al campo base
+   il posto di solito c'e' gia'. Se fra i luoghi il set ha il suo
+   indirizzo si parte da quello; altrimenti dal posto della giornata. */
+function odgDoveSiParcheggia(d) {
+  const set = (d.luoghi || []).find(l => /^(set|location)\b/i.test(String(l.nome || '')) && l.indirizzo && !odgAlSet(l.indirizzo));
+  return set ? set.indirizzo : d.location;
+}
 function odgCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
 
 
@@ -14496,10 +14503,10 @@ function odgPienoHtml(d) {
           <span class="i">${ODG_SEGNI.luogo}</span>
           <span class="c"><span class="t">${esc(d.location)}</span><span class="s">Campo base e mezzi tecnici</span></span>
           <span class="go">Mappa ›</span></a>${odgArrivoHtml(d)}`}
-    ${d.pickup || !d.location ? '' : `<a class="odg-posto" href="${odgMapsVicino('parcheggio', d.location)}" target="_blank" rel="noopener">
+    ${d.pickup || !d.location ? '' : `<a class="odg-posto" href="${odgMapsVicino('parcheggio', odgDoveSiParcheggia(d))}" target="_blank" rel="noopener">
       <span class="i">${ODG_SEGNI.parcheggio}</span>
       <span class="c"><span class="t">Dove parcheggiare</span>
-      <span class="s">I parcheggi più vicini al campo base</span></span>
+      <span class="s">I parcheggi più vicini al set</span></span>
       <span class="go">Cerca ›</span></a>`}</div>` : ''}
 
 

@@ -174,6 +174,14 @@ ok('ognuna porta alla sua mappa', await p.evaluate(()=>
 ok('e non c\'è più il muro di testo', await p.evaluate(()=>
   !/METEO|DAWN/.test(document.querySelector('#odgSection .card')?.textContent||'')), true);
 
+/* I parcheggi si cercano vicino al set. La scritta diceva "campo base" ma
+   la ricerca partiva gia' dal posto della giornata: ora dicono la stessa cosa. */
+console.log('\n── dove parcheggiare: vicino al set ──');
+ok('⚠ set e campo base in due posti: si parte dal set', await p.evaluate(()=>decodeURIComponent(odgMapsVicino('parcheggio', odgDoveSiParcheggia({location:'Napoli',
+  luoghi:[{nome:'Campo base',indirizzo:'Via Tiberina 831, Roma'},{nome:'Set',indirizzo:'Piazza del Plebiscito 1, Napoli'}]}))).replace(/\+/g,' ').includes('parcheggio vicino a Piazza del Plebiscito 1, Napoli')), true);
+ok('il set senza un suo indirizzo: dal posto della giornata', await p.evaluate(()=>odgDoveSiParcheggia({location:'Masseria Lamie, Monteiasi',luoghi:[{nome:'Campo base',indirizzo:'Via X 1'},{nome:'Set',indirizzo:'al set'}]})), 'Masseria Lamie, Monteiasi');
+ok('nessun elenco di luoghi: dal posto della giornata', await p.evaluate(()=>odgDoveSiParcheggia({location:'Masseria Lamie, Monteiasi'})), 'Masseria Lamie, Monteiasi');
+ok('la scritta dice "al set"', require('fs').readFileSync(RADICE+'/index.html','utf8').includes('I parcheggi più vicini al set'), true);
 ok('nessun errore di pagina', err.filter(e=>!/supabase/.test(e)), []);
 console.log(ko?`\n${ko} CONTROLLI FALLITI`:'\nTutti i controlli passati.');
 await b.close(); process.exit(ko?1:0);})();
