@@ -245,6 +245,8 @@ const AZIONI = {
       db(env, `consumi?select=${CAMPI_CONSUMI}&user_id=eq.${u}&limit=1000`).catch(() => [])
     ]);
     const a = acc[0] || {}, p = (prof || [])[0] || {}, F = new Map((ff || []).map(f => [f.id, f]));
+    // Puo' aprire un film da zero? null se la tabella non c'e' ancora (sql/permessi.sql).
+    const perm = await db(env, `permessi?select=crea_film&user_id=eq.${u}&limit=1`).catch(() => null);
     const perScopo = {};
     for (const c of consumi || []) {
       const s = perScopo[c.scopo] || (perScopo[c.scopo] = { chiamate: 0, entrata: 0, uscita: 0 });
@@ -253,6 +255,7 @@ const AZIONI = {
     return {
       id: u, nome: p.nome || '', cognome: p.cognome || '', reparto: p.reparto || '', email: a.email || '',
       iscritto: a.created_at || null, ultimoAccesso: a.last_sign_in_at || null, bloccato: bloccato(a),
+      creaFilm: perm ? !!(perm[0] && perm[0].crea_film) : null,
       ultima: piuTardi(((uso || [])[0] || {}).ultimo, p.app_vista),
       versione: p.app_versione || null, versioneVista: p.app_vista || null, dollari: somma(consumi).dollari,
       film: (membri || []).filter(m => F.has(m.project_id)).map(m => ({ id: m.project_id, titolo: F.get(m.project_id).titolo,
@@ -671,6 +674,21 @@ const AZIONI = {
     await AZIONI.togli(env, { id: b.id, film: da });
     await AZIONI.aggiungi(env, { id: b.id, film: a });
     return { fatto: true };
+  },
+
+  /* Dare o togliere a una persona il permesso di aprire un film da zero.
+     I film che ha gia' aperto restano suoi: si toglie solo la possibilita'
+     di aprirne altri. */
+  async permesso(env, b) {
+    const u = id(b.id); if (!u) throw new Error('manca la persona');
+    try {
+      await db(env, 'permessi?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id: u, crea_film: !!b.creaFilm, dal: new Date().toISOString() }) });
+    } catch (e) {
+      if (/permessi|42P01|PGRST205|does not exist|schema cache/i.test(e.message || '')) throw new Error('manca la tabella dei permessi: lancia sql/permessi.sql');
+      throw e;
+    }
+    return { fatto: true, creaFilm: !!b.creaFilm };
   },
 
   async blocca(env, b, io) {

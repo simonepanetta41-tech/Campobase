@@ -28,7 +28,7 @@ const apri=async(scena, larghezza=390)=>{
     const persone=[{id:A,nome:'Anna',cognome:'Riva',reparto:'Regia',email:'anna@x.it',film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',ruolo:'membro'}],telefoni:1,ultima:new Date().toISOString(),bloccato:false},
                    {id:L,nome:'Luca',cognome:'Berti',reparto:'Fotografia',email:'luca@x.it',film:[],telefoni:0,ultima:null,bloccato:false},
                    {id:'cccccccc-1111-4111-8111-111111111111',nome:'',cognome:'',reparto:'',email:'bloccato@x.it',film:[],telefoni:0,ultima:null,bloccato:true}];
-    const scheda={id:A,nome:'Anna',cognome:'Riva',reparto:'Regia',email:'anna@x.it',iscritto:'2026-11-09T10:00:00Z',ultima:new Date().toISOString(),bloccato:false,
+    const scheda={id:A,nome:'Anna',cognome:'Riva',reparto:'Regia',email:'anna@x.it',iscritto:'2026-11-09T10:00:00Z',ultima:new Date().toISOString(),bloccato:false,creaFilm:false,
       film:[{id:FA,titolo:'Missione San Gennaro',sigla:'MSG',ruolo:'membro',segna:true}],telefoni:[{tipo:'iPhone'}],
       notifiche:[{titolo:'MSG - OdG 30',mandato:new Date().toISOString(),mostrato:new Date().toISOString(),dispositivi:1}],uso7:420,consumi:{spoglio:{chiamate:2,entrata:30000,uscita:12000}}};
     window.fetch=async(url,opz)=>{
@@ -98,6 +98,10 @@ await p.evaluate(()=>{ togli('f1f1f1f1-1111-4111-8111-111111111111'); }); await 
 ok('detto di sì, parte', (await azioni(p)).map(c=>c.azione), ['togli']);
 await p.evaluate(()=>{ CHIESTE.length=0; scegliFilm('sposta','f1f1f1f1-1111-4111-8111-111111111111'); }); await p.waitForTimeout(80); await p.click('#foglio .riga'); await p.waitForTimeout(200);
 ok('spostare: da dove e verso dove', await azioni(p), [{azione:'sposta',id:'aaaaaaaa-1111-4111-8111-111111111111',da:'f1f1f1f1-1111-4111-8111-111111111111',a:'f2f2f2f2-1111-4111-8111-111111111111'}]);
+/* Chi puo' aprire un film da zero: un interruttore nella scheda. */
+ok('l\'interruttore "Può aprire un film da zero" parte spento', await p.evaluate(()=>[document.querySelector('.kv.int span').textContent, document.getElementById('swFilm').getAttribute('aria-pressed')]), ['Può aprire un film da zero','false']);
+await p.evaluate(()=>{ CHIESTE.length=0; }); await p.click('#swFilm'); await p.waitForTimeout(200);
+ok('⚠ toccandolo lo accende, per quella persona', (await azioni(p)).filter(c=>c.azione==='permesso'), [{azione:'permesso',id:'aaaaaaaa-1111-4111-8111-111111111111',creaFilm:true}]);
 await p.evaluate(()=>{ CHIESTE.length=0; blocca(); }); await p.waitForTimeout(80);
 ok('⚠ bloccare chiede conferma e dice cosa succede', await p.evaluate(()=>[document.querySelector('#foglio h3').textContent, /non può più entrare/.test(document.querySelector('#foglio .sotto').textContent)]), ['Bloccare Anna Riva?', true]);
 await p.click('#cNo'); await p.waitForTimeout(80);

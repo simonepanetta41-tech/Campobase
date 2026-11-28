@@ -138,6 +138,20 @@ ok('servono due film diversi', (await chiedi('tok-io', { azione: 'sposta', id: A
 
 console.log('\n── ⚠ bloccare ──');
 mondo();
+/* Chi puo' aprire un film da zero lo decide l'amministrazione, persona
+   per persona (sql/permessi.sql). */
+ok('senza la tabella dei permessi: non si sa, e lo dice', [(await chiedi('tok-io', { azione: 'persona', id: ANNA }))[1].creaFilm,
+  JSON.stringify((await chiedi('tok-io', { azione: 'permesso', id: ANNA, creaFilm: true }))[1]).includes('lancia sql/permessi.sql')], [null, true]);
+T.permessi = [];
+ok('di norma no', (await chiedi('tok-io', { azione: 'persona', id: ANNA }))[1].creaFilm, false);
+ok('⚠ il permesso non se lo dà un membro qualsiasi', [(await chiedi('tok-anna', { azione: 'permesso', id: ANNA, creaFilm: true }))[0], T.permessi.length], [403, 0]);
+[st, d] = await chiedi('tok-io', { azione: 'permesso', id: ANNA, creaFilm: true });
+ok('⚠ l\'amministratore lo accende, per quella persona', [st, d.creaFilm, T.permessi.map(r => [r.user_id, r.crea_film])], [200, true, [[ANNA, true]]]);
+ok('e nella scheda risulta', (await chiedi('tok-io', { azione: 'persona', id: ANNA }))[1].creaFilm, true);
+ok('gli altri restano com\'erano', (await chiedi('tok-io', { azione: 'persona', id: LUCA }))[1].creaFilm, false);
+await chiedi('tok-io', { azione: 'permesso', id: ANNA, creaFilm: false });
+ok('e si spegne', T.permessi.at(-1).crea_film, false);
+delete T.permessi;
 ok('non si blocca se stessi', [(await chiedi('tok-io', { azione: 'blocca', id: IO }))[0], banditi[IO]], [400, undefined]);
 T.push_appuntamenti.push({ id: U(6), user_id: LUCA, genere: 'pickup', testo: 'x', quando: '2099-01-01T00:00:00Z', mandato: null });
 T.push_iscrizioni.push({ user_id: LUCA, endpoint: 'https://web.push.apple.com/l' });

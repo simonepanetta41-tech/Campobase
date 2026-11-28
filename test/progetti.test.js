@@ -29,8 +29,9 @@ ok('c\'è il tasto nuovo',  await p.evaluate(()=>/Nuovo da sceneggiatura/.test(d
 /* I due modi di aggiungere un film sono due tasti uguali, e il codice
    viene prima: e' quello che usa quasi tutta la troupe. */
 ok('prima il codice, poi la sceneggiatura', await p.evaluate(()=>
-  [...document.querySelectorAll('#homePage > .prog-nuovo')].map(b=>b.textContent.trim())),
+  [...document.querySelectorAll('#homePage > .prog-nuovo')].filter(b=>b.offsetParent).map(b=>b.textContent.trim())),
   ['＋ Entra con un codice','＋ Nuovo da sceneggiatura']);
+ok('"Nuovo film" c\'è, ma chi non è abilitato non lo vede', await p.evaluate(()=>{ const b=document.getElementById('progFilm'); return [!!b, !!b.offsetParent]; }), [true,false]);
 ok('con lo stesso aspetto', await p.evaluate(()=>{
   const s=id=>{const c=getComputedStyle(document.getElementById(id));
     return [c.minHeight,c.borderTopStyle,c.color,c.fontSize].join('|');};

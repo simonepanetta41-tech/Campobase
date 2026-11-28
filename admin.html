@@ -51,6 +51,10 @@ button{font-family:inherit;cursor:pointer}
 .btn.r{border-color:rgba(248,113,113,.5);color:var(--r)}
 .btn:disabled{opacity:.5}
 .due{display:flex;gap:8px}.due .btn{flex:1}
+.kv.int{align-items:center}.kv.int span{color:var(--w)}
+.sw{flex:0 0 auto;width:50px;height:30px;padding:0;border:none;border-radius:15px;background:var(--card2);position:relative;cursor:pointer;transition:background .15s}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:var(--m);transition:transform .15s,background .15s}
+.sw[aria-pressed="true"]{background:var(--y)}.sw[aria-pressed="true"]::after{transform:translateX(20px);background:#111}
 details.testo{margin:12px 0;border:1px solid var(--bd);border-radius:12px;background:var(--card)}
 details.testo summary{padding:12px 14px;font-size:13.5px;color:var(--w);cursor:pointer}
 details.testo pre{margin:0;padding:0 14px 14px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.5;color:var(--d);white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
@@ -152,7 +156,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.16';
+const ADMIN_VERSIONE = '1.17';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -341,6 +345,9 @@ function disegnaScheda(p) {
         Math.round((c.entrata + c.uscita) / 1000) + 'k token</span></div>').join('') : '<div class="kv"><span>Chiamate al modello</span><span>nessuna</span></div>') + '</div>' +
 
     '<div class="sez">Account</div>' +
+    (p.creaFilm == null || p.bloccato ? '' :
+      '<div class="card"><div class="kv int"><span>Può aprire un film da zero</span>' +
+      '<button class="sw" id="swFilm" aria-pressed="' + !!p.creaFilm + '" aria-label="Può aprire un film da zero" onclick="permessoFilm()"></button></div></div>') +
     (p.bloccato ? '<button class="btn" onclick="sblocca()">Sblocca</button>'
                 : '<button class="btn r" onclick="blocca()">Blocca dall\'app</button>');
   window.SCHEDA = p;
@@ -388,6 +395,11 @@ async function blocca() {
     fai('blocca', null, 'Bloccato');
 }
 function sblocca() { fai('sblocca', null, 'Sbloccato'); }
+/* L'interruttore: chi lo ha acceso vede "Nuovo film" nella sua lista. */
+function permessoFilm() {
+  const p = window.SCHEDA, on = !p.creaFilm;
+  fai('permesso', { creaFilm: on }, on ? 'Ora può aprire un film' : 'Non può più aprire film');
+}
 
 /* ── La prova di notifica: partita, accettata, mostrata ── */
 let giro = 0;

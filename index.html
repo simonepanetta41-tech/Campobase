@@ -891,6 +891,8 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   border:none;border-radius:11px;color:#0A0B0D;font-family:'Space Grotesk',sans-serif;
   font-size:14px;font-weight:600;cursor:pointer}
 .cod-box.on{flex-wrap:wrap}
+.film-box input{letter-spacing:0;text-transform:none;font-family:'Inter',system-ui,sans-serif}
+.prog-nuovo + .cod-box + .prog-nuovo, .film-box + .prog-nuovo{margin-top:8px}
 .cod-box button.cod-qr{flex:1 0 100%;background:none;border:1px solid var(--border-l);color:var(--white)}
 .qr-vista{display:none;position:fixed;inset:0;z-index:2000;background:#000}
 .qr-vista.on{display:block}
@@ -1761,6 +1763,15 @@ body.senza-rete #cbSenzaRete { display: block; }
         <div class="qr-mira"></div>
         <div class="qr-testo">Inquadra il QR del film</div>
         <button onclick="qrChiudi()">Annulla</button>
+      </div>
+      <!-- Aprire un film da zero. Lo vede solo chi l'amministrazione ha
+           abilitato (sql/permessi.sql): gli altri non sanno che esiste. -->
+      <button class="prog-nuovo" id="progFilm" onclick="filmNuovoMostra()" style="display:none">
+        ＋ Nuovo film</button>
+      <div class="cod-box film-box" id="filmBox">
+        <input id="filmTitolo" maxlength="80" autocomplete="off" autocapitalize="words" placeholder="Titolo del film"
+               onkeydown="if(event.key==='Enter')filmNuovoCrea()">
+        <button onclick="filmNuovoCrea()">Crea</button>
       </div>
       <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
         ＋ Nuovo da sceneggiatura</button>
@@ -3865,6 +3876,7 @@ async function loadHistory() {
        analisi, gli restava vuota: dentro il film nel database, fuori
        dall'app. */
     renderHistoryGrid(data || [], await filmDaMembri(data || []));
+    filmNuovoPermesso();
     // Quante giornate ha il film e a che punto e': sta nel piano di
     // lavorazione, non nell'analisi. Si chiede dopo aver disegnato, in
     // una query sola per tutti i progetti, e la lista si completa da se'.
@@ -3926,7 +3938,10 @@ async function filmDaMembri(analisi) {
     const gia = new Set((analisi || []).map(a => a.data?.titolo).filter(Boolean));
     return (data || [])
       .map(r => Array.isArray(r.projects) ? r.projects[0] : r.projects)
-      .filter(p => p && p.id && p.user_id !== currentUser.id && !gia.has(p.titolo));
+      /* I propri di solito compaiono con la loro analisi. Ma un film aperto
+         da zero un'analisi non ce l'ha: senza questo non starebbe in
+         nessuna lista, nemmeno in quella di chi l'ha appena creato. */
+      .filter(p => p && p.id && !gia.has(p.titolo));
   } catch (e) { console.log('[film] lista non caricata:', e.message); return []; }
 }
 
@@ -4049,6 +4064,61 @@ async function qrScansiona(){
 }
 // Uscendo dall'app la fotocamera si spegne: non resta accesa dietro.
 document.addEventListener('visibilitychange', () => { if (document.hidden && qrFlusso) qrChiudi(); });
+
+/* ── Aprire un film da zero ────────────────────────────────────────────
+ *
+ * Un film nasceva solo caricando una sceneggiatura. Chi vuole usare
+ * Campobase con la sua troupe deve poterlo aprire vuoto: gli bastano il
+ * titolo, il codice d'invito e la casella della posta, e l'ordine del
+ * giorno arriva da solo.
+ *
+ * Il tasto lo vede solo chi e' stato abilitato dall'amministrazione; e il
+ * permesso lo controlla di nuovo il database quando si crea (nuovo_film),
+ * perche' un tasto nascosto non e' un divieto.
+ */
+const CB_CREA_FILM = 'cb_crea_film';
+async function filmNuovoPermesso(){
+  const b = document.getElementById('progFilm'); if (!b || !currentUser) return;
+  const mostra = si => { b.style.display = si ? '' : 'none'; if (!si) document.getElementById('filmBox')?.classList.remove('on'); };
+  // Subito quello che si sapeva, poi la risposta vera.
+  try { mostra(localStorage.getItem(CB_CREA_FILM) === currentUser.id); } catch (_) {}
+  try {
+    const { data, error } = await sb.from('permessi').select('crea_film').eq('user_id', currentUser.id).maybeSingle();
+    if (error) return;                       // tabella non ancora creata, o niente rete: resta com'era
+    const si = !!(data && data.crea_film);
+    try { if (si) localStorage.setItem(CB_CREA_FILM, currentUser.id); else localStorage.removeItem(CB_CREA_FILM); } catch (_) {}
+    mostra(si);
+  } catch (_) {}
+}
+function filmNuovoMostra(){
+  const b = document.getElementById('filmBox'); if (!b) return;
+  codiceChiudi();
+  if (b.classList.toggle('on')) { document.getElementById('filmTitolo').focus(); b.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+async function filmNuovoCrea(){
+  const el = document.getElementById('filmTitolo');
+  const titolo = (el.value || '').replace(/\s+/g, ' ').trim();
+  if (titolo.length < 2) { showToast('Scrivi il titolo del film.', 'red'); return; }
+  const b = document.querySelector('#filmBox button');
+  if (b) { b.disabled = true; b.textContent = '…'; }
+  let riga = null, errore = null;
+  try { const r = await sb.rpc('nuovo_film', { p_titolo: titolo }); errore = r.error; riga = Array.isArray(r.data) ? r.data[0] : r.data; }
+  catch (e) { errore = e; }
+  if (b) { b.disabled = false; b.textContent = 'Crea'; }
+  if (errore || !riga || !riga.id) {
+    const m = String(errore && errore.message || '');
+    showToast(/gia'? un film/i.test(m) ? 'Hai già un film con questo titolo.'
+            : /non puoi/i.test(m) ? 'Non sei abilitato ad aprire un film.'
+            : 'Non riuscito. Riprova quando c\'è rete.', 'red', 5000);
+    return;
+  }
+  el.value = ''; document.getElementById('filmBox').classList.remove('on');
+  await apriFilm(riga.id);
+  // Si atterra sulla troupe: il codice per invitare e la casella della
+  // posta sono le prime due cose da fare con un film vuoto.
+  try { switchResultTab('troupe'); } catch (_) {}
+  showToast('Film creato.');
+}
 
 async function codiceEntra() {
   const el = document.getElementById('codInput');
@@ -5741,7 +5811,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.202';
+const CB_VERSIONE = '1.203';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
