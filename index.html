@@ -892,7 +892,10 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
   font-size:14px;font-weight:600;cursor:pointer}
 .cod-box.on{flex-wrap:wrap}
 .film-box input{letter-spacing:0;text-transform:none;font-family:'Inter',system-ui,sans-serif}
-.prog-nuovo + .cod-box + .prog-nuovo, .film-box + .prog-nuovo{margin-top:8px}
+/* "Nuovo film" sta in fondo e pieno, in giallo: con lo stesso aspetto
+   degli altri due non si notava. Lo vede solo chi e' abilitato. */
+.prog-nuovo.prog-film{margin-top:8px;border:none;background:var(--yellow);color:#0A0B0D;font-weight:600}
+.film-box{margin-top:8px}
 .cod-box button.cod-qr{flex:1 0 100%;background:none;border:1px solid var(--border-l);color:var(--white)}
 .qr-vista{display:none;position:fixed;inset:0;z-index:2000;background:#000}
 .qr-vista.on{display:block}
@@ -1764,15 +1767,6 @@ body.senza-rete #cbSenzaRete { display: block; }
         <div class="qr-testo">Inquadra il QR del film</div>
         <button onclick="qrChiudi()">Annulla</button>
       </div>
-      <!-- Aprire un film da zero. Lo vede solo chi l'amministrazione ha
-           abilitato (sql/permessi.sql): gli altri non sanno che esiste. -->
-      <button class="prog-nuovo" id="progFilm" onclick="filmNuovoMostra()" style="display:none">
-        ＋ Nuovo film</button>
-      <div class="cod-box film-box" id="filmBox">
-        <input id="filmTitolo" maxlength="80" autocomplete="off" autocapitalize="words" placeholder="Titolo del film"
-               onkeydown="if(event.key==='Enter')filmNuovoCrea()">
-        <button onclick="filmNuovoCrea()">Crea</button>
-      </div>
       <button class="prog-nuovo" id="progNuovo" onclick="homeNuovo()">
         ＋ Nuovo da sceneggiatura</button>
       <div class="panel" id="uploadPanel" style="display:none;margin-top:12px">
@@ -1815,6 +1809,15 @@ body.senza-rete #cbSenzaRete { display: block; }
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l10 5-10 5V3z" fill="currentColor" stroke="none"/></svg>
           Avvia Analisi
         </button>
+      </div>
+      <!-- Aprire un film da zero. Lo vede solo chi l'amministrazione ha
+           abilitato (sql/permessi.sql): gli altri non sanno che esiste. -->
+      <button class="prog-nuovo prog-film" id="progFilm" onclick="filmNuovoMostra()" style="display:none">
+        ＋ Nuovo film</button>
+      <div class="cod-box film-box" id="filmBox">
+        <input id="filmTitolo" maxlength="80" autocomplete="off" autocapitalize="words" placeholder="Titolo del film"
+               onkeydown="if(event.key==='Enter')filmNuovoCrea()">
+        <button onclick="filmNuovoCrea()">Crea</button>
       </div>
     </div>
 
@@ -5811,7 +5814,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.203';
+const CB_VERSIONE = '1.204';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');

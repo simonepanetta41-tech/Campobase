@@ -35,8 +35,9 @@ await p.evaluate(()=>{ __perm={data:null,error:{message:'relation "permessi" doe
 ok('tabella non ancora creata: nessun tasto, nessun errore', await visibile(), false);
 await p.evaluate(()=>{ __perm={data:{crea_film:true},error:null}; return filmNuovoPermesso(); });
 ok('⚠ chi è abilitato sì', await visibile(), true);
-ok('sta fra "Entra con un codice" e "Nuovo da sceneggiatura"', await p.evaluate(()=>[...document.querySelectorAll('#homePage > .prog-nuovo')].filter(b=>b.offsetParent).map(b=>b.textContent.trim())),
-  ['＋ Entra con un codice','＋ Nuovo film','＋ Nuovo da sceneggiatura']);
+ok('sta in fondo, dopo gli altri due', await p.evaluate(()=>[...document.querySelectorAll('#homePage > .prog-nuovo')].filter(b=>b.offsetParent).map(b=>b.textContent.trim())),
+  ['＋ Entra con un codice','＋ Nuovo da sceneggiatura','＋ Nuovo film']);
+ok('ed è pieno, in giallo: si nota', await p.evaluate(()=>getComputedStyle(document.getElementById('progFilm')).backgroundColor===getComputedStyle(document.querySelector('#codBox button')).backgroundColor), true);
 await p.evaluate(()=>{ __perm={data:null,error:{message:'Failed to fetch'}}; return filmNuovoPermesso(); });
 ok('senza rete resta com\'era', await visibile(), true);
 await p.evaluate(()=>{ __perm={data:{crea_film:false},error:null}; return filmNuovoPermesso(); });
