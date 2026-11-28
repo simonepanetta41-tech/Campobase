@@ -51,6 +51,9 @@ button{font-family:inherit;cursor:pointer}
 .btn.r{border-color:rgba(248,113,113,.5);color:var(--r)}
 .btn:disabled{opacity:.5}
 .due{display:flex;gap:8px}.due .btn{flex:1}
+details.testo{margin:12px 0;border:1px solid var(--bd);border-radius:12px;background:var(--s)}
+details.testo summary{padding:12px 14px;font-size:13.5px;color:var(--w);cursor:pointer}
+details.testo pre{margin:0;padding:0 14px 14px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.5;color:var(--d);white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
 .mitt-nuovo{display:flex;gap:8px;align-items:stretch;margin-top:5px}
 #foglio .mitt-nuovo .cerca{flex:1;min-width:0;margin:0}
 .mitt-nuovo .btn{width:48px;flex:0 0 48px;margin:0;padding:0;font-size:22px;line-height:1;color:var(--y);border-color:var(--y)}
@@ -149,7 +152,7 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const ADMIN_VERSIONE = '1.14';
+const ADMIN_VERSIONE = '1.15';
 let PERSONE = [], FILM = [], aperta = null, corsa = 0, LING = 'persone', FILM_TUTTI = [], POSTA = null, corsaL = 0;
 
 /* Ogni richiesta passa dal server con il proprio accesso: e' lui a dire
@@ -718,6 +721,7 @@ async function apriMail(id, zitta) {
       '<div class="sez">Cosa è successo</div><div class="card">' + m.passi.map(p => '<div class="passo"><time>' + ora(p.quando) + '</time><div><span class="' +
         ({ g: 'ok', r: 'no', y: 'boh' }[p.colore] || '') + '">' + esc(p.titolo) + '</span>' + (p.testo ? '<div class="d">' + esc(p.testo) + '</div>' : '') + '</div></div>').join('') + '</div>' +
       (m.nota ? '<div class="nota">' + esc(m.nota) + '</div>' : '') +
+      (m.testo ? '<details class="testo"><summary>Testo della mail</summary><pre>' + esc(m.testo) + '</pre></details>' : '') +
       (m.esito === 'da verificare' ? '<button class="btn y" onclick="accettaMail(\'' + m.id + '\')">Accetta e leggi</button>' +
         '<button class="btn r" onclick="scartaMail(\'' + m.id + '\')">Scarta</button>' : '') +
       (m.haOdg ? '<button class="btn" onclick="vediLettura(\'' + m.id + '\',\'odg\')">Vedi la lettura dell\'ordine del giorno</button>' : '') +

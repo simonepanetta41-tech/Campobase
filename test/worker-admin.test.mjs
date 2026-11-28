@@ -246,6 +246,7 @@ ok('né come piano, se il piano non c\'è', (await chiedi('tok-io', { azione: 'r
   T.posta.push({ id: MS, project_id: FA, stato: 'nuova', oggetto: 'MSG - ODG #35', testo: 'In allegato \nstralci corretti  Day #35\n\nGrazie\nA.', ricevuta: new Date().toISOString(),
     allegati: [{ nome: 'Stralci 35.pdf', tenuto: true, percorso: 'a/c/nuovi.pdf', byte: 5 }] });
   ok('nella scheda della mail c\'è il tasto', (await chiedi('tok-io', { azione: 'mail', id: MS }))[1].rileggibile.stralci, true);
+  ok('e il testo della mail, per intero', (await chiedi('tok-io', { azione: 'mail', id: MS }))[1].testo, 'In allegato \nstralci corretti  Day #35\n\nGrazie\nA.');
   ok('una mail con l\'ordine del giorno non ce l\'ha', (await chiedi('tok-io', { azione: 'mail', id: M1 }))[1].rileggibile.stralci, false);
   ok('un membro qualsiasi non può', (await chiedi('tok-anna', { azione: 'stralci', id: MS }))[0], 403);
   const prima = T.push_appuntamenti.length;

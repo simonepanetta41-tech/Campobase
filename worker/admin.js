@@ -420,7 +420,12 @@ const AZIONI = {
     await lettura('Piano', r.piano_stato, r.piano_il, r.pinfo, r.pscritto, r.perrore);
     passi.sort((x, y) => String(x.quando).localeCompare(String(y.quando)));
     const [esito, colore] = esitoMail(r);
+    /* Il testo della mail, solo qui e non negli elenchi: pesa, e serve quando
+       si deve capire cosa ha scritto chi l'ha mandata (una conferma di
+       inoltro, un'errata, un formato nuovo). */
+    const testo = ((await db(env, `posta?select=testo&id=eq.${m}&limit=1`).catch(() => [])) || [])[0];
     return { ...rigaMail(r, F, new Map([[r.id, cons || []]])), esito, colore, nota: r.nota || r.onota || null, mittente: r.mittente_vero || null,
+      testo: (testo && testo.testo) || null,
       allegati: (r.allegati || []).map(a => ({ nome: a.nome, byte: a.byte || 0, tenuto: !!a.tenuto, genere: a.tenuto ? (genereDi(a) || null) : null })),
       rileggibile: { odg: tenuti.some(a => genereDi(a) === 'odg'), piano: tenuti.some(a => genereDi(a) === 'pdl'),
         stralci: soliStralci(r.allegati) && !/^stralci sostituiti/.test(r.nota || '') },
