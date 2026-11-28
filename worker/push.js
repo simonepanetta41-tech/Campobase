@@ -565,6 +565,21 @@ export async function avvisaPosta(env, projectId, fatti, oggetto, corpo) {
  * Solo a lui, non alla troupe: la troupe non puo' farci niente, e una
  * notifica che non si puo' agire e' rumore.
  */
+/* Gmail chiede conferma dell'inoltro: lo deve sapere chi ha aperto il
+   film, che e' l'unico a poterla dare (dall'app, pagina Troupe). Alla
+   troupe non si dice niente. Una sola per richiesta. */
+export async function avvisaConferma(env, film, da, chiave) {
+  let capi = await db(env, `film_membri?select=user_id&project_id=eq.${film.id}&ruolo=eq.capo`);
+  if (!capi?.length && film.user_id) capi = [{ user_id: film.user_id }];
+  if (!capi?.length) return 0;
+  const adesso = new Date().toISOString();
+  await db(env, 'push_appuntamenti?on_conflict=chiave', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify(capi.map(c => ({ user_id: c.user_id, project_id: film.id, quando: adesso, genere: 'avviso',
+      testo: 'Gmail chiede conferma dell\'inoltro\n' + (da ? da + ' · ' : '') + 'apri Troupe per confermare',
+      chiave: `${c.user_id}:conferma:${chiave}` }))) });
+  return capi.length;
+}
+
 export async function avvisaMailDaParte(env, film, oggetto) {
   let capi = await db(env,
     `film_membri?select=user_id&project_id=eq.${film.id}&ruolo=eq.capo`);

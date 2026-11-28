@@ -25,7 +25,7 @@ import { leggiMessaggio } from './mime.js';
    catch e' giusto, una notifica mancata non deve far rimbalzare una mail
    arrivata; ma messo attorno a un nome che non esiste rende invisibile un
    errore di programmazione. */
-import { avvisaPosta, avvisaMailDaParte, primeParole } from './push.js';
+import { avvisaPosta, avvisaMailDaParte, avvisaConferma, primeParole } from './push.js';
 import { stralciNuovi, stralciIndiceDopo } from './scrive.js';
 import { indiceStralci } from './stralci.js';
 import { genereDalNome } from './ombra.js';
@@ -234,6 +234,28 @@ async function tuttiIByte(stream, quanti) {
   return n === buf.length ? buf : buf.subarray(0, n);
 }
 
+/* La mail con cui Gmail chiede conferma di un inoltro.
+ *
+ * Chi imposta l'inoltro della sua casella verso quella del film riceve —
+ * all'indirizzo di destinazione, cioe' qui — un link da aprire. Finiva
+ * fra le mail senza allegati e la vedeva solo l'amministrazione: nessuno
+ * poteva attivare l'inoltro da solo.
+ *
+ * Si riconosce da due cose insieme: il mittente di Google per gli inoltri
+ * e il link di conferma nel testo. Torna { link, da } o null. Il link e'
+ * solo quello di conferma ("vf-"): nella stessa mail ce n'e' un secondo
+ * ("uf-") che la annulla.
+ */
+const LINK_CONFERMA = /https:\/\/mail-settings\.google\.com\/mail\/vf-[^\s<>"']+/;
+export function confermaInoltro(mail) {
+  if (!/forwarding-noreply@google\.com/i.test(String(mail.mittente || '') + ' ' + String(mail.mittente_vero || ''))) return null;
+  const testo = String(mail.testo || '');
+  const link = (testo.match(LINK_CONFERMA) || [])[0];
+  if (!link) return null;
+  const da = (testo.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i) || [])[0] || '';
+  return { link, da: da.toLowerCase() };
+}
+
 export async function riceviPosta(message, env, ctx) {
   const destinatario = String(message.to || '').toLowerCase();
   const casella = destinatario.split('@')[0].trim();
@@ -322,6 +344,15 @@ export async function riceviPosta(message, env, ctx) {
     riga.nota = String(e && e.message || e).slice(0, 500);
   }
 
+  /* Una richiesta di conferma dell'inoltro non e' posta della produzione:
+     non passa dal controllo del mittente e non va alla troupe. Resta con
+     uno stato suo, e l'app la mostra a chi ha aperto il film. */
+  const conferma = riga.stato !== 'errore' ? confermaInoltro(riga) : null;
+  if (conferma) {
+    riga.stato = 'conferma';
+    riga.nota = 'conferma di inoltro' + (conferma.da ? ' da ' + conferma.da : '');
+  }
+
   /* Il controllo sta qui, e non appena si conosce la casella, perche'
      guarda il corpo e l'oggetto: roba che esiste solo dopo aver aperto
      il messaggio. Se l'apertura e' fallita lo stato e' 'errore' e non si
@@ -390,6 +421,11 @@ export async function riceviPosta(message, env, ctx) {
    * definitiva. Quando il nome non dice niente si resta sul generico
    * invece di annunciare un ordine del giorno che non c'e'.
    */
+  if (riga.stato === 'conferma') {
+    try { await avvisaConferma(env, film, conferma.da, riga.id); }
+    catch (e) { console.error('posta: avviso di conferma non partito', e.message); }
+    return;
+  }
   if (riga.stato === 'da verificare') {
     try {
       const quanti = await avvisaMailDaParte(env, film, riga.oggetto);

@@ -10,7 +10,7 @@ const FINTO = `window.__db = {
   membri:[{user_id:'u1',ruolo:'capo',created_at:'1'}],
   profili:{u1:{id:'u1',nome:'Simone',cognome:'Panetta',reparto:'Suono'},
            u2:{id:'u2',nome:'Alfredo',cognome:'De Marchi',reparto:'Suono'}},
-  odg:[], rpc:[], aggiornamenti:[]
+  odg:[], rpc:[], aggiornamenti:[], posta:[]
 };
 window.supabase={createClient:()=>({
   auth:{getSession:async()=>({data:{session:null}}),signOut:async()=>({}),
@@ -32,9 +32,11 @@ window.supabase={createClient:()=>({
     in(k,v){q._in=v;return Promise.resolve({data:(v||[]).map(x=>__db.profili[x]).filter(Boolean)})},
     order(){return q},maybeSingle(){return Promise.resolve({data:t==='projects'?__db.progetto:null})},
     single(){return Promise.resolve({data:null})},
-    update(v){__db.aggiornamenti.push([t,v]);Object.assign(__db.progetto,v);return {eq:async()=>({error:null})}},
+    update(v){__db.aggiornamenti.push([t,v]);
+      if(t==='posta'){const c={eq(k,x){c['_'+k]=x;if(k==='id')__db.posta.filter(r=>r.id===x).forEach(r=>Object.assign(r,v));return c},then:(f)=>Promise.resolve({error:null}).then(f)};return c;}
+      Object.assign(__db.progetto,v);return {eq:async()=>({error:null})}},
     upsert:async(r)=>{__db.odg.push(r);return {error:null}},
-    limit:async()=>({data:t==='odg'?__db.odg.filter(x=>!q._f.project_id||x.project_id===q._f.project_id)
+    limit:async()=>({data:t==='posta'?__db.posta.filter(x=>x.stato===q._f.stato):t==='odg'?__db.odg.filter(x=>!q._f.project_id||x.project_id===q._f.project_id)
                                       .map(x=>({dati:x.dati,data:x.data})):[]}),
     then:(f)=>Promise.resolve({data:t==='film_membri'?__db.membri:[]}).then(f)};
     if (t==='film_membri') q.limit=async()=>({data:__db.membri
@@ -100,6 +102,33 @@ ok('e non lo deduce da dove si e\' aperta l\'app', await p.evaluate(()=>
   filmPosta().endsWith('@campobase.dev')), true);
 ok('senza casella non lo inventa', await p.evaluate(()=>
   filmPosta({id:'p1',titolo:'X',codice:'A1B2C3D4'})), '');
+
+/* Gmail chiede conferma dell'inoltro mandando un link alla casella del
+   film: lo vede chi ha aperto il film, sotto l'indirizzo. */
+console.log('\n── ⚠ la conferma dell\'inoltro di Gmail ──');
+ok('senza richieste non c\'è nessun riquadro', await p.evaluate(()=>document.querySelectorAll('.tr-conf').length), 0);
+const VF='https://mail-settings.google.com/mail/vf-%5BANGjdJ_aaaa%5D-kL48bbbb';
+await p.evaluate((VF)=>{ const ora=new Date().toISOString(), vecchia=new Date(Date.now()-9*864e5).toISOString();
+  __db.posta=[
+    {id:'c1',stato:'conferma',ricevuta:ora,nota:'conferma di inoltro da collega.prova@gmail.com',testo:'fai clic:\n'+VF+'\n\nper annullare:\nhttps://mail-settings.google.com/mail/uf-zzz'},
+    {id:'c2',stato:'conferma',ricevuta:vecchia,nota:'conferma di inoltro da vecchio@gmail.com',testo:VF+'vecchio'},
+    {id:'c3',stato:'conferma',ricevuta:ora,nota:'conferma di inoltro da furbo@gmail.com',testo:'apri https://esempio.it/vf-finta'},
+    {id:'n1',stato:'nuova',ricevuta:ora,nota:null,testo:VF}];
+  switchResultTab('troupe'); },VF);
+await p.waitForTimeout(400);
+ok('⚠ una richiesta: chi la fa', await p.evaluate(()=>[...document.querySelectorAll('.tr-conf .t')].map(e=>e.textContent)), ['collega.prova@gmail.com vuole inoltrare qui la sua posta.']);
+ok('⚠ il tasto apre il link che conferma, quello di Google', await p.evaluate(()=>document.querySelector('.tr-conf a.si').getAttribute('href')), VF);
+ok('sta sotto l\'indirizzo della casella', await p.evaluate(()=>!!(document.getElementById('troupeMail').compareDocumentPosition(document.querySelector('.tr-conf'))&4)), true);
+await p.evaluate(()=>{ __db.aggiornamenti.length=0; document.querySelector('.tr-conf a.si').addEventListener('click',e=>e.preventDefault()); document.querySelector('.tr-conf a.si').click(); });
+await p.waitForTimeout(150);
+ok('confermata: il riquadro se ne va, per tutti i telefoni', await p.evaluate(()=>[document.querySelectorAll('.tr-conf').length, __db.aggiornamenti]), [0, [['posta',{stato:'confermata'}]]]);
+await p.evaluate(()=>{ __db.posta[0].stato='conferma'; __db.aggiornamenti.length=0; switchResultTab('troupe'); }); await p.waitForTimeout(400);
+await p.click('.tr-conf .sp-azioni button'); await p.waitForTimeout(150);
+ok('"Ignora" la toglie senza confermare', await p.evaluate(()=>[document.querySelectorAll('.tr-conf').length, __db.aggiornamenti]), [0, [['posta',{stato:'scartata'}]]]);
+await p.evaluate(()=>{ __db.posta[0].stato='conferma'; currentUser={id:'u2'}; filmImposta(null); return filmCarica('p1').then(()=>switchResultTab('troupe')); });
+await p.waitForTimeout(400);
+ok('⚠ un membro qualsiasi non la vede', await p.evaluate(()=>[document.querySelectorAll('.tr-conf').length, !document.getElementById('troupeMail')]), [0, true]);
+await p.evaluate(async()=>{ __db.posta=[]; currentUser={id:'u1'}; filmImposta(null); await filmCarica('p1'); });
 
 console.log('\n── un film aperto prima che le caselle esistessero ──');
 await p.evaluate(()=>{   // in memoria c'e' la copia vecchia, senza casella

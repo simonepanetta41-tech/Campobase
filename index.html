@@ -1123,6 +1123,12 @@ table.tt2{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;mi
 .tr-mail button{flex:none;padding:7px 13px;font-size:12px;border-radius:8px;
   background:var(--surface);border:1px solid var(--border);color:var(--white)}
 .tr-avviso{font-size:12px!important;color:var(--orange)!important}
+.tr-conf{margin-top:9px;padding:15px 16px;border-color:var(--yellow)}
+.tr-conf .k{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.tr-conf .t{margin:7px 0 12px;font-size:14px;line-height:1.45;color:var(--white);overflow-wrap:anywhere}
+.tr-conf .sp-azioni{margin:0}
+.tr-conf .sp-azioni a.si{flex:1;display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:12px;
+  background:var(--yellow);color:#0A0B0D;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;text-decoration:none}
 /* Pagina Cast */
 #castSection{padding:14px 16px 96px}
 #castContent{max-width:700px;margin:0 auto;padding:0}
@@ -5735,7 +5741,7 @@ function askConfirm(msg, { conferma = 'Elimina', annulla = 'Annulla', pericolo =
  * qualche parte, "e' arrivato il deploy?" e' una domanda a cui si
  * risponde a tentoni — ed e' successo due volte in un giorno solo.
  */
-const CB_VERSIONE = '1.201';
+const CB_VERSIONE = '1.202';
 
 function cbMostraVersione() {
   const el = document.getElementById('cbVer');
@@ -11757,10 +11763,12 @@ async function troupeRender(){
         </div>
         <p class="tr-avviso">È una chiave, non un nome: chi ce l'ha può infilare
           documenti nel film. Tienila fuori dai gruppi.</p>
-      </div>` : ''}
+      </div>
+      <div id="troupeConferme"></div>` : ''}
     <div class="odg-sez">IN QUESTO FILM</div>
     <div class="card" id="troupeElenco" style="margin-top:9px"><div class="sp-vuoto" style="padding:18px">…</div></div>`;
   if (f.codice) troupeQr(f.codice);
+  if (f.casella && f.mio) troupeConferme(f);
   const m = await troupeMembri();
   await segnaChiCarica();
   const el = document.getElementById('troupeElenco');
@@ -11887,6 +11895,47 @@ const CB_POSTA_DOMINIO = 'campobase.dev';
 function filmPosta(f){
   const film = f || filmCorrente();
   return film && film.casella ? film.casella + '@' + CB_POSTA_DOMINIO : '';
+}
+
+/* ── Gmail chiede conferma dell'inoltro ───────────────────────────────
+ *
+ * Chi imposta l'inoltro della sua Gmail verso la casella del film deve
+ * confermarlo aprendo un link che Gmail manda... alla casella del film.
+ * Il server lo riconosce (worker/posta.js) e qui lo vede chi ha aperto il
+ * film, sotto l'indirizzo: chi lo chiede, e il tasto per confermare.
+ *
+ * Il link si apre solo se e' proprio quello di Google: e' testo arrivato
+ * per mail, e non si fa aprire a un tasto un indirizzo qualsiasi.
+ */
+const CB_LINK_CONFERMA = /https:\/\/mail-settings\.google\.com\/mail\/vf-[^\s<>"']+/;
+async function troupeConferme(f){
+  const el = document.getElementById('troupeConferme'); if (!el) return;
+  let righe = [];
+  try {
+    const { data } = await sb.from('posta').select('id,ricevuta,nota,testo')
+      .eq('project_id', f.id).eq('stato', 'conferma').order('ricevuta', { ascending: false }).limit(5);
+    righe = data || [];
+  } catch (_) {}
+  // Il link di Google scade: dopo una settimana non serve piu' mostrarlo.
+  const fa = Date.now() - 7 * 864e5;
+  righe = righe.map(r => ({ id: r.id, da: (String(r.nota || '').match(/da (\S+@\S+)/) || [])[1] || '',
+                            link: (String(r.testo || '').match(CB_LINK_CONFERMA) || [])[0] || '', quando: Date.parse(r.ricevuta) }))
+               .filter(r => r.link && r.quando > fa);
+  if (document.getElementById('troupeConferme') !== el) return;
+  el.innerHTML = righe.map(r => `
+    <div class="card tr-conf" data-id="${esc(r.id)}">
+      <div class="k">Gmail chiede conferma</div>
+      <div class="t">${r.da ? esc(r.da) + ' vuole inoltrare qui la sua posta.' : 'Qualcuno vuole inoltrare qui la sua posta.'}</div>
+      <div class="sp-azioni">
+        <a class="si" href="${esc(r.link)}" target="_blank" rel="noopener" onclick="troupeConfermata('${esc(r.id)}')">Conferma</a>
+        <button onclick="troupeConfermata('${esc(r.id)}', true)">Ignora</button>
+      </div>
+    </div>`).join('');
+}
+/* Confermata (o ignorata): il riquadro se ne va, per tutti i telefoni. */
+async function troupeConfermata(id, ignora){
+  document.querySelector('.tr-conf[data-id="' + id + '"]')?.remove();
+  try { await sb.from('posta').update({ stato: ignora ? 'scartata' : 'confermata' }).eq('id', id).eq('stato', 'conferma'); } catch (_) {}
 }
 
 async function troupeCopiaMail(){

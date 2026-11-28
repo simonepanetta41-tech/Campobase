@@ -154,6 +154,8 @@ export function esitoMail(r) {
   if (r.ombra_stato === 'tronca') return ['troncata', 'r'];
   if (s && s.scritto) return [s.errata ? 'errata' : 'letta', s.errata ? 'y' : 'g'];
   if (ps && ps.scritto) return ['letta', 'g'];
+  if (r.stato === 'conferma') return ['conferma di inoltro', 'y'];
+  if (r.stato === 'confermata') return ['inoltro confermato', 'm'];
   if (r.stato === 'senza allegati') return ['senza allegati', 'm'];
   if (r.stato === 'scartata') return ['scartata', 'm'];
   if (r.ombra_stato === 'fatta' || r.piano_stato === 'fatta') return ['letta in ombra', 'm'];

@@ -305,5 +305,24 @@ ok('stato errore',              tavoli.posta[0].stato, 'errore');
 ok('non messa da parte',        tavoli.posta[0].stato === 'da verificare', false);
 ok('e nessuno svegliato',       tavoli.push_appuntamenti.length, 0);
 
+/* Gmail chiede conferma dell'inoltro: una mail di solo testo, da un
+   mittente che non e' la produzione. Con le colonne piene finirebbe "da
+   verificare"; senza, fra le "senza allegati". In tutti e due i casi chi
+   ha aperto il film non la vedeva mai. */
+console.log('\n── ⚠ la conferma di inoltro di Gmail ha uno stato suo ──');
+const VF = 'https://mail-settings.google.com/mail/vf-%5BANGjdJ_aaaa%5D-kL48bbbb';
+const CONFERMA = ['From: Team di Gmail <forwarding-noreply@google.com>', 'To: abc123@campobase.dev',
+  'Subject: (#123456789) Conferma inoltro Gmail - Posta ricevuta da collega.prova@gmail.com', 'Message-ID: <conf@google.com>',
+  'Date: Fri, 20 Nov 2026 17:07:00 +0100', 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=utf-8', '',
+  "collega.prova@gmail.com ha richiesto l'inoltro automatico", 'della posta al tuo indirizzo email abc123@campobase.dev.', '',
+  'fai clic sul link di seguito per confermare la richiesta:', '', VF, '', 'Grazie per aver scelto Gmail.', ''].join('\r\n');
+for (const [nome, mitt, marc] of [['colonne piene', PRODUZIONE, 'MSG'], ['colonne vuote', null, null]]) {
+  azzera(mitt, marc);
+  await posta.riceviPosta({ ...messaggio(CONFERMA), from: 'forwarding-noreply@google.com' }, ENV, {});
+  ok(nome + ': stato "conferma"', [tavoli.posta[0].stato, tavoli.posta[0].nota], ['conferma', 'conferma di inoltro da collega.prova@gmail.com']);
+  ok(nome + ': il link resta nel testo, per l\'app', (tavoli.posta[0].testo || '').includes(VF), true);
+  ok(nome + ': avvisato solo chi ha aperto il film', tavoli.push_appuntamenti.map(r => (r.testo || '').split('\n')[0]), ["Gmail chiede conferma dell'inoltro"]);
+}
+
 console.log(ko ? `\n${ko} CONTROLLI FALLITI` : '\nTutti i controlli passati.');
 process.exit(ko ? 1 : 0);
